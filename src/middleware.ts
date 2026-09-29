@@ -3,7 +3,13 @@ import { createServerClient } from "@supabase/ssr"
 import { SUPABASE_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supabase/env"
 
 /** Rotas acessíveis sem login. Todo o resto exige sessão válida. */
-const PUBLIC_PATHS = ["/login", "/auth/confirm", "/redefinir-senha"]
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/confirm",
+  "/redefinir-senha",
+  // Chamada pelo agendador da Vercel sem login: a própria rota exige o CRON_SECRET.
+  "/api/integracoes/sincronizar",
+]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

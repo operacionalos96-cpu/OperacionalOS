@@ -39,6 +39,7 @@ import { EmptyState, GroupLabel, PageHeader, Panel, StatCard } from "@/component
 import { UserAvatar } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
 import { AccountFormDialog, NewContentDialog, PlatformIcon, accountLabel, formatLabel, platformLabel } from "@/components/content/content-bits"
+import { ConnectionBadge, IntegrationResultToast, SyncMetricsButton, useConnections, type Connection } from "@/components/content/integrations"
 
 type Tab = "producao" | "contas" | "metricas"
 
@@ -57,6 +58,7 @@ function Content() {
   const tab = (["producao", "contas", "metricas"].includes(params.get("aba") ?? "") ? params.get("aba") : "producao") as Tab
   const [newOpen, setNewOpen] = useState(false)
   const [accountForm, setAccountForm] = useState<{ open: boolean; account: ContentAccount | null }>({ open: false, account: null })
+  const { connections, reload } = useConnections()
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -64,7 +66,9 @@ function Content() {
         title="Conteúdos"
         description="Do roteiro ao post: produção, arquivos por etapa, contas e métricas."
         actions={
-          tab === "contas" ? (
+          tab === "metricas" ? (
+            <SyncMetricsButton onDone={reload} />
+          ) : tab === "contas" ? (
             <Button onClick={() => setAccountForm({ open: true, account: null })}>
               <PlusIcon /> Nova conta
             </Button>
@@ -89,10 +93,18 @@ function Content() {
 
       <div className="min-h-0 flex-1">
         {tab === "producao" && <Production onNew={() => setNewOpen(true)} />}
-        {tab === "contas" && <Accounts onEdit={(account) => setAccountForm({ open: true, account })} onNew={() => setAccountForm({ open: true, account: null })} />}
+        {tab === "contas" && (
+          <Accounts
+            connections={connections}
+            onConnectionsChanged={reload}
+            onEdit={(account) => setAccountForm({ open: true, account })}
+            onNew={() => setAccountForm({ open: true, account: null })}
+          />
+        )}
         {tab === "metricas" && <Metrics />}
       </div>
 
+      <IntegrationResultToast onResult={reload} />
       <NewContentDialog open={newOpen} onClose={() => setNewOpen(false)} onCreated={(id) => router.push(`/conteudos/${id}`)} />
       <AccountFormDialog open={accountForm.open} account={accountForm.account} onClose={() => setAccountForm({ open: false, account: null })} />
     </div>
@@ -217,7 +229,17 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
 
 // ---------- Contas: principal → cortes, por plataforma ----------
 
-function Accounts({ onEdit, onNew }: { onEdit: (a: ContentAccount) => void; onNew: () => void }) {
+function Accounts({
+  onEdit,
+  onNew,
+  connections,
+  onConnectionsChanged,
+}: {
+  onEdit: (a: ContentAccount) => void
+  onNew: () => void
+  connections: Map<string, Connection>
+  onConnectionsChanged: () => void
+}) {
   const accounts = useContentAccounts((s) => s.items)
   const items = useContentItems((s) => s.items)
   const byAccount = useMemo(() => metricsByAccount(items), [items])
@@ -245,8 +267,9 @@ function Accounts({ onEdit, onNew }: { onEdit: (a: ContentAccount) => void; onNe
       <div className="flex items-start gap-3 rounded-xl border border-dashed bg-card/50 p-4">
         <PlugIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <p className="t-desc">
-          <span className="font-medium text-foreground">Publicação e métricas via API:</span> a estrutura já está pronta (cada publicação guarda o ID
-          da plataforma). A conexão com YouTube, Instagram e TikTok entra numa próxima etapa. Por enquanto, registre links e números manualmente.
+          <span className="font-medium text-foreground">Métricas automáticas (YouTube e TikTok):</span> clique em <span className="font-medium text-foreground">Conectar</span> em cada
+          conta (principal e cortes). Depois, basta colar o link do post publicado no conteúdo: as métricas são atualizadas todo dia e no botão
+          “Atualizar métricas”. Publicar direto pelo sistema entra na próxima etapa.
         </p>
       </div>
       {platforms.map((p) => {
@@ -264,15 +287,15 @@ function Accounts({ onEdit, onNew }: { onEdit: (a: ContentAccount) => void; onNe
             <ul className="divide-y">
               {tree.groups.map(({ principal, cuts }) => (
                 <li key={principal.id}>
-                  <AccountRow account={principal} stats={byAccount.get(principal.id)} onEdit={onEdit} />
+                  <AccountRow account={principal} stats={byAccount.get(principal.id)} onEdit={onEdit} connection={connections.get(principal.id)} onConnectionsChanged={onConnectionsChanged} />
                   {cuts.map((c) => (
-                    <AccountRow key={c.id} account={c} stats={byAccount.get(c.id)} onEdit={onEdit} nested />
+                    <AccountRow key={c.id} account={c} stats={byAccount.get(c.id)} onEdit={onEdit} nested connection={connections.get(c.id)} onConnectionsChanged={onConnectionsChanged} />
                   ))}
                 </li>
               ))}
               {tree.orphanCuts.map((c) => (
                 <li key={c.id}>
-                  <AccountRow account={c} stats={byAccount.get(c.id)} onEdit={onEdit} />
+                  <AccountRow account={c} stats={byAccount.get(c.id)} onEdit={onEdit} connection={connections.get(c.id)} onConnectionsChanged={onConnectionsChanged} />
                 </li>
               ))}
             </ul>
@@ -288,11 +311,15 @@ function AccountRow({
   stats,
   onEdit,
   nested = false,
+  connection,
+  onConnectionsChanged,
 }: {
   account: ContentAccount
   stats?: { posts: number; metrics: { views: number } }
   onEdit: (a: ContentAccount) => void
   nested?: boolean
+  connection?: Connection
+  onConnectionsChanged: () => void
 }) {
   return (
     <div className={cn("group flex items-center gap-3 px-4 py-2.5", nested && "pl-10")}>
@@ -305,6 +332,9 @@ function AccountRow({
           </span>
         </p>
       </div>
+      <span className="hidden w-44 shrink-0 justify-end sm:flex">
+        <ConnectionBadge account={account} connection={connection} onChanged={onConnectionsChanged} />
+      </span>
       <span className="tabular w-36 shrink-0 text-right text-xs text-muted-foreground">
         {stats ? `${stats.posts} posts · ${compact(stats.metrics.views)} views` : "sem posts"}
       </span>

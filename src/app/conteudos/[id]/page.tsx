@@ -476,7 +476,11 @@ function PostRow({ post, onChange, onRemove }: { post: ContentPost; onChange: (p
           </div>
         </div>
       )}
-      {post.metricsAt && <p className="t-desc text-[11px]">Números atualizados {dateTime(post.metricsAt)} · manual</p>}
+      {post.metricsAt && (
+        <p className="t-desc text-[11px]">
+          Números atualizados {dateTime(post.metricsAt)} · {post.source === "api" ? "automático (API)" : "manual"}
+        </p>
+      )}
     </li>
   )
 }
