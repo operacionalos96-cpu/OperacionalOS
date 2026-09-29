@@ -30,3 +30,12 @@ git add .
 git commit -m "resolve conflito"
 git push
 ```
+
+## Deploy na Vercel (importante)
+A Vercel (plano gratuito) só publica commits feitos pela conta dona do projeto.
+Por isso, **em cada PC**, dentro da pasta do projeto, rode uma vez:
+```bash
+git config user.name "operacionalos96-cpu"
+git config user.email "335688876+operacionalos96-cpu@users.noreply.github.com"
+```
+Isso vale só para esta pasta. Depois, todo `git push` na `main` publica sozinho.
