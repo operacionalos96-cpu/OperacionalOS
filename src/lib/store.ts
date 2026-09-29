@@ -1,0 +1,378 @@
+"use client"
+
+import { create } from "zustand"
+import { toast } from "sonner"
+import { TEAM } from "@/config/team"
+import { isOpenStage, stageLabel } from "@/lib/domain/constants"
+import type {
+  Activity,
+  ActivityKind,
+  FinanceSettings,
+  Lead,
+  MindMap,
+  NextAction,
+  Note,
+  Stage,
+  Task,
+  Temperature,
+  Transaction,
+} from "@/lib/domain/types"
+import { uid } from "@/lib/format"
+import { templateMap, type TemplateId } from "@/lib/mindmap-templates"
+import { getRepositories } from "@/lib/repositories"
+
+const ME_KEY = "operacional:me"
+
+/** Falhas de persistência não travam a UI, mas o usuário é avisado. */
+function persist(p: Promise<unknown>) {
+  p.catch(() => toast.error("Não foi possível salvar. Tente de novo."))
+}
+
+const nowIso = () => new Date().toISOString()
+
+export interface NewLeadInput {
+  name: string
+  company?: string
+  contact?: string
+  valueCents: number
+  ownerId: string
+  stage?: Stage
+  temperature?: Temperature
+  nextAction: NextAction
+}
+
+export interface NewTaskInput {
+  title: string
+  ownerId: string
+  dueDate?: string
+  leadId?: string
+}
+
+export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
+
+interface State {
+  hydrated: boolean
+  meId: string
+  leads: Lead[]
+  activities: Activity[]
+  tasks: Task[]
+  notes: Note[]
+  transactions: Transaction[]
+  mindMaps: MindMap[]
+  financeSettings: FinanceSettings
+
+  hydrate(): Promise<void>
+  setMe(id: string): void
+
+  createLead(input: NewLeadInput): Lead
+  updateLead(id: string, patch: Partial<Omit<Lead, "id">>): void
+  moveLead(id: string, stage: Stage, extra?: { lostReason?: string }): void
+  completeNextAction(id: string, next?: NextAction): void
+  logInteraction(leadId: string, kind: ActivityKind, text: string): void
+  deleteLead(id: string): void
+  restoreLead(lead: Lead, activities: Activity[]): void
+
+  createTask(input: NewTaskInput): Task
+  updateTask(id: string, patch: Partial<Omit<Task, "id">>): void
+  toggleTask(id: string): void
+  deleteTask(id: string): void
+  restoreTask(task: Task): void
+
+  createNote(): Note
+  updateNote(id: string, patch: Partial<Pick<Note, "title" | "body">>): void
+  deleteNote(id: string): void
+  restoreNote(note: Note): void
+
+  createTransaction(input: NewTransactionInput): Transaction
+  deleteTransaction(id: string): void
+  restoreTransaction(tx: Transaction): void
+  setMonthlyGoal(monthKey: string, cents: number): void
+  setOpeningBalance(cents: number): void
+
+  createMap(template: TemplateId): MindMap
+  saveMap(map: MindMap): void
+  renameMap(id: string, title: string): void
+  deleteMap(id: string): void
+  restoreMap(map: MindMap): void
+}
+
+export const useStore = create<State>((set, get) => {
+  const repos = () => getRepositories()
+
+  /** Registra atividade no lead e marca o lead como "mexido" agora. */
+  const addActivity = (leadId: string, kind: ActivityKind, text: string) => {
+    const activity: Activity = { id: uid(), leadId, kind, text, authorId: get().meId, createdAt: nowIso() }
+    set((s) => ({ activities: [...s.activities, activity] }))
+    persist(repos().activities.upsert(activity))
+    touchLead(leadId)
+  }
+
+  const touchLead = (leadId: string) => {
+    const lead = get().leads.find((l) => l.id === leadId)
+    if (lead) saveLead({ ...lead, lastActivityAt: nowIso() })
+  }
+
+  const saveLead = (lead: Lead) => {
+    set((s) => ({ leads: s.leads.map((l) => (l.id === lead.id ? lead : l)) }))
+    persist(repos().leads.upsert(lead))
+  }
+
+  const saveTask = (task: Task) => {
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) }))
+    persist(repos().tasks.upsert(task))
+  }
+
+  return {
+    hydrated: false,
+    meId: TEAM[0].id,
+    leads: [],
+    activities: [],
+    tasks: [],
+    notes: [],
+    transactions: [],
+    mindMaps: [],
+    financeSettings: { openingBalanceCents: 0, monthlyGoals: {} },
+
+    async hydrate() {
+      if (get().hydrated) return
+      const r = repos()
+      const [leads, activities, tasks, notes, transactions, mindMaps, financeSettings] = await Promise.all([
+        r.leads.list(),
+        r.activities.list(),
+        r.tasks.list(),
+        r.notes.list(),
+        r.transactions.list(),
+        r.mindMaps.list(),
+        r.financeSettings.get(),
+      ])
+      let meId = TEAM[0].id
+      try {
+        const saved = localStorage.getItem(ME_KEY)
+        if (saved && TEAM.some((u) => u.id === saved)) meId = saved
+      } catch {}
+      set({ hydrated: true, meId, leads, activities, tasks, notes, transactions, mindMaps, financeSettings })
+    },
+
+    setMe(id) {
+      set({ meId: id })
+      try {
+        localStorage.setItem(ME_KEY, id)
+      } catch {}
+    },
+
+    // ---------- leads ----------
+
+    createLead(input) {
+      const now = nowIso()
+      const lead: Lead = {
+        id: uid(),
+        name: input.name.trim(),
+        company: input.company?.trim() || undefined,
+        contact: input.contact?.trim() || undefined,
+        stage: input.stage ?? "novo",
+        ownerId: input.ownerId,
+        valueCents: input.valueCents,
+        temperature: input.temperature,
+        nextAction: { text: input.nextAction.text.trim(), dueDate: input.nextAction.dueDate },
+        lastActivityAt: now,
+        createdAt: now,
+      }
+      set((s) => ({ leads: [...s.leads, lead] }))
+      persist(repos().leads.upsert(lead))
+      addActivity(lead.id, "criado", "Lead criado")
+      return lead
+    },
+
+    updateLead(id, patch) {
+      const lead = get().leads.find((l) => l.id === id)
+      if (!lead) return
+      if (patch.ownerId && patch.ownerId !== lead.ownerId) {
+        const owner = TEAM.find((u) => u.id === patch.ownerId)
+        saveLead({ ...lead, ...patch })
+        addActivity(id, "nota", `Responsável alterado para ${owner?.name}`)
+        return
+      }
+      saveLead({ ...lead, ...patch })
+    },
+
+    moveLead(id, stage, extra) {
+      const lead = get().leads.find((l) => l.id === id)
+      if (!lead || lead.stage === stage) return
+      const closing = !isOpenStage(stage)
+      saveLead({
+        ...lead,
+        stage,
+        closedAt: closing ? nowIso() : undefined,
+        lostReason: stage === "perdido" ? extra?.lostReason || undefined : undefined,
+      })
+      const reason = stage === "perdido" && extra?.lostReason ? ` — ${extra.lostReason}` : ""
+      addActivity(id, "estagio", `${stageLabel(lead.stage)} → ${stageLabel(stage)}${reason}`)
+    },
+
+    completeNextAction(id, next) {
+      const lead = get().leads.find((l) => l.id === id)
+      if (!lead) return
+      addActivity(id, "acao_concluida", lead.nextAction.text)
+      if (next) {
+        const fresh = get().leads.find((l) => l.id === id)!
+        saveLead({ ...fresh, nextAction: { text: next.text.trim(), dueDate: next.dueDate } })
+      }
+    },
+
+    logInteraction(leadId, kind, text) {
+      addActivity(leadId, kind, text.trim())
+    },
+
+    // Tarefas vinculadas mantêm o leadId; a UI ignora vínculos para leads inexistentes
+    // (assim o "Desfazer" restaura tudo sem perda).
+    deleteLead(id) {
+      const removed = get().activities.filter((a) => a.leadId === id)
+      set((s) => ({
+        leads: s.leads.filter((l) => l.id !== id),
+        activities: s.activities.filter((a) => a.leadId !== id),
+      }))
+      persist(Promise.all([repos().leads.remove(id), ...removed.map((a) => repos().activities.remove(a.id))]))
+    },
+
+    restoreLead(lead, activities) {
+      set((s) => ({ leads: [...s.leads, lead], activities: [...s.activities, ...activities] }))
+      persist(Promise.all([repos().leads.upsert(lead), ...activities.map((a) => repos().activities.upsert(a))]))
+    },
+
+    // ---------- tarefas ----------
+
+    createTask(input) {
+      const task: Task = {
+        id: uid(),
+        title: input.title.trim(),
+        ownerId: input.ownerId,
+        dueDate: input.dueDate,
+        leadId: input.leadId,
+        done: false,
+        createdAt: nowIso(),
+      }
+      set((s) => ({ tasks: [...s.tasks, task] }))
+      persist(repos().tasks.upsert(task))
+      return task
+    },
+
+    updateTask(id, patch) {
+      const task = get().tasks.find((t) => t.id === id)
+      if (task) saveTask({ ...task, ...patch })
+    },
+
+    toggleTask(id) {
+      const task = get().tasks.find((t) => t.id === id)
+      if (!task) return
+      const done = !task.done
+      saveTask({ ...task, done, doneAt: done ? nowIso() : undefined })
+      if (done && task.leadId) addActivity(task.leadId, "acao_concluida", `Tarefa: ${task.title}`)
+    },
+
+    deleteTask(id) {
+      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+      persist(repos().tasks.remove(id))
+    },
+
+    restoreTask(task) {
+      set((s) => ({ tasks: [...s.tasks, task] }))
+      persist(repos().tasks.upsert(task))
+    },
+
+    // ---------- notas ----------
+
+    createNote() {
+      const note: Note = { id: uid(), title: "", body: "", authorId: get().meId, updatedAt: nowIso() }
+      set((s) => ({ notes: [...s.notes, note] }))
+      persist(repos().notes.upsert(note))
+      return note
+    },
+
+    updateNote(id, patch) {
+      const note = get().notes.find((n) => n.id === id)
+      if (!note) return
+      const updated = { ...note, ...patch, updatedAt: nowIso() }
+      set((s) => ({ notes: s.notes.map((n) => (n.id === id ? updated : n)) }))
+      persist(repos().notes.upsert(updated))
+    },
+
+    deleteNote(id) {
+      set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
+      persist(repos().notes.remove(id))
+    },
+
+    restoreNote(note) {
+      set((s) => ({ notes: [...s.notes, note] }))
+      persist(repos().notes.upsert(note))
+    },
+
+    // ---------- financeiro ----------
+
+    createTransaction(input) {
+      const tx: Transaction = { ...input, id: uid(), createdById: get().meId }
+      set((s) => ({ transactions: [...s.transactions, tx] }))
+      persist(repos().transactions.upsert(tx))
+      return tx
+    },
+
+    deleteTransaction(id) {
+      set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }))
+      persist(repos().transactions.remove(id))
+    },
+
+    restoreTransaction(tx) {
+      set((s) => ({ transactions: [...s.transactions, tx] }))
+      persist(repos().transactions.upsert(tx))
+    },
+
+    setMonthlyGoal(monthKey, cents) {
+      const financeSettings = {
+        ...get().financeSettings,
+        monthlyGoals: { ...get().financeSettings.monthlyGoals, [monthKey]: cents },
+      }
+      set({ financeSettings })
+      persist(repos().financeSettings.save(financeSettings))
+    },
+
+    setOpeningBalance(cents) {
+      const financeSettings = { ...get().financeSettings, openingBalanceCents: cents }
+      set({ financeSettings })
+      persist(repos().financeSettings.save(financeSettings))
+    },
+
+    // ---------- mapas ----------
+
+    createMap(template) {
+      const map = templateMap(template)
+      set((s) => ({ mindMaps: [...s.mindMaps, map] }))
+      persist(repos().mindMaps.upsert(map))
+      return map
+    },
+
+    saveMap(map) {
+      const updated = { ...map, updatedAt: nowIso() }
+      set((s) => ({ mindMaps: s.mindMaps.map((m) => (m.id === map.id ? updated : m)) }))
+      persist(repos().mindMaps.upsert(updated))
+    },
+
+    renameMap(id, title) {
+      const map = get().mindMaps.find((m) => m.id === id)
+      if (map) get().saveMap({ ...map, title })
+    },
+
+    deleteMap(id) {
+      set((s) => ({ mindMaps: s.mindMaps.filter((m) => m.id !== id) }))
+      persist(repos().mindMaps.remove(id))
+    },
+
+    restoreMap(map) {
+      set((s) => ({ mindMaps: [...s.mindMaps, map] }))
+      persist(repos().mindMaps.upsert(map))
+    },
+  }
+})
+
+/** Atalho para o usuário atual. */
+export function useMe() {
+  return useStore((s) => s.meId)
+}
