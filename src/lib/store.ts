@@ -212,6 +212,7 @@ export const useStore = create<State>((set, get) => {
         set({ access: "erro" })
         return
       }
+      selfUserId = auth.user.id
       startRealtime()
     },
 
@@ -453,6 +454,8 @@ type CollectionKey = "leads" | "activities" | "tasks" | "notes" | "transactions"
 const TABLE_TO_KEY = Object.fromEntries(Object.entries(TABLES).map(([k, t]) => [t, k])) as Record<string, CollectionKey>
 
 let stopRealtime: (() => void) | null = null
+/** Id do usuário logado: eventos com updated_by igual a ele são eco das próprias gravações. */
+let selfUserId: string | null = null
 
 /**
  * Aplica no estado local o que o sócio mudou. Aplica item a item (não recarrega
@@ -463,6 +466,8 @@ function startRealtime() {
   if (stopRealtime) return
   stopRealtime = subscribeToChanges((payload) => {
     const { table, eventType } = payload
+    // O estado local já é o mais novo; aplicar o eco atrasado desfaria o que acabou de ser digitado.
+    if (eventType !== "DELETE" && selfUserId && (payload.new as { updated_by?: string }).updated_by === selfUserId) return
     const moduleCollection = registeredCollections().get(table)
     if (moduleCollection) {
       moduleCollection.getState().applyRemote(eventType, (eventType === "DELETE" ? payload.old : payload.new) as { id?: string })

@@ -3,6 +3,7 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand"
 import { toast } from "sonner"
 import { supabaseBrowser } from "@/lib/supabase/client"
+import { queueWrite } from "@/lib/write-queue"
 
 /**
  * Base de expansão: todo módulo novo (Produtos, Conteúdos, e os próximos) cria
@@ -55,7 +56,7 @@ export function createCollection<T extends { id: string; updatedAt?: string }>(t
     save(input) {
       const item = { ...input, updatedAt: new Date().toISOString() } as T
       set((s) => ({ items: s.items.some((x) => x.id === item.id) ? s.items.map((x) => (x.id === item.id ? item : x)) : [...s.items, item] }))
-      persist(db().upsert({ id: item.id, data: item }))
+      persist(queueWrite(`${table}:${item.id}`, () => db().upsert({ id: item.id, data: item })))
       return item
     },
 
@@ -67,7 +68,7 @@ export function createCollection<T extends { id: string; updatedAt?: string }>(t
     remove(id) {
       const current = get().items.find((x) => x.id === id)
       set((s) => ({ items: s.items.filter((x) => x.id !== id) }))
-      persist(db().delete().eq("id", id))
+      persist(queueWrite(`${table}:${id}`, () => db().delete().eq("id", id)))
       return current
     },
 

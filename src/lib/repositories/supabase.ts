@@ -4,6 +4,7 @@ import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 import type { FinanceSettings } from "@/lib/domain/types"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { registeredCollections } from "@/lib/collection-store"
+import { queueWrite } from "@/lib/write-queue"
 import type { CollectionRepository, FinanceSettingsRepository, Repositories } from "./types"
 
 /**
@@ -29,12 +30,12 @@ function collection<T extends { id: string }>(table: string): CollectionReposito
       return (data ?? []).map((row) => row.data as T)
     },
     async upsert(item) {
-      const { error } = await db().upsert({ id: item.id, data: item })
+      const { error } = await queueWrite(`${table}:${item.id}`, () => db().upsert({ id: item.id, data: item }))
       if (error) throw error
       return item
     },
     async remove(id) {
-      const { error } = await db().delete().eq("id", id)
+      const { error } = await queueWrite(`${table}:${id}`, () => db().delete().eq("id", id))
       if (error) throw error
     },
   }
@@ -49,7 +50,7 @@ const financeSettings: FinanceSettingsRepository = {
     return (data?.data as FinanceSettings | undefined) ?? DEFAULT_SETTINGS
   },
   async save(settings) {
-    const { error } = await supabaseBrowser().from("finance_settings").upsert({ id: "default", data: settings })
+    const { error } = await queueWrite("finance_settings:default", () => supabaseBrowser().from("finance_settings").upsert({ id: "default", data: settings }))
     if (error) throw error
     return settings
   },
