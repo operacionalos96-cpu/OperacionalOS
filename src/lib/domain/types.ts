@@ -30,6 +30,8 @@ export interface Lead {
   createdAt: ISODate
   closedAt?: ISODate
   lostReason?: string
+  /** Produto de interesse (rastreio de leads por produto). */
+  productId?: string
 }
 
 export type ActivityKind = "nota" | "ligacao" | "reuniao" | "mensagem" | "estagio" | "acao_concluida" | "criado"
@@ -88,6 +90,8 @@ export interface Transaction {
   description: string
   date: ISODate
   leadId?: string
+  /** Produto a que a entrada/saída pertence (rastreio financeiro por produto). */
+  productId?: string
   createdById: string
 }
 

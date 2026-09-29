@@ -3,6 +3,7 @@
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 import type { FinanceSettings } from "@/lib/domain/types"
 import { supabaseBrowser } from "@/lib/supabase/client"
+import { registeredCollections } from "@/lib/collection-store"
 import type { CollectionRepository, FinanceSettingsRepository, Repositories } from "./types"
 
 /**
@@ -72,7 +73,7 @@ export type ChangePayload = RealtimePostgresChangesPayload<Record<string, unknow
 export function subscribeToChanges(onChange: (payload: ChangePayload) => void) {
   const sb = supabaseBrowser()
   const channel = sb.channel("operacional-sync")
-  for (const table of [...Object.values(TABLES), "finance_settings"]) {
+  for (const table of [...Object.values(TABLES), "finance_settings", ...registeredCollections().keys()]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange)
   }
   channel.subscribe()

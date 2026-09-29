@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
-import { Chip, DueDateField, OwnerToggle, TemperatureToggle } from "@/components/shared/fields"
+import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } from "@/components/shared/fields"
 import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
@@ -304,6 +304,9 @@ function Properties({ lead }: { lead: Lead }) {
       </Prop>
       <Prop label="Temperatura">
         <TemperatureToggle value={lead.temperature} onChange={(temperature) => updateLead(lead.id, { temperature })} />
+      </Prop>
+      <Prop label="Produto">
+        <ProductSelect value={lead.productId} onChange={(productId) => updateLead(lead.id, { productId })} />
       </Prop>
       <Prop label="Contato">
         <InlineText

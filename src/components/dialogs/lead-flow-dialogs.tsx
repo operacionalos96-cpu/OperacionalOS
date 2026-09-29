@@ -153,6 +153,7 @@ export function WonDialog() {
       description: `${lead.name}${lead.company ? ` — ${lead.company}` : ""}`,
       date: today(),
       leadId: lead.id,
+      productId: lead.productId,
     })
     close()
     toast.success(`Entrada de ${money(cents)} registrada no financeiro`)

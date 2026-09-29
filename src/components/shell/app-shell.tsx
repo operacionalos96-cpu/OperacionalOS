@@ -179,7 +179,8 @@ function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto grid gap-3 border-t p-3">
+      {/* grid-cols-[minmax(0,1fr)]: sem isso o e-mail longo estica o card para fora da barra. */}
+      <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-3 border-t p-3">
         <AccountCard />
         <div className="flex items-center justify-between">
           <DataMenu />
@@ -290,7 +291,7 @@ function AccountCard() {
   const signOut = useStore((s) => s.signOut)
   const me = getUser(meId)
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2">
+    <div className="flex min-w-0 items-center gap-2.5 overflow-hidden rounded-lg border bg-card px-2.5 py-2" title={meEmail}>
       <span className="flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: me.color }}>
         {me.initials}
       </span>

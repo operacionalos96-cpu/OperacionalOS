@@ -1,6 +1,8 @@
 # Operacional OS
 
-Sistema do dia a dia para uma equipe de 2 pessoas: **Início (Dashboard)**, **Pipeline (CRM)**, **Financeiro**, **Tarefas & Notas** e **Mapas**.
+Sistema do dia a dia para uma equipe de 2 pessoas: **Início (Dashboard)**, **Pipeline (CRM)**, **Produtos**, **Conteúdos**, **Financeiro**, **Tarefas & Notas** e **Mapas**.
+
+Como adicionar módulos novos: **[docs/ARQUITETURA.md](docs/ARQUITETURA.md)**.
 
 ## Rodar
 

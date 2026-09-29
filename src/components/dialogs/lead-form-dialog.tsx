@@ -17,8 +17,7 @@ import {
   OwnerToggle,
   SubmitRow,
   TemperatureToggle,
-  submitOnModEnter,
-} from "@/components/shared/fields"
+  submitOnModEnter, ProductSelect } from "@/components/shared/fields"
 
 export function LeadFormDialog() {
   const form = useUI((s) => s.leadForm)
@@ -33,6 +32,7 @@ export function LeadFormDialog() {
   const [valueText, setValueText] = useState("")
   const [ownerId, setOwnerId] = useState(meId)
   const [temperature, setTemperature] = useState<Temperature | undefined>()
+  const [productId, setProductId] = useState<string | undefined>()
   const [actionText, setActionText] = useState("")
   const [actionDate, setActionDate] = useState<string | undefined>()
   const [tried, setTried] = useState(false)
@@ -48,6 +48,7 @@ export function LeadFormDialog() {
     setValueText(moneyInputValue(p.valueCents))
     setOwnerId(p.ownerId ?? meId)
     setTemperature(p.temperature)
+    setProductId(p.productId)
     setActionText(p.nextAction?.text ?? "")
     setActionDate(p.nextAction?.dueDate ?? dueShortcuts()[1].value)
     setTried(false)
@@ -81,6 +82,7 @@ export function LeadFormDialog() {
       valueCents: valueCents!,
       ownerId,
       temperature,
+      productId,
       stage: form?.prefill?.stage,
       nextAction: { text: actionText, dueDate: actionDate! },
     })
@@ -143,6 +145,10 @@ export function LeadFormDialog() {
               <TemperatureToggle value={temperature} onChange={setTemperature} />
             </Field>
           </div>
+
+          <Field label="Produto de interesse" hint="opcional · rastreia leads por produto">
+            <ProductSelect value={productId} onChange={setProductId} />
+          </Field>
 
           {tried && invalid && (
             <p className="text-sm text-destructive">

@@ -26,6 +26,8 @@ import { templateMap, type TemplateId } from "@/lib/mindmap-templates"
 import { getRepositories } from "@/lib/repositories"
 import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
 import { supabaseBrowser } from "@/lib/supabase/client"
+import { registeredCollections } from "@/lib/collection-store"
+import "@/lib/modules"
 
 /** Falhas de persistência não travam a UI, mas o usuário é avisado. */
 function persist(p: Promise<unknown>) {
@@ -43,6 +45,7 @@ export interface NewLeadInput {
   stage?: Stage
   temperature?: Temperature
   nextAction: NextAction
+  productId?: string
 }
 
 export interface NewTaskInput {
@@ -154,8 +157,13 @@ export const useStore = create<State>((set, get) => {
     async hydrate() {
       if (get().hydrated) return
       const sb = supabaseBrowser()
-      const { data: auth } = await sb.auth.getUser()
+      const { data: auth, error: authError } = await sb.auth.getUser()
       if (!auth.user) {
+        // Sem sessão → login. Falha de rede → tela "sem conexão" (não derruba a sessão).
+        if (authError && authError.name !== "AuthSessionMissingError" && authError.status !== 401 && authError.status !== 403) {
+          set({ access: "erro" })
+          return
+        }
         window.location.href = "/login"
         return
       }
@@ -181,6 +189,12 @@ export const useStore = create<State>((set, get) => {
           r.mindMaps.list(),
           r.financeSettings.get(),
         ])
+        // Coleções dos módulos (Produtos, Conteúdos, …) carregam em paralelo. Se a tabela
+        // de um módulo ainda não existir no banco, só aquele módulo fica vazio (o resto abre).
+        const modules = await Promise.allSettled([...registeredCollections().values()].map((c) => c.getState().load()))
+        if (modules.some((r) => r.status === "rejected")) {
+          toast.warning("Algum módulo não carregou", { description: "Rode o SQL mais recente de supabase/migrations no Supabase." })
+        }
         set({
           hydrated: true,
           access: "ok",
@@ -221,6 +235,7 @@ export const useStore = create<State>((set, get) => {
         ownerId: input.ownerId,
         valueCents: input.valueCents,
         temperature: input.temperature,
+        productId: input.productId,
         nextAction: { text: input.nextAction.text.trim(), dueDate: input.nextAction.dueDate },
         lastActivityAt: now,
         createdAt: now,
@@ -448,6 +463,11 @@ function startRealtime() {
   if (stopRealtime) return
   stopRealtime = subscribeToChanges((payload) => {
     const { table, eventType } = payload
+    const moduleCollection = registeredCollections().get(table)
+    if (moduleCollection) {
+      moduleCollection.getState().applyRemote(eventType, (eventType === "DELETE" ? payload.old : payload.new) as { id?: string })
+      return
+    }
     if (table === "finance_settings") {
       if (payload.new && "data" in payload.new) useStore.setState({ financeSettings: payload.new.data as FinanceSettings })
       return

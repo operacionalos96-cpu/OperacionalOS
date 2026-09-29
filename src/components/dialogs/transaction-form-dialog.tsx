@@ -9,7 +9,7 @@ import { useStore } from "@/lib/store"
 import { useUI } from "@/lib/ui-store"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { CalendarChip, Chip, Field, LeadSelect, MoneyInput, Segmented, SubmitRow, submitOnModEnter } from "@/components/shared/fields"
+import { CalendarChip, Chip, Field, LeadSelect, MoneyInput, ProductSelect, Segmented, SubmitRow, submitOnModEnter } from "@/components/shared/fields"
 import { addDays } from "date-fns"
 
 export function TransactionFormDialog() {
@@ -23,6 +23,8 @@ export function TransactionFormDialog() {
   const [description, setDescription] = useState("")
   const [date, setDate] = useState(today())
   const [leadId, setLeadId] = useState<string | undefined>()
+  const [productId, setProductId] = useState<string | undefined>()
+  const leads = useStore((s) => s.leads)
 
   useEffect(() => {
     if (!form) return
@@ -34,6 +36,7 @@ export function TransactionFormDialog() {
     setDescription(p.description ?? "")
     setDate(p.date ?? today())
     setLeadId(p.leadId)
+    setProductId(p.productId)
   }, [form])
 
   const cents = parseMoney(valueText)
@@ -59,6 +62,7 @@ export function TransactionFormDialog() {
       description: description.trim() || category,
       date,
       leadId: type === "entrada" ? leadId : undefined,
+      productId,
     })
     form?.onCreated?.(tx)
     close()
@@ -111,9 +115,21 @@ export function TransactionFormDialog() {
           </Field>
           {type === "entrada" && (
             <Field label="Veio de um negócio do pipeline?" hint="opcional">
-              <LeadSelect value={leadId} onChange={setLeadId} includeClosed />
+              <LeadSelect
+                value={leadId}
+                onChange={(id) => {
+                  setLeadId(id)
+                  // O produto do lead vira o produto do lançamento (dá para trocar).
+                  const lp = leads.find((l) => l.id === id)?.productId
+                  if (lp && !productId) setProductId(lp)
+                }}
+                includeClosed
+              />
             </Field>
           )}
+          <Field label="Produto" hint="opcional · para ver entradas e saídas por produto">
+            <ProductSelect value={productId} onChange={setProductId} />
+          </Field>
           <SubmitRow onCancel={close} submitLabel="Registrar" disabled={!valid} />
         </form>
       </DialogContent>

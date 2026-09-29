@@ -12,12 +12,15 @@
 | **Força bruta** | Limite de tentativas do Supabase + trava de 60s no formulário após 5 erros. Mensagens genéricas (não revelam se o e-mail existe). |
 | **Cabeçalhos HTTP** | CSP, anti-iframe (clickjacking), nosniff, HSTS em produção, sem `X-Powered-By`. |
 | **Redirecionamentos** | Só para caminhos internos (evita "open redirect" para site falso). |
+| **Arquivos** | Bucket `conteudos` privado: só membros enviam/leem; links de download expiram em 1h; nomes de arquivo higienizados; só vídeo/áudio/imagem/PDF/texto até 50 MB. |
+| **Links** | Links cadastrados (produtos, contas, posts) só aceitam http(s) — bloqueia `javascript:` e similares. Abrem em nova aba sem acesso à página de origem. |
 | **Auditoria** | Cada registro guarda `updated_by` (quem mexeu) e `updated_at`, preenchidos pelo banco. |
 
 ## Configurar (uma vez, no painel do Supabase)
 
 1. **SQL Editor → New query**: cole `supabase/migrations/0001_operacional_os.sql` e rode.
    No fim do arquivo, troque os e-mails do `insert into public.members` pelos reais e rode essa parte.
+   Depois rode também `0002_produtos_conteudos.sql` (Produtos, Conteúdos e o bucket privado de arquivos).
 2. **Authentication → Sign In / Providers → Email**:
    - desligue **Allow new users to sign up** (ninguém cria conta sozinho);
    - **Confirm email** ligado; **Minimum password length** = 12; exigir letras, números e símbolos;

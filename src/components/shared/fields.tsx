@@ -11,6 +11,7 @@ import type { Temperature } from "@/lib/domain/types"
 import { dueShortcuts, parseMoney, toDateKey } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
+import { useProducts } from "@/lib/modules"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
@@ -297,4 +298,33 @@ export function submitOnModEnter(e: React.KeyboardEvent<HTMLFormElement>) {
     e.preventDefault()
     e.currentTarget.requestSubmit()
   }
+}
+
+/** Seleciona um produto (ou nenhum). Arquivados só aparecem se já estiverem escolhidos. */
+export function ProductSelect({
+  value,
+  onChange,
+  placeholder = "Nenhum produto",
+}: {
+  value: string | undefined
+  onChange: (id: string | undefined) => void
+  placeholder?: string
+}) {
+  const products = useProducts((s) => s.items)
+  const options = products.filter((p) => p.status !== "arquivado" || p.id === value).sort((a, b) => a.name.localeCompare(b.name))
+  return (
+    <Select value={value ?? "none"} onValueChange={(v) => onChange(v === "none" ? undefined : v)}>
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">{placeholder}</SelectItem>
+        {options.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            {p.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
