@@ -1,18 +1,15 @@
-import { createLocalRepositories, resetLocalData } from "./local"
+import { createSupabaseRepositories } from "./supabase"
 import type { Repositories } from "./types"
 
 export type { Repositories } from "./types"
 
-/** Apaga os dados (só existe enquanto o backend é local). */
-export const resetData = resetLocalData
-
 let instance: Repositories | null = null
 
 /**
- * Ponto único de troca de backend. Hoje: localStorage.
- * Depois: `createSupabaseRepositories()` implementando as mesmas interfaces.
+ * Ponto único de backend: Supabase (dados compartilhados entre os dois, com login).
+ * `local.ts` continua existindo só para importar dados antigos deste navegador.
  */
 export function getRepositories(): Repositories {
-  instance ??= createLocalRepositories()
+  instance ??= createSupabaseRepositories()
   return instance
 }

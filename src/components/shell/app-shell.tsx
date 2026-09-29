@@ -4,22 +4,25 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
+import { toast } from "sonner"
 import {
   CheckSquareIcon,
   DatabaseIcon,
-  EraserIcon,
+  LogOutIcon,
   MonitorIcon,
   MoonIcon,
   PlusIcon,
-  RotateCcwIcon,
   SearchIcon,
+  ShieldAlertIcon,
   SunIcon,
+  UploadIcon,
   UserPlusIcon,
   WalletIcon,
+  WifiOffIcon,
 } from "lucide-react"
-import { TEAM } from "@/config/team"
+import { TEAM, getUser } from "@/config/team"
 import { isOverdue, leadsNeedingAction } from "@/lib/domain/rules"
-import { resetData } from "@/lib/repositories"
+import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
 import { openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -41,9 +44,19 @@ import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { NAV, isActive } from "./nav"
 
+/** Telas sem barra lateral e sem dados (login, redefinir senha). */
+const BARE_PATHS = ["/login", "/redefinir-senha"]
+
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  if (BARE_PATHS.some((p) => pathname.startsWith(p))) return <>{children}</>
+  return <ProtectedShell>{children}</ProtectedShell>
+}
+
+function ProtectedShell({ children }: { children: React.ReactNode }) {
   const hydrated = useStore((s) => s.hydrated)
   const hydrate = useStore((s) => s.hydrate)
+  const access = useStore((s) => s.access)
 
   useEffect(() => {
     hydrate()
@@ -51,6 +64,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useGlobalShortcuts()
   const pathname = usePathname()
+
+  if (access === "negado" || access === "erro") return <AccessProblem kind={access} />
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -165,7 +180,7 @@ function Sidebar() {
       </nav>
 
       <div className="mt-auto grid gap-3 border-t p-3">
-        <MeSwitcher />
+        <AccountCard />
         <div className="flex items-center justify-between">
           <DataMenu />
           <ThemeSwitcher />
@@ -175,13 +190,23 @@ function Sidebar() {
   )
 }
 
-/** Discreto de propósito: usado uma vez, para trocar os dados de exemplo pelos reais. */
+/** Discreto de propósito: usado uma vez, para levar dados antigos deste navegador para o banco. */
 function DataMenu() {
-  const [confirm, setConfirm] = useState<null | "zero" | "exemplo">(null)
+  const [counts, setCounts] = useState<ReturnType<typeof localSnapshotCounts>>(null)
+  const [busy, setBusy] = useState(false)
 
-  function run() {
-    resetData({ withExamples: confirm === "exemplo" })
-    window.location.href = "/"
+  async function run() {
+    setBusy(true)
+    try {
+      const n = await importLocalData()
+      toast.success(`${n} itens importados`, { description: "Já estão no banco e aparecem para os dois." })
+      setCounts(null)
+      setTimeout(() => window.location.reload(), 800)
+    } catch {
+      toast.error("Não foi possível importar. Nada foi apagado; tente de novo.")
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -192,29 +217,34 @@ function DataMenu() {
             <DatabaseIcon className="size-3" /> Dados
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-64">
-          <DropdownMenuItem onSelect={() => setConfirm("zero")}>
-            <EraserIcon /> Começar do zero (apagar exemplos)
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setConfirm("exemplo")}>
-            <RotateCcwIcon /> Restaurar dados de exemplo
+        <DropdownMenuContent align="start" side="top" className="w-72">
+          <DropdownMenuItem
+            onSelect={() => {
+              const c = localSnapshotCounts()
+              if (!c) toast("Não há dados antigos neste navegador.")
+              else setCounts(c)
+            }}
+          >
+            <UploadIcon /> Importar dados antigos deste navegador
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Dialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
+      <Dialog open={counts !== null} onOpenChange={(o) => !o && setCounts(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{confirm === "zero" ? "Começar do zero?" : "Restaurar dados de exemplo?"}</DialogTitle>
+            <DialogTitle>Importar para o banco?</DialogTitle>
             <DialogDescription>
-              Isso apaga todos os leads, tarefas, notas, lançamentos e mapas salvos neste navegador. Não dá para desfazer.
+              Encontrei neste navegador: {counts?.leads} leads, {counts?.tasks} tarefas, {counts?.transactions} lançamentos,{" "}
+              {counts?.notes} notas e {counts?.mindMaps} mapas. Se for só o exemplo que veio com o app, não importe.
+              Itens com o mesmo ID são atualizados; nada é apagado.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
+            <Button variant="ghost" onClick={() => setCounts(null)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={run}>
-              Apagar tudo
+            <Button onClick={run} disabled={busy}>
+              {busy ? "Importando…" : "Importar"}
             </Button>
           </div>
         </DialogContent>
@@ -253,28 +283,24 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** "Quem está usando?" — define "minhas" coisas e o dono padrão do que é criado. */
-function MeSwitcher() {
+/** Quem está logado (vem do banco, não dá para trocar) + sair. */
+function AccountCard() {
   const meId = useStore((s) => s.meId)
-  const setMe = useStore((s) => s.setMe)
+  const meEmail = useStore((s) => s.meEmail)
+  const signOut = useStore((s) => s.signOut)
+  const me = getUser(meId)
   return (
-    <div>
-      <p className="t-label px-1 pb-1.5">Você é</p>
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5">
-        {TEAM.map((u) => (
-          <button
-            key={u.id}
-            onClick={() => setMe(u.id)}
-            className={cn(
-              "flex h-7 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:text-foreground",
-              meId === u.id && "bg-card text-foreground shadow-[0_1px_2px_oklch(0_0_0/10%),0_2px_6px_-2px_oklch(0_0_0/12%)]",
-            )}
-          >
-            <span className="size-2 rounded-full" style={{ backgroundColor: u.color }} />
-            {u.name}
-          </button>
-        ))}
+    <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: me.color }}>
+        {me.initials}
+      </span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate text-xs font-semibold">{me.name}</p>
+        <p className="truncate text-[11px] text-muted-foreground">{meEmail}</p>
       </div>
+      <Button variant="ghost" size="icon-sm" onClick={() => signOut()} aria-label="Sair" title="Sair">
+        <LogOutIcon />
+      </Button>
     </div>
   )
 }
@@ -313,9 +339,8 @@ function ThemeSwitcher() {
 function MobileNav() {
   const pathname = usePathname()
   const meId = useStore((s) => s.meId)
-  const setMe = useStore((s) => s.setMe)
+  const signOut = useStore((s) => s.signOut)
   const me = TEAM.find((u) => u.id === meId) ?? TEAM[0]
-  const other = TEAM.find((u) => u.id !== meId) ?? TEAM[1]
   return (
     <>
       <div className="fixed right-4 bottom-20 z-40 md:hidden">
@@ -336,14 +361,14 @@ function MobileNav() {
           </Link>
         ))}
         <button
-          onClick={() => setMe(other.id)}
+          onClick={() => signOut()}
           className="flex w-14 flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground"
-          aria-label={`Você é ${me.name}. Trocar para ${other.name}`}
+          aria-label={`Logado como ${me.name}. Sair`}
         >
           <span className="flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white" style={{ backgroundColor: me.color }}>
             {me.initials}
           </span>
-          {me.name}
+          Sair
         </button>
       </nav>
     </>
@@ -359,6 +384,30 @@ function PageSkeleton() {
         <Skeleton className="h-32" />
       </div>
       <Skeleton className="h-64" />
+    </div>
+  )
+}
+
+/** Logou, mas não está na lista de membros — ou o banco não respondeu. */
+function AccessProblem({ kind }: { kind: "negado" | "erro" }) {
+  const email = useStore((s) => s.meEmail)
+  const denied = kind === "negado"
+  return (
+    <div className="flex h-dvh items-center justify-center p-6">
+      <div className="w-full max-w-sm animate-enter rounded-xl border bg-card p-6 text-center">
+        <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl border bg-muted">
+          {denied ? <ShieldAlertIcon className="size-5 text-danger" /> : <WifiOffIcon className="size-5 text-muted-foreground" />}
+        </div>
+        <h1 className="t-title">{denied ? "Acesso não autorizado" : "Sem conexão com o banco"}</h1>
+        <p className="t-desc mt-1">
+          {denied
+            ? `A conta ${email || "usada"} não está na lista de membros do Operacional OS. A sessão foi encerrada.`
+            : "Não foi possível carregar os dados. Verifique a internet e tente de novo."}
+        </p>
+        <Button className="mt-5 w-full" onClick={() => (window.location.href = denied ? "/login" : window.location.pathname)}>
+          {denied ? "Voltar ao login" : "Tentar de novo"}
+        </Button>
+      </div>
     </div>
   )
 }

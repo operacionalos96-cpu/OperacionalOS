@@ -24,8 +24,8 @@ import type {
 import { uid } from "@/lib/format"
 import { templateMap, type TemplateId } from "@/lib/mindmap-templates"
 import { getRepositories } from "@/lib/repositories"
-
-const ME_KEY = "operacional:me"
+import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
+import { supabaseBrowser } from "@/lib/supabase/client"
 
 /** Falhas de persistência não travam a UI, mas o usuário é avisado. */
 function persist(p: Promise<unknown>) {
@@ -59,9 +59,15 @@ export interface NewTaskInput {
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
 
+/** "negado" = logou, mas o e-mail não está na lista de membros do banco. */
+export type Access = "verificando" | "ok" | "negado" | "erro"
+
 interface State {
   hydrated: boolean
+  access: Access
+  /** Vem do login (tabela members), nunca de escolha na tela. */
   meId: string
+  meEmail: string
   leads: Lead[]
   activities: Activity[]
   tasks: Task[]
@@ -71,7 +77,7 @@ interface State {
   financeSettings: FinanceSettings
 
   hydrate(): Promise<void>
-  setMe(id: string): void
+  signOut(): Promise<void>
 
   createLead(input: NewLeadInput): Lead
   updateLead(id: string, patch: Partial<Omit<Lead, "id">>): void
@@ -134,7 +140,9 @@ export const useStore = create<State>((set, get) => {
 
   return {
     hydrated: false,
+    access: "verificando",
     meId: TEAM[0].id,
+    meEmail: "",
     leads: [],
     activities: [],
     tasks: [],
@@ -145,29 +153,59 @@ export const useStore = create<State>((set, get) => {
 
     async hydrate() {
       if (get().hydrated) return
-      const r = repos()
-      const [leads, activities, tasks, notes, transactions, mindMaps, financeSettings] = await Promise.all([
-        r.leads.list(),
-        r.activities.list(),
-        r.tasks.list(),
-        r.notes.list(),
-        r.transactions.list(),
-        r.mindMaps.list(),
-        r.financeSettings.get(),
-      ])
-      let meId = TEAM[0].id
+      const sb = supabaseBrowser()
+      const { data: auth } = await sb.auth.getUser()
+      if (!auth.user) {
+        window.location.href = "/login"
+        return
+      }
+      // O banco só devolve a linha se o e-mail estiver autorizado (RLS).
+      const { data: member, error: memberError } = await sb.from("members").select("team_id").maybeSingle()
+      if (memberError) {
+        set({ access: "erro" })
+        return
+      }
+      if (!member || !TEAM.some((u) => u.id === member.team_id)) {
+        set({ access: "negado", meEmail: auth.user.email ?? "" })
+        await sb.auth.signOut()
+        return
+      }
       try {
-        const saved = localStorage.getItem(ME_KEY)
-        if (saved && TEAM.some((u) => u.id === saved)) meId = saved
-      } catch {}
-      set({ hydrated: true, meId, leads, activities, tasks, notes, transactions, mindMaps, financeSettings })
+        const r = repos()
+        const [leads, activities, tasks, notes, transactions, mindMaps, financeSettings] = await Promise.all([
+          r.leads.list(),
+          r.activities.list(),
+          r.tasks.list(),
+          r.notes.list(),
+          r.transactions.list(),
+          r.mindMaps.list(),
+          r.financeSettings.get(),
+        ])
+        set({
+          hydrated: true,
+          access: "ok",
+          meId: member.team_id,
+          meEmail: auth.user.email ?? "",
+          leads,
+          activities,
+          tasks,
+          notes,
+          transactions,
+          mindMaps,
+          financeSettings,
+        })
+      } catch {
+        set({ access: "erro" })
+        return
+      }
+      startRealtime()
     },
 
-    setMe(id) {
-      set({ meId: id })
-      try {
-        localStorage.setItem(ME_KEY, id)
-      } catch {}
+    async signOut() {
+      stopRealtime?.()
+      stopRealtime = null
+      await supabaseBrowser().auth.signOut()
+      window.location.href = "/login"
     },
 
     // ---------- leads ----------
@@ -393,6 +431,42 @@ export const useStore = create<State>((set, get) => {
     },
   }
 })
+
+// ---------- tempo real ----------
+
+type CollectionKey = "leads" | "activities" | "tasks" | "notes" | "transactions" | "mindMaps"
+const TABLE_TO_KEY = Object.fromEntries(Object.entries(TABLES).map(([k, t]) => [t, k])) as Record<string, CollectionKey>
+
+let stopRealtime: (() => void) | null = null
+
+/**
+ * Aplica no estado local o que o sócio mudou. Aplica item a item (não recarrega
+ * tudo), então não atrapalha quem está digitando. Eventos das próprias
+ * gravações chegam iguais e não mudam nada.
+ */
+function startRealtime() {
+  if (stopRealtime) return
+  stopRealtime = subscribeToChanges((payload) => {
+    const { table, eventType } = payload
+    if (table === "finance_settings") {
+      if (payload.new && "data" in payload.new) useStore.setState({ financeSettings: payload.new.data as FinanceSettings })
+      return
+    }
+    const key = TABLE_TO_KEY[table]
+    if (!key) return
+    useStore.setState((s) => {
+      const list = s[key] as { id: string }[]
+      if (eventType === "DELETE") {
+        const id = (payload.old as { id?: string }).id
+        return { [key]: list.filter((x) => x.id !== id) } as Partial<State>
+      }
+      const item = (payload.new as { data?: { id: string } }).data
+      if (!item) return {}
+      const exists = list.some((x) => x.id === item.id)
+      return { [key]: exists ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item] } as Partial<State>
+    })
+  })
+}
 
 /** Atalho para o usuário atual. */
 export function useMe() {

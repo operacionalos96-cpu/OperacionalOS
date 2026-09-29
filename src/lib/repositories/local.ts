@@ -1,4 +1,4 @@
-import type { FinanceSettings } from "@/lib/domain/types"
+import type { Activity, FinanceSettings, Lead, MindMap, Note, Task, Transaction } from "@/lib/domain/types"
 import { createSeed } from "@/lib/seed"
 import type { CollectionRepository, FinanceSettingsRepository, Repositories } from "./types"
 
@@ -92,4 +92,25 @@ export function resetLocalData({ withExamples }: { withExamples: boolean }) {
     .filter((k) => k.startsWith(PREFIX))
     .forEach((k) => localStorage.removeItem(k))
   if (!withExamples) write("seeded", true)
+}
+
+/** Lê o que existe neste navegador SEM criar dados de exemplo (para importar no banco). */
+export function readLocalSnapshot() {
+  const has = (key: string) => {
+    try {
+      return localStorage.getItem(PREFIX + key) !== null
+    } catch {
+      return false
+    }
+  }
+  if (!["leads", "tasks", "transactions", "notes", "mindMaps"].some(has)) return null
+  return {
+    leads: read<Lead[]>("leads", []),
+    activities: read<Activity[]>("activities", []),
+    tasks: read<Task[]>("tasks", []),
+    notes: read<Note[]>("notes", []),
+    transactions: read<Transaction[]>("transactions", []),
+    mindMaps: read<MindMap[]>("mindMaps", []),
+    financeSettings: has("financeSettings") ? read<FinanceSettings>("financeSettings", DEFAULT_SETTINGS) : null,
+  }
 }
