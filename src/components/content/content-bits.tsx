@@ -44,6 +44,7 @@ export function accountLabel(a: ContentAccount | undefined) {
 export function AccountFormDialog({ open, account, onClose }: { open: boolean; account: ContentAccount | null; onClose: () => void }) {
   const accounts = useContentAccounts((s) => s.items)
   const save = useContentAccounts((s) => s.save)
+  const removeAccount = useContentAccounts((s) => s.remove)
   const [name, setName] = useState("")
   const [handle, setHandle] = useState("")
   const [platform, setPlatform] = useState<Platform>("youtube")
@@ -150,6 +151,32 @@ export function AccountFormDialog({ open, account, onClose }: { open: boolean; a
             <ProductSelect value={productId} onChange={setProductId} />
           </Field>
           {error && <p className="text-xs text-danger">{error}</p>}
+          {account && (
+            <button
+              type="button"
+              onClick={() => {
+                const cuts = accounts.filter((a) => a.parentId === account.id)
+                const removed = removeAccount(account.id)
+                // Contas de cortes ficam "soltas" (não são apagadas junto).
+                for (const c of cuts) save({ ...c, parentId: undefined })
+                onClose()
+                if (removed)
+                  toast(`Conta "${removed.name}" excluída`, {
+                    description: "As publicações antigas continuam registradas nos conteúdos.",
+                    action: {
+                      label: "Desfazer",
+                      onClick: () => {
+                        useContentAccounts.getState().restore(removed)
+                        for (const c of cuts) useContentAccounts.getState().save(c)
+                      },
+                    },
+                  })
+              }}
+              className="w-fit text-xs text-muted-foreground hover:text-danger"
+            >
+              Excluir esta conta
+            </button>
+          )}
           <SubmitRow onCancel={onClose} submitLabel={account ? "Salvar" : "Adicionar conta"} disabled={!name.trim()} />
         </form>
       </DialogContent>

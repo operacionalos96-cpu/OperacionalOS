@@ -289,7 +289,20 @@ function AccountCard() {
   const meId = useStore((s) => s.meId)
   const meEmail = useStore((s) => s.meEmail)
   const signOut = useStore((s) => s.signOut)
+  const hydrated = useStore((s) => s.hydrated)
   const me = getUser(meId)
+  // Antes do login carregar, meId ainda é o valor padrão: mostrar um nome agora seria mentira.
+  if (!hydrated) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2" aria-label="Carregando conta">
+        <Skeleton className="size-7 rounded-full" />
+        <div className="grid flex-1 gap-1.5">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-2.5 w-24" />
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="flex min-w-0 items-center gap-2.5 overflow-hidden rounded-lg border bg-card px-2.5 py-2" title={meEmail}>
       <span className="flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: me.color }}>
@@ -341,6 +354,7 @@ function MobileNav() {
   const pathname = usePathname()
   const meId = useStore((s) => s.meId)
   const signOut = useStore((s) => s.signOut)
+  const hydrated = useStore((s) => s.hydrated)
   const me = TEAM.find((u) => u.id === meId) ?? TEAM[0]
   return (
     <>
@@ -366,9 +380,13 @@ function MobileNav() {
           className="flex w-14 flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground"
           aria-label={`Logado como ${me.name}. Sair`}
         >
-          <span className="flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white" style={{ backgroundColor: me.color }}>
-            {me.initials}
-          </span>
+          {hydrated ? (
+            <span className="flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white" style={{ backgroundColor: me.color }}>
+              {me.initials}
+            </span>
+          ) : (
+            <Skeleton className="size-5 rounded-full" />
+          )}
           Sair
         </button>
       </nav>
