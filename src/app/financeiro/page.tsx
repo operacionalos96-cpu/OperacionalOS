@@ -5,7 +5,7 @@ import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
-import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, TargetIcon, Trash2Icon } from "lucide-react"
+import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, ScaleIcon, TargetIcon, Trash2Icon, WalletIcon } from "lucide-react"
 import type { Transaction, TransactionType } from "@/lib/domain/types"
 import { balance, daysSince, goalProgress, monthDelta, monthKey, monthStats } from "@/lib/domain/rules"
 import { money, moneyCompact, moneyInputValue, parseMoney } from "@/lib/format"
@@ -16,11 +16,13 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { MoneyInput, Segmented } from "@/components/shared/fields"
-import { EmptyState, PageHeader, Panel } from "@/components/shared/layout"
+import { EmptyState, PageHeader, Panel, StatCard } from "@/components/shared/layout"
+import { CountUp } from "@/components/shared/count-up"
 import { UserAvatar } from "@/components/shared/user-avatar"
 import { GoalBar } from "@/components/dashboard/goal-bar"
 import { GoalEditor } from "@/components/finance/goal-editor"
 import { CashflowChart } from "@/components/finance/cashflow-chart"
+import { BalanceChart, ExpensesByCategory } from "@/components/finance/charts"
 
 export default function FinancePage() {
   const transactions = useStore((s) => s.transactions)
@@ -41,71 +43,88 @@ export default function FinancePage() {
     <div className="flex flex-col">
       <PageHeader
         title="Financeiro"
+        description="Caixa, meta do mês e cada lançamento. Tudo que entra e sai passa por aqui."
         actions={
           <>
             <Button variant="outline" onClick={() => openTxForm({ prefill: { type: "saida" } })}>
-              <ArrowUpRightIcon className="text-red-500" /> Saída
+              <ArrowUpRightIcon className="text-chart-out" /> Saída
             </Button>
-            <Button onClick={() => openTxForm({ prefill: { type: "entrada" } })}>
+            <Button variant="brand" onClick={() => openTxForm({ prefill: { type: "entrada" } })}>
               <ArrowDownLeftIcon /> Entrada
             </Button>
           </>
         }
       />
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Saldo em caixa</p>
-              <OpeningBalanceEditor />
-            </div>
-            <p className={cn("tabular mt-1 text-3xl font-semibold tracking-tight", stats.balance < 0 && "text-red-600")}>
-              {money(stats.balance)}
+          <StatCard
+            label="Saldo em caixa"
+            icon={WalletIcon}
+            info="Saldo inicial informado + todas as entradas − todas as saídas registradas."
+            aside={<OpeningBalanceEditor />}
+            style={{ "--i": 0 } as React.CSSProperties}
+          >
+            <p className={cn("t-value mt-3", stats.balance < 0 && "text-danger")}>
+              <CountUp value={stats.balance} format={money} />
             </p>
-            <p className={cn("tabular mt-1 text-sm font-medium", stats.delta.net >= 0 ? "text-emerald-600" : "text-red-600")}>
+            <p className={cn("tabular mt-1.5 text-sm font-semibold", stats.delta.net >= 0 ? "text-success" : "text-danger")}>
               {stats.delta.net >= 0 ? "+" : "−"}
-              {money(Math.abs(stats.delta.net))} <span className="font-normal text-muted-foreground">este mês</span>
+              {money(Math.abs(stats.delta.net))} <span className="t-desc font-normal">este mês</span>
             </p>
-          </div>
+          </StatCard>
 
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground capitalize">{format(now, "MMMM", { locale: ptBR })}</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <Stat label="Entrou" value={moneyCompact(stats.month.income)} tone="text-emerald-600" />
-              <Stat label="Saiu" value={moneyCompact(stats.month.expense)} tone="text-red-600" />
-              <Stat label="Resultado" value={moneyCompact(stats.month.net)} />
+          <StatCard
+            label={`Resultado de ${format(now, "MMMM", { locale: ptBR })}`}
+            icon={ScaleIcon}
+            accent="var(--chart-in)"
+            info="Entradas menos saídas lançadas neste mês."
+            style={{ "--i": 1 } as React.CSSProperties}
+          >
+            <p className={cn("t-value mt-3", stats.month.net < 0 && "text-danger")}>
+              {stats.month.net >= 0 ? "+" : "−"}
+              <CountUp value={Math.abs(stats.month.net)} format={moneyCompact} />
+            </p>
+            <div className="mt-3 grid grid-cols-2 divide-x rounded-lg border bg-muted/40">
+              <Stat color="var(--chart-in)" label="Entrou" value={moneyCompact(stats.month.income)} />
+              <Stat color="var(--chart-out)" label="Saiu" value={moneyCompact(stats.month.expense)} />
             </div>
-          </div>
+          </StatCard>
 
-          <div className="rounded-xl border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Meta de faturamento</p>
+          <StatCard
+            label="Meta de faturamento"
+            icon={TargetIcon}
+            accent={stats.goal.pct >= 1 ? "var(--success)" : stats.goal.atRisk ? "var(--warning)" : "var(--brand)"}
+            info="Soma das entradas do mês comparada à meta. O traço na barra é onde você deveria estar hoje para bater a meta."
+            aside={
               <GoalEditor
                 monthKey={monthKey(now)}
-                trigger={<button className="text-xs text-muted-foreground hover:text-foreground">{stats.goal.hasGoal ? "Editar" : "Definir"}</button>}
+                trigger={<button className="text-xs font-medium text-brand hover:underline">{stats.goal.hasGoal ? "Editar" : "Definir"}</button>}
               />
-            </div>
+            }
+            style={{ "--i": 2 } as React.CSSProperties}
+          >
             {stats.goal.hasGoal ? (
               <>
-                <p className="tabular mt-1 text-sm">
-                  <span className="text-2xl font-semibold">{Math.round(stats.goal.pct * 100)}%</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {moneyCompact(stats.goal.achieved)} de {moneyCompact(stats.goal.target)}
-                  </span>
+                <p className="t-value mt-3">
+                  <CountUp value={Math.round(stats.goal.pct * 100)} format={(n) => `${n}%`} />
+                </p>
+                <p className="t-desc mt-0.5 tabular">
+                  {moneyCompact(stats.goal.achieved)} de {moneyCompact(stats.goal.target)}
                 </p>
                 <div className="mt-3">
                   <GoalBar pct={stats.goal.pct} expectedPct={stats.goal.expectedPct} atRisk={stats.goal.atRisk} />
                 </div>
               </>
             ) : (
-              <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                <TargetIcon className="size-4" /> Sem meta para este mês.
-              </p>
+              <p className="t-desc mt-3">Sem meta para este mês. Defina para acompanhar o ritmo.</p>
             )}
-          </div>
+          </StatCard>
         </div>
 
+        <div className="grid gap-4 lg:grid-cols-5">
+          <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" />
+          <ExpensesByCategory transactions={transactions} className="lg:col-span-2" />
+        </div>
         <CashflowChart transactions={transactions} />
         <TransactionList transactions={transactions} />
       </div>
@@ -113,11 +132,14 @@ export default function FinancePage() {
   )
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("tabular text-lg font-semibold", tone)}>{value}</p>
+    <div className="px-3 py-2">
+      <p className="t-label flex items-center gap-1.5">
+        <span className="size-2 rounded-[3px]" style={{ background: color }} />
+        {label}
+      </p>
+      <p className="tabular text-sm font-semibold">{value}</p>
     </div>
   )
 }
@@ -235,7 +257,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
                         </p>
                       </div>
                       <UserAvatar userId={t.createdById} size="xs" />
-                      <span className={cn("tabular w-28 text-right text-sm font-medium", t.type === "entrada" ? "text-emerald-600" : "text-foreground")}>
+                      <span className={cn("tabular w-28 text-right text-sm font-medium", t.type === "entrada" ? "text-success" : "text-foreground")}>
                         {t.type === "entrada" ? "+" : "−"}
                         {money(t.amountCents)}
                       </span>

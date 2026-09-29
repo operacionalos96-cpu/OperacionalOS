@@ -39,6 +39,25 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Marca + cores com significado. Use estas, não red-600/emerald-600 soltos. */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-chart-in: var(--chart-in);
+  --color-chart-out: var(--chart-out);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-lift: var(--shadow-lift);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -46,75 +65,137 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --animate-enter: enter 420ms var(--ease-out) both;
+  --animate-pop: pop 360ms var(--ease-spring) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/*
+ * Direção visual: SaaS premium, dark por padrão. 90% neutro (preto, grafite,
+ * cinza, branco) + 10% de verde. Profundidade vem da diferença de tons, não de
+ * sombra. O verde só marca positivo/crescimento e pequenos destaques.
+ * O tema claro segue as mesmas regras, invertidas.
+ */
 :root {
-  --background: oklch(0.985 0.002 270);
-  --foreground: oklch(0.145 0 0);
+  color-scheme: light;
+  --background: oklch(0.975 0 0);
+  --foreground: oklch(0.2 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.965 0.002 270);
-  --muted-foreground: oklch(0.52 0.01 270);
-  --accent: oklch(0.955 0.004 270);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.975 0.003 270);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: oklch(0.21 0 0);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.955 0 0);
+  --secondary-foreground: oklch(0.21 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.945 0 0);
+  --accent-foreground: oklch(0.21 0 0);
+  --destructive: oklch(0.58 0.19 25);
+  --border: oklch(0.905 0 0);
+  --input: oklch(0.88 0 0);
+  --ring: oklch(0.55 0.14 152);
+
+  --brand: oklch(0.55 0.14 152);
+  --brand-foreground: oklch(0.99 0 0);
+  --brand-soft: oklch(0.55 0.14 152 / 10%);
+  --success: oklch(0.55 0.14 152);
+  --success-soft: oklch(0.55 0.14 152 / 10%);
+  --warning: oklch(0.64 0.14 70);
+  --warning-soft: oklch(0.7 0.14 75 / 14%);
+  --danger: oklch(0.58 0.19 25);
+  --danger-soft: oklch(0.58 0.19 25 / 9%);
+  --info: oklch(0.5 0 0);
+  --info-soft: oklch(0.5 0 0 / 8%);
+
+  /* Estágios = rampa SEQUENCIAL neutra (ordem do funil); só "ganho" é verde. */
+  --stage-novo: oklch(0.82 0 0);
+  --stage-contato: oklch(0.68 0 0);
+  --stage-proposta: oklch(0.52 0 0);
+  --stage-negociacao: oklch(0.34 0 0);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 4%);
+  --shadow-lift: 0 6px 20px -8px oklch(0 0 0 / 14%);
+
+  /* Entradas = verde (positivo), saídas = neutro. Validado com dataviz. */
+  --chart-in: oklch(0.55 0.14 152);
+  --chart-out: #8a8a8a;
+  --chart-1: oklch(0.55 0.14 152);
+  --chart-2: oklch(0.72 0 0);
+  --chart-3: oklch(0.45 0 0);
+  --chart-4: oklch(0.6 0 0);
+  --chart-5: oklch(0.82 0 0);
+  --radius: 0.4rem;
+  --sidebar: oklch(0.955 0 0);
+  --sidebar-foreground: oklch(0.2 0 0);
+  --sidebar-primary: oklch(0.55 0.14 152);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(1 0 0);
+  --sidebar-accent-foreground: oklch(0.2 0 0);
+  --sidebar-border: oklch(0.905 0 0);
+  --sidebar-ring: oklch(0.55 0.14 152);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --background: #171717;
+  --foreground: #ececec;
+  --card: #202020;
+  --card-foreground: #ececec;
+  --popover: #232323;
+  --popover-foreground: #ececec;
+  --primary: #ececec;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #ececec;
+  --muted: #262626;
+  --muted-foreground: #8f8f8f;
+  --accent: #292929;
+  --accent-foreground: #ececec;
+  --destructive: oklch(0.66 0.17 24);
+  --border: #2c2c2c;
+  --input: #333333;
+  --ring: oklch(0.7 0.15 152);
+
+  --brand: oklch(0.7 0.15 152);
+  --brand-foreground: #0f0f0f;
+  --brand-soft: oklch(0.7 0.15 152 / 12%);
+  --success: oklch(0.7 0.15 152);
+  --success-soft: oklch(0.7 0.15 152 / 12%);
+  --warning: oklch(0.78 0.12 75);
+  --warning-soft: oklch(0.78 0.12 75 / 12%);
+  --danger: oklch(0.68 0.16 24);
+  --danger-soft: oklch(0.68 0.16 24 / 13%);
+  --info: #a3a3a3;
+  --info-soft: rgb(255 255 255 / 6%);
+
+  --stage-novo: #5e5e5e;
+  --stage-contato: #808080;
+  --stage-proposta: #9a9a9a;
+  --stage-negociacao: #d4d4d4;
+
+  --shadow-card: 0 0 0 transparent;
+  --shadow-lift: 0 8px 24px -12px rgb(0 0 0 / 70%);
+
+  --chart-in: oklch(0.7 0.15 152);
+  --chart-out: #6e6e6e;
+  --chart-1: oklch(0.7 0.15 152);
+  --chart-2: #6e6e6e;
+  --chart-3: #a3a3a3;
+  --chart-4: #7a7a7a;
+  --chart-5: #d4d4d4;
+  --sidebar: #111111;
+  --sidebar-foreground: #ececec;
+  --sidebar-primary: oklch(0.7 0.15 152);
+  --sidebar-primary-foreground: #0f0f0f;
+  --sidebar-accent: #1c1c1c;
+  --sidebar-accent-foreground: #ececec;
+  --sidebar-border: #1f1f1f;
+  --sidebar-ring: oklch(0.7 0.15 152);
 }
 
 @layer base {
@@ -130,6 +211,70 @@
   html {
     @apply font-sans;
     font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: var(--brand-soft);
+  }
+}
+
+/* ---------- Movimento ----------
+ * Regra: animar só o que muda de estado ou chega na tela; 150–420ms; nunca bloquear clique.
+ * `--i` na linha define o atraso em cascata (stagger).
+ */
+@keyframes enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes ring-burst {
+  from { box-shadow: 0 0 0 0 var(--success); opacity: 0.7; }
+  to { box-shadow: 0 0 0 10px transparent; opacity: 0; }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+
+@utility stagger {
+  animation: var(--animate-enter);
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@utility grow-x {
+  transform-origin: left;
+  animation: grow-x 700ms var(--ease-out) both;
+}
+@utility lift {
+  transition: box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out), border-color 200ms;
+  &:hover {
+    border-color: color-mix(in oklch, var(--foreground) 18%, var(--border));
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-1px);
+  }
+}
+@utility check-burst {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: ring-burst 500ms var(--ease-out);
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
   }
 }
 
@@ -151,4 +296,82 @@
 /* Números alinhados em valores monetários e contagens. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Botões ----------
+ * Compactos e integrados: cor chapada, brilho interno de 1px no topo (quase
+ * invisível) e hover que sobe 1px e clareia o tom. Clique afunda levemente.
+ * Sem gradiente forte, sem sombra pesada: a profundidade vem do tom.
+ */
+@utility btn-depth {
+  --btn-bg: var(--primary);
+  --btn-fg: var(--primary-foreground);
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 12%), inset 0 0 0 1px oklch(0 0 0 / 8%);
+  transition: transform 180ms var(--ease-out), background-color 180ms, box-shadow 180ms;
+  &:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--btn-bg), var(--background) 12%);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 14%), inset 0 0 0 1px oklch(0 0 0 / 8%), var(--shadow-lift);
+  }
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+/* Botão de superfície: fundo do card + borda fina; no hover a borda e o tom clareiam. */
+@utility btn-surface {
+  background: var(--card);
+  transition: transform 180ms var(--ease-out), background-color 180ms, border-color 180ms, color 180ms;
+  &:hover {
+    transform: translateY(-1px);
+    background: var(--accent);
+    border-color: color-mix(in oklch, var(--foreground) 22%, var(--border));
+  }
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+/* Seta que desliza no hover: <ArrowRightIcon data-icon="arrow" /> dentro do botão. */
+[data-slot="button"] [data-icon="arrow"] {
+  transition: transform 300ms var(--ease-out);
+}
+[data-slot="button"]:hover [data-icon="arrow"] {
+  transform: translateX(3px);
+}
+
+/* ---------- Hierarquia de texto (4 níveis, sempre os mesmos) ----------
+ * t-title   → título: o que é esta tela/bloco. Forte, escuro.
+ * t-label   → rótulo: nome de um dado ou grupo. Pequeno, caixa-alta, cinza.
+ * t-value   → informação: o dado em si. Grande, tabular, escuro.
+ * t-desc    → descrição: contexto/explicação. Normal, cinza, nunca em negrito.
+ */
+@utility t-title {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+@utility t-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+@utility t-value {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+@utility t-desc {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--muted-foreground);
 }

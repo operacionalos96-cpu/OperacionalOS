@@ -124,7 +124,7 @@ function NextActionBlock({ lead }: { lead: Lead }) {
 
   if (!isOpenStage(lead.stage)) {
     return (
-      <div className={cn("rounded-xl border p-4", lead.stage === "ganho" ? "border-emerald-200 bg-emerald-50" : "bg-muted/50")}>
+      <div className={cn("rounded-xl border p-4", lead.stage === "ganho" ? "border-success/30 bg-success-soft" : "bg-muted/50")}>
         <p className="text-sm font-medium">{lead.stage === "ganho" ? "🎉 Negócio ganho" : "Negócio perdido"}</p>
         <p className="text-sm text-muted-foreground">
           {lead.closedAt && `Fechado em ${shortDate(lead.closedAt)}.`}
@@ -138,14 +138,14 @@ function NextActionBlock({ lead }: { lead: Lead }) {
     <div
       className={cn(
         "rounded-xl border bg-card p-4",
-        urgency === "vencida" && "border-red-200 bg-red-50/50",
-        urgency === "parado" && "border-amber-200 bg-amber-50/50",
+        urgency === "vencida" && "border-danger/30 bg-danger-soft",
+        urgency === "parado" && "border-warning/30 bg-warning-soft",
       )}
     >
       <div className="flex items-center gap-2">
         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Próxima ação</p>
         {urgency === "parado" && (
-          <span className="text-xs font-medium text-amber-700">· Sem atividade há {daysSince(lead.lastActivityAt, now)} dias</span>
+          <span className="text-xs font-medium text-warning">· Sem atividade há {daysSince(lead.lastActivityAt, now)} dias</span>
         )}
       </div>
       <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -172,7 +172,7 @@ function DuePopover({ lead, urgent }: { lead: Lead; urgent: boolean }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className={cn("mt-0.5 flex items-center gap-1 text-sm hover:underline", urgent ? "font-medium text-red-600" : "text-muted-foreground")}>
+        <button className={cn("mt-0.5 flex items-center gap-1 text-sm hover:underline", urgent ? "font-medium text-danger" : "text-muted-foreground")}>
           <ClockIcon className="size-3.5" /> {dueLabel(lead.nextAction.dueDate)} · {shortDate(lead.nextAction.dueDate)}
         </button>
       </PopoverTrigger>
@@ -235,7 +235,7 @@ function Composer({ leadId }: { leadId: string }) {
 
 const KIND_DOT: Partial<Record<ActivityKind, string>> = {
   estagio: "bg-sky-500",
-  acao_concluida: "bg-emerald-500",
+  acao_concluida: "bg-success",
   criado: "bg-zinc-400",
 }
 
@@ -398,7 +398,7 @@ function LinkedMoney({ lead }: { lead: Lead }) {
           {txs.map((t) => (
             <li key={t.id} className="flex justify-between">
               <span className="text-muted-foreground">{shortDate(t.date)}</span>
-              <span className="tabular font-medium text-emerald-600">+{money(t.amountCents)}</span>
+              <span className="tabular font-medium text-success">+{money(t.amountCents)}</span>
             </li>
           ))}
         </ul>

@@ -91,7 +91,7 @@ export function NextActionDialog() {
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <CheckCircle2Icon className="size-4 text-emerald-600" /> Feito! E agora?
+                <CheckCircle2Icon className="size-4 text-success" /> Feito! E agora?
               </DialogTitle>
               <DialogDescription>
                 <span className="line-through">{lead.nextAction.text}</span> · {lead.name}
@@ -165,7 +165,7 @@ export function WonDialog() {
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <PartyPopperIcon className="size-4 text-emerald-600" /> Negócio ganho!
+                <PartyPopperIcon className="size-4 text-success" /> Negócio ganho!
               </DialogTitle>
               <DialogDescription>
                 {lead.name} foi para Ganho. Quer registrar a entrada no caixa agora?

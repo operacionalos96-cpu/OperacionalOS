@@ -19,6 +19,8 @@ interface UIState {
   wonFor: string | null
   /** Lead indo para perdido: pedir motivo (opcional). */
   lostFor: string | null
+  /** Tarefa aberta no painel de detalhes. */
+  taskDetail: string | null
 
   set(patch: Partial<Omit<UIState, "set">>): void
 }
@@ -31,8 +33,11 @@ export const useUI = create<UIState>((set) => ({
   nextActionFor: null,
   wonFor: null,
   lostFor: null,
+  taskDetail: null,
   set: (patch) => set(patch),
 }))
+
+export const openTaskDetail = (id: string) => useUI.getState().set({ taskDetail: id })
 
 export const openLeadForm = (opts: UIState["leadForm"] = {}) => useUI.getState().set({ leadForm: opts })
 export const openTaskForm = (opts: UIState["taskForm"] = {}) => useUI.getState().set({ taskForm: opts })

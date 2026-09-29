@@ -4,6 +4,8 @@
  */
 import {
   addDays,
+  addMonths,
+  addWeeks,
   differenceInCalendarDays,
   endOfWeek,
   format,
@@ -15,7 +17,7 @@ import {
 } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { OPEN_STAGES, STALE_AFTER_DAYS, isOpenStage } from "./constants"
-import type { FinanceSettings, Lead, Stage, Task, Transaction } from "./types"
+import type { FinanceSettings, Lead, Priority, Recurrence, Stage, Task, Transaction } from "./types"
 
 // ---------- datas ----------
 
@@ -151,6 +153,35 @@ export function cashflowSeries(txs: Transaction[], range: 30 | 90, now: Date): C
   return points
 }
 
+/** Saldo ao fim de cada dia dos últimos `days` dias (centavos). */
+export function balanceSeries(settings: FinanceSettings, txs: Transaction[], days: number, now: Date) {
+  const today = startOfDay(now)
+  const start = addDays(today, -(days - 1))
+  const startKey = format(start, "yyyy-MM-dd")
+  let running = settings.openingBalanceCents + sum(txs.filter((t) => t.date < startKey).map(signed))
+  const byDay = new Map<string, number>()
+  for (const t of txs) if (t.date >= startKey) byDay.set(t.date, (byDay.get(t.date) ?? 0) + signed(t))
+  return Array.from({ length: days }, (_, i) => {
+    const d = addDays(start, i)
+    const key = format(d, "yyyy-MM-dd")
+    running += byDay.get(key) ?? 0
+    return { key, label: format(d, "dd MMM", { locale: ptBR }), saldo: running }
+  })
+}
+
+/** Saídas do mês por categoria, da maior para a menor (centavos). */
+export function expensesByCategory(txs: Transaction[], now: Date) {
+  const map = new Map<string, number>()
+  for (const t of txs) {
+    if (t.type !== "saida" || !isSameMonth(parseISO(t.date), now)) continue
+    map.set(t.category, (map.get(t.category) ?? 0) + t.amountCents)
+  }
+  const total = sum([...map.values()])
+  return [...map.entries()]
+    .map(([category, cents]) => ({ category, cents, pct: total ? cents / total : 0 }))
+    .sort((a, b) => b.cents - a.cents)
+}
+
 // ---------- tarefas e agenda ----------
 
 export type TaskBucket = "atrasadas" | "hoje" | "semana" | "depois" | "sem_prazo" | "feitas"
@@ -181,6 +212,75 @@ export function taskBucket(task: Task, now: Date): TaskBucket {
   return task.done ? "feitas" : dueBucket(task.dueDate, now)
 }
 
+const PRIORITY_WEIGHT: Record<Priority, number> = { urgente: 0, alta: 1, media: 2, baixa: 3 }
+
+export type TaskSort = "prazo" | "prioridade"
+
+/** Prazo: data e depois prioridade. Prioridade: prioridade e depois data. Sem valor vai para o fim. */
+export function compareTasks(a: Task, b: Task, sort: TaskSort = "prazo") {
+  const pa = a.priority ? PRIORITY_WEIGHT[a.priority] : 9
+  const pb = b.priority ? PRIORITY_WEIGHT[b.priority] : 9
+  const da = a.dueDate ?? "9999"
+  const db = b.dueDate ?? "9999"
+  return sort === "prioridade" ? pa - pb || da.localeCompare(db) : da.localeCompare(db) || pa - pb
+}
+
+export function checklistProgress(task: Pick<Task, "checklist">) {
+  const items = task.checklist ?? []
+  const done = items.filter((i) => i.done).length
+  return { done, total: items.length, pct: items.length ? done / items.length : 0 }
+}
+
+/** Próximo prazo de uma tarefa recorrente, a partir do prazo atual (ou de hoje, se não tiver). */
+export function nextOccurrence(dueDate: string | undefined, recurrence: Recurrence, now: Date) {
+  const base = dueDate ? parseISO(dueDate) : startOfDay(now)
+  const next = recurrence === "diaria" ? addDays(base, 1) : recurrence === "semanal" ? addWeeks(base, 1) : addMonths(base, 1)
+  return format(next, "yyyy-MM-dd")
+}
+
+/**
+ * Atalhos no campo rápido: "Ligar pro cliente !alta #vendas".
+ * `!urgente|!alta|!media|!baixa` (ou !!!, !!, !) definem prioridade; `#palavra` vira etiqueta.
+ */
+export function parseQuickAdd(input: string): { title: string; priority?: Priority; labels: string[] } {
+  let priority: Priority | undefined
+  const labels: string[] = []
+  const words = input.split(/\s+/).filter((w) => {
+    const lower = w.toLowerCase()
+    const byName: Record<string, Priority> = {
+      "!urgente": "urgente",
+      "!!!": "urgente",
+      "!alta": "alta",
+      "!!": "alta",
+      "!media": "media",
+      "!média": "media",
+      "!": "media",
+      "!baixa": "baixa",
+    }
+    if (byName[lower]) {
+      priority = byName[lower]
+      return false
+    }
+    if (/^#[\p{L}\p{N}_-]+$/u.test(w)) {
+      const label = w.slice(1).toLowerCase()
+      if (!labels.includes(label)) labels.push(label)
+      return false
+    }
+    return true
+  })
+  return { title: words.join(" ").trim(), priority, labels }
+}
+
+/** Progresso do dia: tarefas com prazo hoje (ou atrasadas) já concluídas vs. total. */
+export function dayProgress(tasks: Task[], userId: string | null, now: Date) {
+  const todayKey = format(now, "yyyy-MM-dd")
+  const mine = tasks.filter((t) => (userId === null || t.ownerId === userId) && t.dueDate)
+  const doneToday = mine.filter((t) => t.done && t.doneAt && daysSince(t.doneAt, now) === 0 && t.dueDate! <= todayKey).length
+  const pending = mine.filter((t) => !t.done && t.dueDate! <= todayKey).length
+  const total = doneToday + pending
+  return { done: doneToday, total, pct: total ? doneToday / total : 0 }
+}
+
 export interface AgendaItem {
   kind: "task" | "lead"
   id: string
@@ -188,6 +288,7 @@ export interface AgendaItem {
   context?: string
   dueDate: string
   bucket: "atrasadas" | "hoje" | "semana"
+  priority?: Priority
 }
 
 /** Tudo que é responsabilidade de `userId` até o fim desta semana (inclui atrasados). */
@@ -198,7 +299,7 @@ export function myAgenda(userId: string, leads: Lead[], tasks: Task[], now: Date
     const bucket = dueBucket(t.dueDate, now)
     if (bucket === "atrasadas" || bucket === "hoje" || bucket === "semana") {
       const lead = t.leadId ? leads.find((l) => l.id === t.leadId) : undefined
-      items.push({ kind: "task", id: t.id, title: t.title, context: lead?.name, dueDate: t.dueDate, bucket })
+      items.push({ kind: "task", id: t.id, title: t.title, context: lead?.name, dueDate: t.dueDate, bucket, priority: t.priority })
     }
   }
   for (const l of leads) {

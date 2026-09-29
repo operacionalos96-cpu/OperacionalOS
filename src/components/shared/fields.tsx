@@ -41,9 +41,9 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground transition-colors hover:text-foreground",
+            "inline-flex items-center gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground transition-[color,background-color,box-shadow,transform] duration-200 hover:text-foreground active:scale-[0.97]",
             size === "sm" ? "h-6 text-xs" : "h-7 text-sm",
-            value === o.value && "bg-background text-foreground shadow-sm",
+            value === o.value && "bg-card text-foreground shadow-[inset_0_0_0_1px_var(--border)]",
           )}
         >
           {o.label}
@@ -170,10 +170,10 @@ export function Chip({
     <button
       type="button"
       className={cn(
-        "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors",
+        "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.96]",
         active
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+          ? "border-foreground/80 bg-foreground text-background"
+          : "border-border bg-card text-muted-foreground hover:-translate-y-px hover:border-foreground/25 hover:bg-accent hover:text-foreground",
         className,
       )}
       {...props}
@@ -258,9 +258,9 @@ export function Field({
 }) {
   return (
     <div className="grid gap-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-muted-foreground">
-        {label}
-        {hint && <span className="font-normal"> · {hint}</span>}
+      <label htmlFor={htmlFor} className="flex items-baseline gap-1.5">
+        <span className="t-label">{label}</span>
+        {hint && <span className="t-desc text-xs">{hint}</span>}
       </label>
       {children}
     </div>

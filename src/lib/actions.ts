@@ -1,7 +1,7 @@
 "use client"
 
 import { toast } from "sonner"
-import { money } from "@/lib/format"
+import { dueLabel, money } from "@/lib/format"
 import { useStore } from "@/lib/store"
 
 /**
@@ -13,11 +13,18 @@ export function toggleTaskWithFeedback(id: string) {
   const s = useStore.getState()
   const task = s.tasks.find((t) => t.id === id)
   if (!task) return
-  s.toggleTask(id)
+  const next = s.toggleTask(id)
   if (!task.done) {
     toast.success("Tarefa concluída", {
-      description: task.title,
-      action: { label: "Desfazer", onClick: () => useStore.getState().updateTask(id, { done: false, doneAt: undefined }) },
+      description: next?.dueDate ? `${task.title} · próxima: ${dueLabel(next.dueDate)}` : task.title,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const st = useStore.getState()
+          st.updateTask(id, { done: false, doneAt: undefined })
+          if (next) st.deleteTask(next.id)
+        },
+      },
     })
   }
 }

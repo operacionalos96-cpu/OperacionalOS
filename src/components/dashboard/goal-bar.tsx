@@ -8,7 +8,7 @@ export function GoalBar({ pct, expectedPct, atRisk }: { pct: number; expectedPct
       <div
         className={cn(
           "h-full rounded-full transition-all duration-500",
-          done ? "bg-emerald-500" : atRisk ? "bg-amber-500" : "bg-foreground",
+          done ? "bg-success" : atRisk ? "bg-warning" : "bg-foreground/80",
         )}
         style={{ width: `${Math.min(pct, 1) * 100}%` }}
       />

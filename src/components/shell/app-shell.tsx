@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 import {
   CheckSquareIcon,
   DatabaseIcon,
   EraserIcon,
+  MonitorIcon,
+  MoonIcon,
   PlusIcon,
   RotateCcwIcon,
   SearchIcon,
+  SunIcon,
   UserPlusIcon,
   WalletIcon,
 } from "lucide-react"
@@ -33,6 +37,7 @@ import { LeadFormDialog } from "@/components/dialogs/lead-form-dialog"
 import { TaskFormDialog } from "@/components/dialogs/task-form-dialog"
 import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dialog"
 import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/lead-flow-dialogs"
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { NAV, isActive } from "./nav"
 
@@ -45,12 +50,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [hydrate])
 
   useGlobalShortcuts()
+  const pathname = usePathname()
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">
-        {hydrated ? children : <PageSkeleton />}
+        {/* key por rota: cada página entra com um fade curto. */}
+        {hydrated ? (
+          <div key={pathname} className="flex min-h-0 flex-1 animate-enter flex-col">
+            {children}
+          </div>
+        ) : (
+          <PageSkeleton />
+        )}
       </main>
       <MobileNav />
       {hydrated && (
@@ -62,6 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NextActionDialog />
           <WonDialog />
           <LostDialog />
+          <TaskDetailSheet />
         </>
       )}
     </div>
@@ -102,9 +116,9 @@ function Sidebar() {
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r bg-sidebar md:flex">
-      <div className="flex h-12 items-center gap-2 px-4">
-        <div className="flex size-6 items-center justify-center rounded-md bg-foreground text-[11px] font-bold text-background">O</div>
-        <span className="text-sm font-semibold">Operacional</span>
+      <div className="flex h-14 items-center gap-2.5 px-4">
+        <div className="btn-depth flex size-7 items-center justify-center rounded-lg text-xs font-extrabold">O</div>
+        <p className="text-sm font-bold tracking-tight">Operacional OS</p>
       </div>
 
       <div className="flex flex-col gap-1 px-2 pb-2">
@@ -119,6 +133,7 @@ function Sidebar() {
         </button>
       </div>
 
+      <p className="t-label px-4 pt-3 pb-1.5">Navegação</p>
       <nav className="flex flex-col gap-0.5 px-2">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href)
@@ -128,23 +143,33 @@ function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex h-8 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                active && "bg-accent text-foreground",
+                "group/nav relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:bg-sidebar-accent hover:text-foreground",
+                active && "bg-sidebar-accent text-foreground shadow-card",
               )}
             >
-              <item.icon className="size-4" />
+              {/* Ativo = 3 sinais: barra de marca, fundo elevado e ícone colorido. */}
+              <span
+                className={cn(
+                  "absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-brand transition-transform duration-300",
+                  active ? "scale-y-100" : "scale-y-0",
+                )}
+              />
+              <item.icon className={cn("size-4 transition-transform duration-200 group-hover/nav:scale-110", active && "text-brand")} />
               {item.label}
               {badge > 0 && (
-                <span className="tabular ml-auto rounded-full bg-red-500/10 px-1.5 text-[11px] font-semibold text-red-600">{badge}</span>
+                <span className="tabular ml-auto rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white shadow-[0_2px_6px_-1px_var(--danger)]">{badge}</span>
               )}
             </Link>
           )
         })}
       </nav>
 
-      <div className="mt-auto border-t p-2">
+      <div className="mt-auto grid gap-3 border-t p-3">
         <MeSwitcher />
-        <DataMenu />
+        <div className="flex items-center justify-between">
+          <DataMenu />
+          <ThemeSwitcher />
+        </div>
       </div>
     </aside>
   )
@@ -163,7 +188,7 @@ function DataMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="mt-2 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground">
+          <button className="flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground">
             <DatabaseIcon className="size-3" /> Dados
           </button>
         </DropdownMenuTrigger>
@@ -234,15 +259,15 @@ function MeSwitcher() {
   const setMe = useStore((s) => s.setMe)
   return (
     <div>
-      <p className="px-1 pb-1.5 text-[11px] font-medium text-muted-foreground">Você é</p>
+      <p className="t-label px-1 pb-1.5">Você é</p>
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5">
         {TEAM.map((u) => (
           <button
             key={u.id}
             onClick={() => setMe(u.id)}
             className={cn(
-              "flex h-7 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground",
-              meId === u.id && "bg-background text-foreground shadow-sm",
+              "flex h-7 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:text-foreground",
+              meId === u.id && "bg-card text-foreground shadow-[0_1px_2px_oklch(0_0_0/10%),0_2px_6px_-2px_oklch(0_0_0/12%)]",
             )}
           >
             <span className="size-2 rounded-full" style={{ backgroundColor: u.color }} />
@@ -250,6 +275,37 @@ function MeSwitcher() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/** Claro / escuro / automático (segue o sistema). */
+function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const options = [
+    { id: "light", icon: SunIcon, label: "Claro" },
+    { id: "dark", icon: MoonIcon, label: "Escuro" },
+    { id: "system", icon: MonitorIcon, label: "Automático" },
+  ] as const
+  return (
+    <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="Tema">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          role="radio"
+          aria-checked={mounted && theme === o.id}
+          title={o.label}
+          onClick={() => setTheme(o.id)}
+          className={cn(
+            "flex size-6 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:text-foreground",
+            mounted && theme === o.id && "bg-card text-foreground shadow-[0_1px_2px_oklch(0_0_0/12%)]",
+          )}
+        >
+          <o.icon className="size-3.5" />
+        </button>
+      ))}
     </div>
   )
 }
@@ -265,14 +321,14 @@ function MobileNav() {
       <div className="fixed right-4 bottom-20 z-40 md:hidden">
         <NewMenu compact />
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t bg-background md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t bg-background/90 backdrop-blur md:hidden">
         {NAV.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
               "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground",
-              isActive(pathname, item.href) && "text-foreground",
+              isActive(pathname, item.href) && "text-brand",
             )}
           >
             <item.icon className="size-5" />

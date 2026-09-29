@@ -1,13 +1,39 @@
-import type { ActivityKind, Stage, Temperature, TransactionType } from "./types"
+import type { ActivityKind, Priority, Recurrence, Stage, Temperature, TransactionType } from "./types"
 
-export const STAGES: { id: Stage; label: string; open: boolean }[] = [
-  { id: "novo", label: "Novo", open: true },
-  { id: "contato", label: "Contato feito", open: true },
-  { id: "proposta", label: "Proposta", open: true },
-  { id: "negociacao", label: "Negociação", open: true },
-  { id: "ganho", label: "Ganho", open: false },
-  { id: "perdido", label: "Perdido", open: false },
+/** `color` é uma variável CSS de globals.css — muda junto com o tema claro/escuro. */
+export const STAGES: { id: Stage; label: string; open: boolean; color: string }[] = [
+  { id: "novo", label: "Novo", open: true, color: "var(--stage-novo)" },
+  { id: "contato", label: "Contato feito", open: true, color: "var(--stage-contato)" },
+  { id: "proposta", label: "Proposta", open: true, color: "var(--stage-proposta)" },
+  { id: "negociacao", label: "Negociação", open: true, color: "var(--stage-negociacao)" },
+  { id: "ganho", label: "Ganho", open: false, color: "var(--success)" },
+  { id: "perdido", label: "Perdido", open: false, color: "var(--muted-foreground)" },
 ]
+
+export function stageColor(stage: Stage) {
+  return STAGES.find((s) => s.id === stage)?.color ?? "var(--muted-foreground)"
+}
+
+/** Ordem = peso na ordenação (0 = mais importante). */
+export const PRIORITIES: { id: Priority; label: string; short: string; color: string; weight: number }[] = [
+  { id: "urgente", label: "Urgente", short: "!!!", color: "var(--danger)", weight: 0 },
+  { id: "alta", label: "Alta", short: "!!", color: "var(--warning)", weight: 1 },
+  { id: "media", label: "Média", short: "!", color: "var(--info)", weight: 2 },
+  { id: "baixa", label: "Baixa", short: "·", color: "var(--muted-foreground)", weight: 3 },
+]
+
+export function priorityMeta(p: Priority | undefined) {
+  return PRIORITIES.find((x) => x.id === p)
+}
+
+export const RECURRENCES: { id: Recurrence; label: string }[] = [
+  { id: "diaria", label: "Todo dia" },
+  { id: "semanal", label: "Toda semana" },
+  { id: "mensal", label: "Todo mês" },
+]
+
+/** Paleta das etiquetas: a cor vem do nome, então a mesma etiqueta tem sempre a mesma cor. */
+export const LABEL_HUES = [264, 200, 160, 130, 85, 45, 20, 340, 300]
 
 export const OPEN_STAGES = STAGES.filter((s) => s.open).map((s) => s.id)
 

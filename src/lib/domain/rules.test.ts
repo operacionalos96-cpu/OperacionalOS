@@ -3,14 +3,21 @@ import type { FinanceSettings, Lead, Task, Transaction } from "./types"
 import {
   attentionItems,
   balance,
+  balanceSeries,
   cashflowSeries,
+  checklistProgress,
+  compareTasks,
+  dayProgress,
   dueBucket,
+  expensesByCategory,
   goalProgress,
   isStale,
   leadUrgency,
   leadsNeedingAction,
   monthDelta,
   myAgenda,
+  nextOccurrence,
+  parseQuickAdd,
   pipelineSummary,
 } from "./rules"
 
@@ -131,5 +138,86 @@ describe("tarefas e agenda", () => {
     const { items, total } = attentionItems({ leads, tasks, txs: [], settings }, NOW, 2)
     expect(total).toBe(4) // 2 leads + 1 tarefa + meta (0% com ~48% esperado)
     expect(items.map((i) => i.kind)).toEqual(["acao_vencida", "tarefa_atrasada"])
+  })
+})
+
+describe("tarefas personalizadas", () => {
+  const t = (p: Partial<Task>): Task => ({ id: "t", title: "T", ownerId: "u1", done: false, createdAt: NOW.toISOString(), ...p })
+
+  it("parseQuickAdd extrai prioridade e etiquetas", () => {
+    expect(parseQuickAdd("Ligar pro cliente !alta #vendas #Vendas")).toEqual({
+      title: "Ligar pro cliente",
+      priority: "alta",
+      labels: ["vendas"],
+    })
+    expect(parseQuickAdd("Pagar DAS !!!").priority).toBe("urgente")
+    expect(parseQuickAdd("Só texto")).toEqual({ title: "Só texto", priority: undefined, labels: [] })
+  })
+
+  it("compareTasks ordena por prazo ou por prioridade", () => {
+    const a = t({ id: "a", dueDate: "2025-10-20", priority: "urgente" })
+    const b = t({ id: "b", dueDate: "2025-10-16", priority: "baixa" })
+    const c = t({ id: "c" })
+    expect([a, b, c].sort((x, y) => compareTasks(x, y, "prazo")).map((x) => x.id)).toEqual(["b", "a", "c"])
+    expect([c, b, a].sort((x, y) => compareTasks(x, y, "prioridade")).map((x) => x.id)).toEqual(["a", "b", "c"])
+  })
+
+  it("nextOccurrence avança conforme a recorrência", () => {
+    expect(nextOccurrence("2025-10-15", "diaria", NOW)).toBe("2025-10-16")
+    expect(nextOccurrence("2025-10-15", "semanal", NOW)).toBe("2025-10-22")
+    expect(nextOccurrence("2025-01-31", "mensal", NOW)).toBe("2025-02-28")
+    expect(nextOccurrence(undefined, "diaria", NOW)).toBe("2025-10-16")
+  })
+
+  it("checklistProgress e dayProgress", () => {
+    expect(checklistProgress({ checklist: [{ id: "1", text: "a", done: true }, { id: "2", text: "b", done: false }] }).pct).toBe(0.5)
+    const tasks = [
+      t({ id: "1", dueDate: "2025-10-15", done: true, doneAt: NOW.toISOString() }),
+      t({ id: "2", dueDate: "2025-10-14" }),
+      t({ id: "3", dueDate: "2025-10-20" }),
+      t({ id: "4", dueDate: "2025-10-15", ownerId: "u2" }),
+    ]
+    expect(dayProgress(tasks, "u1", NOW)).toEqual({ done: 1, total: 2, pct: 0.5 })
+    expect(dayProgress(tasks, null, NOW).total).toBe(3)
+  })
+})
+
+describe("gráficos do financeiro", () => {
+  const tx = (p: Partial<Transaction>): Transaction => ({
+    id: Math.random().toString(),
+    type: "entrada",
+    amountCents: 0,
+    category: "Outros",
+    description: "",
+    date: "2025-10-15",
+    createdById: "u1",
+    ...p,
+  })
+
+  it("balanceSeries acumula o saldo dia a dia", () => {
+    const txs = [
+      tx({ date: "2025-10-01", amountCents: 1000 }),
+      tx({ date: "2025-10-14", amountCents: 500 }),
+      tx({ date: "2025-10-15", type: "saida", amountCents: 200 }),
+    ]
+    const s = balanceSeries({ openingBalanceCents: 100, monthlyGoals: {} }, txs, 3, NOW)
+    expect(s.map((p) => p.saldo)).toEqual([1100, 1600, 1400])
+    expect(s[2].key).toBe("2025-10-15")
+  })
+
+  it("expensesByCategory soma só as saídas do mês", () => {
+    const r = expensesByCategory(
+      [
+        tx({ type: "saida", category: "Marketing", amountCents: 300 }),
+        tx({ type: "saida", category: "Impostos", amountCents: 100 }),
+        tx({ type: "saida", category: "Marketing", amountCents: 100, date: "2025-09-30" }),
+        tx({ type: "entrada", category: "Serviços", amountCents: 999 }),
+      ],
+      NOW,
+    )
+    expect(r).toEqual([
+      { category: "Marketing", cents: 300, pct: 0.75 },
+      { category: "Impostos", cents: 100, pct: 0.25 },
+    ])
   })
 })

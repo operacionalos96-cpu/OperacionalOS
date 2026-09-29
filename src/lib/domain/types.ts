@@ -43,6 +43,15 @@ export interface Activity {
   createdAt: ISODate
 }
 
+export type Priority = "urgente" | "alta" | "media" | "baixa"
+export type Recurrence = "diaria" | "semanal" | "mensal"
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
+}
+
 export interface Task {
   id: string
   title: string
@@ -52,6 +61,13 @@ export interface Task {
   doneAt?: ISODate
   leadId?: string
   createdAt: ISODate
+  /** Campos opcionais: tarefas antigas continuam válidas sem migração. */
+  priority?: Priority
+  labels?: string[]
+  description?: string
+  checklist?: ChecklistItem[]
+  /** Ao concluir, cria a próxima ocorrência automaticamente. */
+  recurrence?: Recurrence
 }
 
 export interface Note {

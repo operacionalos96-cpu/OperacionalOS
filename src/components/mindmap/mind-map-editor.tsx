@@ -270,7 +270,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         className={cn(
           "min-w-24 max-w-64 rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-shadow",
           selected && "border-foreground/40 ring-2 ring-foreground/10",
-          (data.taskId || data.leadId) && "border-l-[3px] border-l-emerald-500",
+          (data.taskId || data.leadId) && "border-l-[3px] border-l-success",
         )}
       >
         {editing ? (
@@ -289,12 +289,12 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         {(lead || task) && (
           <div className="mt-1 flex flex-col gap-0.5 border-t pt-1">
             {task && (
-              <Link href="/tarefas" className="nodrag text-[11px] text-emerald-700 hover:underline">
+              <Link href="/tarefas" className="nodrag text-[11px] text-success hover:underline">
                 ✓ Tarefa{task.done ? " (feita)" : ""}
               </Link>
             )}
             {lead && (
-              <Link href={`/pipeline/${lead.id}`} className="nodrag text-[11px] text-emerald-700 hover:underline">
+              <Link href={`/pipeline/${lead.id}`} className="nodrag text-[11px] text-success hover:underline">
                 → Lead: {lead.name}
               </Link>
             )}

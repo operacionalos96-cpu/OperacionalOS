@@ -5,7 +5,7 @@ import type { User } from "@/lib/domain/types"
  * Os `id`s não devem mudar depois que houver dados salvos.
  */
 export const TEAM: User[] = [
-  { id: "u1", name: "Gabriel", initials: "GA", color: "#6366f1" },
+  { id: "u1", name: "Gabriel", initials: "GA", color: "#2f6fb0" },
   { id: "u2", name: "Igor", initials: "IG", color: "#f59e0b" },
 ]
 

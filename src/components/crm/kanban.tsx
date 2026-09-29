@@ -16,7 +16,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 import { PlusIcon } from "lucide-react"
-import { STAGES } from "@/lib/domain/constants"
+import { STAGES, stageColor } from "@/lib/domain/constants"
 import type { Lead, Stage } from "@/lib/domain/types"
 import { daysSince, leadUrgency, sum } from "@/lib/domain/rules"
 import { moneyCompact } from "@/lib/format"
@@ -103,19 +103,14 @@ function Column({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex w-64 shrink-0 flex-col rounded-xl bg-muted/60 transition-colors",
+        "flex w-64 shrink-0 flex-col rounded-xl border bg-muted/40 transition-colors",
         !open && "w-56 bg-muted/30",
         isOver && "bg-accent ring-2 ring-foreground/10",
       )}
     >
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <span
-          className={cn(
-            "size-2 rounded-full",
-            stage === "ganho" ? "bg-emerald-500" : stage === "perdido" ? "bg-zinc-400" : "bg-foreground/30",
-          )}
-        />
-        <span className="text-sm font-medium">{label}</span>
+        <span className="size-2 rounded-full" style={{ background: stageColor(stage) }} />
+        <span className="text-sm font-semibold">{label}</span>
         <span className="tabular text-xs text-muted-foreground">{leads.length}</span>
         <span className="tabular ml-auto text-xs font-medium text-muted-foreground">{moneyCompact(total)}</span>
       </div>

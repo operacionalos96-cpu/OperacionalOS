@@ -77,7 +77,7 @@ function Pipeline() {
                   <>
                     Precisa de ação
                     {needsCount > 0 && (
-                      <span className="tabular rounded-full bg-red-500/10 px-1.5 text-[11px] font-semibold text-red-600">{needsCount}</span>
+                      <span className="tabular rounded-full bg-danger-soft px-1.5 text-[11px] font-semibold text-danger">{needsCount}</span>
                     )}
                   </>
                 ),

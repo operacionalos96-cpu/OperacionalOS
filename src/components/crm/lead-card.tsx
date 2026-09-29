@@ -24,8 +24,8 @@ export function LeadCard({ lead, dragging = false }: { lead: Lead; dragging?: bo
     <div
       className={cn(
         "group rounded-lg border bg-card p-3 text-left shadow-xs transition-shadow hover:border-foreground/20 hover:shadow-sm",
-        urgency === "vencida" && "border-l-[3px] border-l-red-500",
-        urgency === "parado" && "border-l-[3px] border-l-amber-400",
+        urgency === "vencida" && "border-l-[3px] border-l-danger",
+        urgency === "parado" && "border-l-[3px] border-l-warning",
         dragging && "rotate-1 shadow-lg ring-1 ring-foreground/10",
         !open && "opacity-80",
       )}
@@ -49,13 +49,13 @@ export function LeadCard({ lead, dragging = false }: { lead: Lead; dragging?: bo
           <p
             className={cn(
               "mt-1 flex items-center gap-1 text-[11px] font-medium",
-              urgency === "vencida" ? "text-red-600" : urgency === "hoje" ? "text-foreground" : "text-muted-foreground",
+              urgency === "vencida" ? "text-danger" : urgency === "hoje" ? "text-foreground" : "text-muted-foreground",
             )}
           >
             <ClockIcon className="size-3" />
             {dueLabel(lead.nextAction.dueDate, now)}
             {urgency === "parado" && (
-              <span className="ml-auto flex items-center gap-1 rounded bg-amber-500/10 px-1 py-px text-amber-700">
+              <span className="ml-auto flex items-center gap-1 rounded bg-warning-soft px-1 py-px text-warning">
                 <AlertTriangleIcon className="size-3" /> parado há {daysSince(lead.lastActivityAt, now)}d
               </span>
             )}

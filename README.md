@@ -1,4 +1,4 @@
-# Operacional
+# Operacional OS
 
 Sistema do dia a dia para uma equipe de 2 pessoas: **Início (Dashboard)**, **Pipeline (CRM)**, **Financeiro**, **Tarefas & Notas** e **Mapas**.
 
@@ -21,6 +21,8 @@ Na primeira abertura o sistema carrega **dados de exemplo**. Para usar de verdad
 | Estágios do pipeline, categorias financeiras, "lead parado" (7 dias) | `src/lib/domain/constants.ts` |
 | Regras (parado, atenção, meta, agenda) — funções puras e testadas | `src/lib/domain/rules.ts` |
 | Dados de exemplo | `src/lib/seed.ts` |
+| Cores, tema escuro/claro, botões, animações e hierarquia de texto | `src/app/globals.css` (tokens) |
+| Prioridades e recorrência de tarefas | `src/lib/domain/constants.ts` |
 
 ## Arquitetura
 
@@ -29,6 +31,20 @@ Na primeira abertura o sistema carrega **dados de exemplo**. Para usar de verdad
 - `src/lib/store.ts` — store (zustand) com atualização otimista; a UI só fala com ela.
 - `src/lib/actions.ts` — ações com toast + "Desfazer".
 - `src/components/dialogs/` — formulários globais (novo lead/tarefa/lançamento, concluir ação, ganho, perdido). Um jeito só de fazer cada coisa.
+
+## Visual
+
+- **Dark mode é o padrão** (troca no rodapé da barra lateral: claro / escuro / automático).
+- Regra: 90% neutro + 10% verde. Verde só para positivo (entradas, meta, concluído).
+- Nunca use cor solta (`text-red-600`): use os tokens `text-danger`, `text-success`, `text-warning`, `bg-brand`…
+- Texto em 4 níveis: `t-title` (título), `t-label` (rótulo), `t-value` (dado), `t-desc` (descrição).
+- Cores dos gráficos validadas para daltonismo (entradas verde × saídas cinza; estágios em rampa neutra).
+
+## Tarefas
+
+- Campo rápido entende atalhos: `Ligar pro cliente !alta #vendas` → prioridade Alta + etiqueta "vendas" (`!!!`/`!urgente`, `!!`/`!alta`, `!`/`!media`, `!baixa`).
+- Clique numa tarefa para abrir o painel: prazo, prioridade, responsável, etiquetas, descrição, **checklist**, lead e **repetição** (todo dia/semana/mês: ao concluir, a próxima é criada sozinha).
+- Filtros por prioridade/etiqueta, busca e ordenação por prazo ou prioridade.
 
 ## Regras de produto embutidas
 

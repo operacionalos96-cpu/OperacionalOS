@@ -4,14 +4,18 @@ import { create } from "zustand"
 import { toast } from "sonner"
 import { TEAM } from "@/config/team"
 import { isOpenStage, stageLabel } from "@/lib/domain/constants"
+import { nextOccurrence } from "@/lib/domain/rules"
 import type {
   Activity,
   ActivityKind,
+  ChecklistItem,
   FinanceSettings,
   Lead,
   MindMap,
   NextAction,
   Note,
+  Priority,
+  Recurrence,
   Stage,
   Task,
   Temperature,
@@ -46,6 +50,11 @@ export interface NewTaskInput {
   ownerId: string
   dueDate?: string
   leadId?: string
+  priority?: Priority
+  labels?: string[]
+  description?: string
+  checklist?: ChecklistItem[]
+  recurrence?: Recurrence
 }
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
@@ -74,7 +83,8 @@ interface State {
 
   createTask(input: NewTaskInput): Task
   updateTask(id: string, patch: Partial<Omit<Task, "id">>): void
-  toggleTask(id: string): void
+  /** Retorna a próxima ocorrência criada, se a tarefa for recorrente. */
+  toggleTask(id: string): Task | undefined
   deleteTask(id: string): void
   restoreTask(task: Task): void
 
@@ -250,6 +260,11 @@ export const useStore = create<State>((set, get) => {
         leadId: input.leadId,
         done: false,
         createdAt: nowIso(),
+        priority: input.priority,
+        labels: input.labels?.length ? input.labels : undefined,
+        description: input.description?.trim() || undefined,
+        checklist: input.checklist?.length ? input.checklist : undefined,
+        recurrence: input.recurrence,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
       persist(repos().tasks.upsert(task))
@@ -267,6 +282,13 @@ export const useStore = create<State>((set, get) => {
       const done = !task.done
       saveTask({ ...task, done, doneAt: done ? nowIso() : undefined })
       if (done && task.leadId) addActivity(task.leadId, "acao_concluida", `Tarefa: ${task.title}`)
+      if (!done || !task.recurrence) return
+      // Recorrente: a próxima nasce com o checklist zerado e o mesmo resto.
+      return get().createTask({
+        ...task,
+        dueDate: nextOccurrence(task.dueDate, task.recurrence, new Date()),
+        checklist: task.checklist?.map((i) => ({ ...i, id: uid(), done: false })),
+      })
     },
 
     deleteTask(id) {

@@ -18,9 +18,9 @@ import { UserAvatar } from "@/components/shared/user-avatar"
 import { TemperatureDot } from "./lead-card"
 
 const GROUPS: { id: LeadUrgency; label: string; hint: string; tone: string }[] = [
-  { id: "vencida", label: "Ação vencida", hint: "O próximo passo já passou da data", tone: "text-red-600" },
+  { id: "vencida", label: "Ação vencida", hint: "O próximo passo já passou da data", tone: "text-danger" },
   { id: "hoje", label: "Para hoje", hint: "Próximo passo marcado para hoje", tone: "text-foreground" },
-  { id: "parado", label: "Parados", hint: "Sem nenhuma atividade há 7 dias ou mais", tone: "text-amber-700" },
+  { id: "parado", label: "Parados", hint: "Sem nenhuma atividade há 7 dias ou mais", tone: "text-warning" },
 ]
 
 export function NeedsActionList({ leads }: { leads: Lead[] }) {
@@ -89,12 +89,12 @@ function ActionRow({ lead, urgency, now }: { lead: Lead; urgency: LeadUrgency; n
           </p>
           <p className="truncate text-sm text-muted-foreground">
             <span className="text-foreground">{lead.nextAction.text}</span> ·{" "}
-            <span className={cn(urgency === "vencida" && "font-medium text-red-600")}>{dueLabel(lead.nextAction.dueDate, now)}</span>
-            {urgency === "parado" && <span className="text-amber-700"> · sem atividade há {daysSince(lead.lastActivityAt, now)} dias</span>}
+            <span className={cn(urgency === "vencida" && "font-medium text-danger")}>{dueLabel(lead.nextAction.dueDate, now)}</span>
+            {urgency === "parado" && <span className="text-warning"> · sem atividade há {daysSince(lead.lastActivityAt, now)} dias</span>}
           </p>
         </div>
       </Link>
-      <div className="flex shrink-0 gap-2 pl-10 sm:pl-0">
+      <div className="flex shrink-0 justify-end gap-2 pl-10 sm:w-72 sm:pl-0">
         {/* Adiar não resolve lead parado (só atividade resolve), então não é oferecido. */}
         {urgency !== "parado" && (
         <DropdownMenu>
