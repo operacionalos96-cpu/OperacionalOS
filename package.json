@@ -27,6 +27,7 @@
     "react": "19.1.0",
     "react-day-picker": "^10.0.1",
     "react-dom": "19.1.0",
+    "read-excel-file": "^9.3.10",
     "recharts": "^3.8.0",
     "server-only": "^0.0.1",
     "shadcn": "^4.21.0",

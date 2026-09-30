@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { KanbanIcon, PlusIcon, SearchIcon, UserPlusIcon } from "lucide-react"
+import { FileSpreadsheetIcon, KanbanIcon, PlusIcon, SearchIcon, UserPlusIcon } from "lucide-react"
 import { leadsNeedingAction } from "@/lib/domain/rules"
 import { useStore } from "@/lib/store"
 import { openLeadForm } from "@/lib/ui-store"
@@ -12,6 +12,7 @@ import { Segmented } from "@/components/shared/fields"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
 import { Kanban } from "@/components/crm/kanban"
 import { NeedsActionList } from "@/components/crm/needs-action-list"
+import { ImportLeadsDialog } from "@/components/crm/import-leads-dialog"
 
 export default function PipelinePage() {
   return (
@@ -31,6 +32,7 @@ function Pipeline() {
   const allLeads = useStore((s) => s.leads)
   const meId = useStore((s) => s.meId)
   const [query, setQuery] = useState("")
+  const [importing, setImporting] = useState(false)
 
   // Estado na URL: links do Dashboard abrem a visão certa, e o voltar do navegador funciona.
   const view: View = params.get("view") === "acao" ? "acao" : "quadro"
@@ -60,9 +62,14 @@ function Pipeline() {
       <PageHeader
         title="Pipeline"
         actions={
-          <Button onClick={() => openLeadForm()}>
-            <PlusIcon /> Novo lead
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setImporting(true)}>
+              <FileSpreadsheetIcon /> Importar planilha
+            </Button>
+            <Button onClick={() => openLeadForm()}>
+              <PlusIcon /> Novo lead
+            </Button>
+          </>
         }
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -118,6 +125,7 @@ function Pipeline() {
           <NeedsActionList leads={leads} />
         )}
       </div>
+      <ImportLeadsDialog open={importing} onClose={() => setImporting(false)} />
     </div>
   )
 }

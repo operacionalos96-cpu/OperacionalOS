@@ -42,7 +42,7 @@ import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dia
 import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/lead-flow-dialogs"
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
-import { NAV, isActive } from "./nav"
+import { NAV, NAV_SECTIONS, isActive } from "./nav"
 
 /** Telas sem barra lateral e sem dados (login, redefinir senha). */
 const BARE_PATHS = ["/login", "/redefinir-senha"]
@@ -148,35 +148,39 @@ function Sidebar() {
         </button>
       </div>
 
-      <p className="t-label px-4 pt-3 pb-1.5">Navegação</p>
-      <nav className="flex flex-col gap-0.5 px-2">
-        {NAV.map((item) => {
-          const active = isActive(pathname, item.href)
-          const badge = hydrated ? badges[item.href] : 0
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "group/nav relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:bg-sidebar-accent hover:text-foreground",
-                active && "bg-sidebar-accent text-foreground shadow-card",
-              )}
-            >
-              {/* Ativo = 3 sinais: barra de marca, fundo elevado e ícone colorido. */}
-              <span
-                className={cn(
-                  "absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-brand transition-transform duration-300",
-                  active ? "scale-y-100" : "scale-y-0",
-                )}
-              />
-              <item.icon className={cn("size-4 transition-transform duration-200 group-hover/nav:scale-110", active && "text-brand")} />
-              {item.label}
-              {badge > 0 && (
-                <span className="tabular ml-auto rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white shadow-[0_2px_6px_-1px_var(--danger)]">{badge}</span>
-              )}
-            </Link>
-          )
-        })}
+      <nav className="flex flex-col gap-4 px-2 pt-2">
+        {NAV_SECTIONS.map((section, si) => (
+          <div key={si} className="flex flex-col gap-0.5">
+            {section.title && <p className="t-label px-2.5 pb-1">{section.title}</p>}
+            {section.items.map((item) => {
+              const active = isActive(pathname, item.href)
+              const badge = hydrated ? badges[item.href] : 0
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "group/nav relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:bg-sidebar-accent hover:text-foreground",
+                    active && "bg-sidebar-accent text-foreground shadow-card",
+                  )}
+                >
+                  {/* Ativo = 3 sinais: barra de marca, fundo elevado e ícone colorido. */}
+                  <span
+                    className={cn(
+                      "absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-brand transition-transform duration-300",
+                      active ? "scale-y-100" : "scale-y-0",
+                    )}
+                  />
+                  <item.icon className={cn("size-4 transition-transform duration-200 group-hover/nav:scale-110", active && "text-brand")} />
+                  {item.label}
+                  {badge > 0 && (
+                    <span className="tabular ml-auto rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white shadow-[0_2px_6px_-1px_var(--danger)]">{badge}</span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* grid-cols-[minmax(0,1fr)]: sem isso o e-mail longo estica o card para fora da barra. */}
@@ -372,7 +376,7 @@ function MobileNav() {
             )}
           >
             <item.icon className="size-5" />
-            {"short" in item ? item.short : item.label}
+            {item.short ?? item.label}
           </Link>
         ))}
         <button
