@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { PRODUCT_KINDS, PRODUCT_STATUSES, type Product, type ProductKind, type ProductStatus } from "@/lib/domain/products"
-import { moneyInputValue, parseMoney, uid } from "@/lib/format"
+import { money, moneyInputValue, parseMoney, uid } from "@/lib/format"
 import { useProducts } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -25,6 +25,8 @@ export function ProductFormDialog({
 }) {
   const meId = useStore((s) => s.meId)
   const save = useProducts((s) => s.save)
+  const leads = useStore((s) => s.leads)
+  const updateLead = useStore((s) => s.updateLead)
   const [name, setName] = useState("")
   const [kind, setKind] = useState<ProductKind>("infoproduto")
   const [status, setStatus] = useState<ProductStatus>("ativo")
@@ -59,7 +61,24 @@ export function ProductFormDialog({
       description: description.trim() || undefined,
       ownerId,
     })
-    toast.success(product ? "Produto atualizado" : `Produto "${saved.name}" criado`)
+    // Preço mudou: leads abertos que seguiam o preço antigo (ou sem valor) acompanham o novo.
+    // Quem tem valor negociado diferente fica como está.
+    const oldPrice = product?.priceCents
+    const newPrice = saved.priceCents
+    const following =
+      product && newPrice && newPrice !== oldPrice
+        ? leads.filter((l) => l.productId === product.id && l.stage !== "ganho" && l.stage !== "perdido" && (l.valueCents === oldPrice || l.valueCents === 0))
+        : []
+    for (const l of following) updateLead(l.id, { valueCents: newPrice! })
+    toast.success(product ? "Produto atualizado" : `Produto "${saved.name}" criado`, {
+      description: following.length ? `${following.length} leads abertos passaram para ${money(newPrice!)}.` : undefined,
+      action: following.length
+        ? {
+            label: "Desfazer nos leads",
+            onClick: () => following.forEach((l) => useStore.getState().updateLead(l.id, { valueCents: l.valueCents })),
+          }
+        : undefined,
+    })
     onSaved?.(saved)
     onClose()
   }
@@ -69,7 +88,9 @@ export function ProductFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{product ? "Editar produto" : "Novo produto"}</DialogTitle>
-          <DialogDescription>Links, leads e lançamentos você liga depois, na página do produto.</DialogDescription>
+          <DialogDescription>
+            {product ? "Mudar o preço atualiza os leads abertos que estavam no preço antigo (valores negociados ficam como estão)." : "Links, leads e lançamentos você liga depois, na página do produto."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} onKeyDown={submitOnModEnter} className="grid gap-4">
           <Field label="Nome *">
