@@ -13,6 +13,7 @@ import { EmptyState, PageHeader } from "@/components/shared/layout"
 import { Kanban } from "@/components/crm/kanban"
 import { NeedsActionList } from "@/components/crm/needs-action-list"
 import { ImportLeadsDialog } from "@/components/crm/import-leads-dialog"
+import { RebalanceButton } from "@/components/crm/rebalance-button"
 
 export default function PipelinePage() {
   return (
@@ -63,6 +64,7 @@ function Pipeline() {
         title="Pipeline"
         actions={
           <>
+            <RebalanceButton />
             <Button variant="outline" onClick={() => setImporting(true)}>
               <FileSpreadsheetIcon /> Importar planilha
             </Button>

@@ -7,6 +7,8 @@ import { stageLabel } from "@/lib/domain/constants"
 import type { Temperature } from "@/lib/domain/types"
 import { dueShortcuts, moneyInputValue, parseMoney } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { nextOwner, openCounts } from "@/lib/domain/distribution"
+import { TEAM } from "@/config/team"
 import { safeUrl } from "@/lib/domain/products"
 import { useUI } from "@/lib/ui-store"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -24,6 +26,7 @@ export function LeadFormDialog() {
   const form = useUI((s) => s.leadForm)
   const setUI = useUI((s) => s.set)
   const meId = useStore((s) => s.meId)
+  const allLeads = useStore((s) => s.leads)
   const createLead = useStore((s) => s.createLead)
   const router = useRouter()
 
@@ -49,7 +52,8 @@ export function LeadFormDialog() {
     setContact(p.contact ?? "")
     setWebsite(p.website ?? "")
     setValueText(moneyInputValue(p.valueCents))
-    setOwnerId(p.ownerId ?? meId)
+    // Sem dono definido: vai para quem tem menos leads abertos (divisão meio a meio).
+    setOwnerId(p.ownerId ?? nextOwner(useStore.getState().leads, TEAM.map((u) => u.id), p.productId))
     setTemperature(p.temperature)
     setProductId(p.productId)
     setActionText(p.nextAction?.text ?? "")
@@ -145,7 +149,10 @@ export function LeadFormDialog() {
           </div>
 
           <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-            <Field label="Responsável">
+            <Field
+              label="Responsável"
+              hint={`automático: quem tem menos (${TEAM.map((u) => `${u.name} ${openCounts(allLeads, TEAM.map((t) => t.id)).get(u.id)}`).join(" · ")})`}
+            >
               <OwnerToggle value={ownerId} onChange={setOwnerId} />
             </Field>
             <Field label="Temperatura">

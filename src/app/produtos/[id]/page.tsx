@@ -36,6 +36,7 @@ import { UserAvatar } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
 import { ProductFormDialog } from "@/components/products/product-form-dialog"
 import { ProductStatusBadge, productKindLabel } from "@/components/products/product-bits"
+import { RebalanceButton } from "@/components/crm/rebalance-button"
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>()
@@ -184,6 +185,7 @@ export default function ProductPage() {
                     </Button>
                   )
                 })()}
+                <RebalanceButton productId={product.id} />
                 <Button size="sm" variant="outline" onClick={() => openLeadForm({ prefill: { productId: product.id } })}>
                   <PlusIcon /> Lead
                 </Button>

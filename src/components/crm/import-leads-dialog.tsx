@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { FileSpreadsheetIcon, Loader2Icon, UploadIcon } from "lucide-react"
 import { TEAM } from "@/config/team"
 import { normalizeHeader, rowsToLeads } from "@/lib/domain/lead-import"
+import { distributeOwners, openCounts } from "@/lib/domain/distribution"
 import { dueShortcuts, moneyInputValue, parseMoney } from "@/lib/format"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -57,7 +58,6 @@ function scriptSheet(sheets: Sheet[]) {
 }
 
 export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const meId = useStore((s) => s.meId)
   const leads = useStore((s) => s.leads)
   const createLead = useStore((s) => s.createLead)
   const updateLead = useStore((s) => s.updateLead)
@@ -134,8 +134,10 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
     if (!preview || (!creating && !updating) || (creating && (!action.trim() || !dueDate))) return
     setBusy(true)
     const updated = fillExisting ? completeExisting() : 0
+    // "Dividir": continua o meio a meio a partir de quantos leads abertos cada um já tem.
+    const owners = owner === "dividir" ? distributeOwners(preview.leads.length, leads, TEAM.map((u) => u.id), productId) : []
     preview.leads.forEach((l, i) => {
-      const ownerId = owner === "dividir" ? TEAM[i % TEAM.length].id : owner
+      const ownerId = owner === "dividir" ? owners[i] : owner
       const lead = createLead({
         name: l.name,
         company: l.company,
@@ -215,11 +217,23 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
                 <MoneyInput value={valueText} onChange={(t) => setValueText(t)} placeholder={moneyInputValue(0) || "0,00"} />
               </Field>
             </div>
-            <Field label="Responsável">
+            <Field
+              label="Responsável"
+              hint={
+                owner === "dividir" && preview?.leads.length
+                  ? (() => {
+                      const ids = TEAM.map((u) => u.id)
+                      const after = openCounts(leads, ids, productId)
+                      for (const o of distributeOwners(preview.leads.length, leads, ids, productId)) after.set(o, after.get(o)! + 1)
+                      return `fica ${TEAM.map((u) => `${u.name} ${after.get(u.id)}`).join(" · ")} leads abertos`
+                    })()
+                  : undefined
+              }
+            >
               <Segmented
                 value={owner}
                 onChange={setOwner}
-                options={[{ value: "dividir", label: "Dividir entre os dois" }, ...TEAM.map((u) => ({ value: u.id, label: u.name })), ...(meId ? [] : [])]}
+                options={[{ value: "dividir", label: "Dividir igualmente" }, ...TEAM.map((u) => ({ value: u.id, label: `Só ${u.name}` }))]}
               />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
