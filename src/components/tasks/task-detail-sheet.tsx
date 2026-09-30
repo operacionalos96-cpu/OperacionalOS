@@ -9,6 +9,8 @@ import { dateTime, dueLabel, uid } from "@/lib/format"
 import { cycleTaskStatus, deleteTaskWithUndo, setTaskStatus } from "@/lib/actions"
 import { taskStatus } from "@/lib/domain/mindmap"
 import { StatusButton } from "@/components/shared/status-button"
+import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { ContextPanel } from "@/components/entities/context-panel"
 import { useStore } from "@/lib/store"
 import { useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -115,6 +117,15 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
             </Link>
           )}
         </Field>
+      </div>
+
+      <div className="border-t">
+        <p className="t-label px-5 pt-4">Conexões</p>
+        <ConnectionsPanel entity={{ type: "task", id: task.id }} bare />
+      </div>
+      <div className="border-t">
+        <p className="t-label px-5 pt-4">Contexto</p>
+        <ContextPanel entity={{ type: "task", id: task.id }} bare />
       </div>
 
       <div className="mt-auto flex items-center gap-2 border-t px-5 py-3">

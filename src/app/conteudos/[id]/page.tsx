@@ -44,6 +44,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, Field, OwnerToggle, ProductSelect } from "@/components/shared/fields"
 import { EmptyState, Panel } from "@/components/shared/layout"
 import { PlatformIcon, accountLabel } from "@/components/content/content-bits"
+import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { ContextPanel } from "@/components/entities/context-panel"
 
 export default function ContentItemPage() {
   const { id } = useParams<{ id: string }>()
@@ -111,7 +113,8 @@ export default function ContentItemPage() {
           <PostsPanel item={item} />
         </div>
 
-        <Panel title="Detalhes" className="h-fit">
+        <div className="flex h-fit flex-col gap-4">
+        <Panel title="Detalhes">
           <div className="grid gap-4 p-4">
             <Field label="Formato">
               <div className="flex flex-wrap gap-1.5">
@@ -137,6 +140,9 @@ export default function ContentItemPage() {
             <p className="t-desc text-xs">Criado {dateTime(item.createdAt)}</p>
           </div>
         </Panel>
+        <ConnectionsPanel entity={{ type: "content", id: item.id }} />
+        <ContextPanel entity={{ type: "content", id: item.id }} />
+        </div>
       </div>
     </div>
   )

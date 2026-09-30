@@ -34,6 +34,8 @@ import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
 import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
+import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { ContextPanel } from "@/components/entities/context-panel"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 export default function LeadPage() {
@@ -115,6 +117,8 @@ function LeadDetail({ lead }: { lead: Lead }) {
           <Properties lead={lead} />
           <LinkedTasks lead={lead} />
           <LinkedMoney lead={lead} />
+          <ConnectionsPanel entity={{ type: "lead", id: lead.id }} />
+          <ContextPanel entity={{ type: "lead", id: lead.id }} />
         </aside>
       </div>
     </div>

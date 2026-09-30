@@ -1,5 +1,28 @@
 # Arquitetura — como o Operacional OS cresce
 
+## Princípio fractal: tudo é uma Entidade
+
+Lead, tarefa, produto, conteúdo, lançamento, nota, mapa, balão do mapa e meta são
+**entidades** (`src/lib/entities/types.ts`: `EntityRef = { type, id }`). Toda entidade
+ganha as mesmas capacidades, em qualquer tela:
+
+| Capacidade | Onde | O que faz |
+| --- | --- | --- |
+| Identidade | `entities/types.ts` · `refKey()` | tipo + id estáveis |
+| Resumo | `entities/summary.ts` · `summaryOf()` | título, subtítulo, concluída? (busca, vínculos, bloqueios) |
+| Abrir | `entities/registry.tsx` · `openEntity()` | ícone e rota de cada tipo (tarefa abre em painel) |
+| Relações | `entities/relations.ts` + coleção `relations` | liga qualquer coisa a qualquer coisa ("depende de", "bloqueia", "gera"…) |
+| Presença | `presenceOf()` | "onde aparece": relações + ligações que já existiam (lead do produto, balão do mapa…) |
+| Bloqueio | `blockersOf()` | tarefa "depende de" algo não feito → aparece **Bloqueada** |
+| Contexto | `components/entities/context-panel.tsx` + coleção `entity_context` | notas, links, anexos, comentários |
+
+Componentes prontos para qualquer página: `<ConnectionsPanel entity={ref} />`,
+`<ContextPanel entity={ref} />`, `<EntityPicker onPick />`, `<EntityChip entity />`.
+A busca Ctrl+K lista todas as entidades pelo registro.
+
+**Entidade nova:** tipo em `types.ts` → caso em `summaryOf`/`searchableEntities` →
+ícone/rota em `registry.tsx` → (se ligar a outras por campo, um caso em `presenceOf`).
+
 ## Módulos
 
 Cada área (Pipeline, Produtos, Conteúdos, …) é um **módulo** com 4 partes:

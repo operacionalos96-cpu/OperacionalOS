@@ -1,11 +1,11 @@
 "use client"
 
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { CheckSquareIcon, ClapperboardIcon, FileTextIcon, PackageIcon, UserPlusIcon, WalletIcon } from "lucide-react"
-import { stageLabel } from "@/lib/domain/constants"
-import { money } from "@/lib/format"
-import { useStore } from "@/lib/store"
-import { useContentItems, useProducts } from "@/lib/modules"
+import { CheckSquareIcon, UserPlusIcon, WalletIcon } from "lucide-react"
+import { ENTITY_ICON, openEntity, useEntitySnapshot } from "@/lib/entities/registry"
+import { ENTITY_LABEL, searchableEntities } from "@/lib/entities/summary"
+import { refKey, type EntityType } from "@/lib/entities/types"
 import { openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
 import {
   Command,
@@ -17,16 +17,17 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
-import { AvatarDot } from "@/components/shared/user-avatar"
 import { NAV } from "./nav"
 
 export function CommandPalette() {
   const open = useUI((s) => s.paletteOpen)
   const setUI = useUI((s) => s.set)
-  const leads = useStore((s) => s.leads)
-  const notes = useStore((s) => s.notes)
-  const products = useProducts((s) => s.items)
-  const contents = useContentItems((s) => s.items)
+  const snap = useEntitySnapshot()
+  const groups = useMemo(() => {
+    const byType = new Map<EntityType, ReturnType<typeof searchableEntities>>()
+    for (const it of searchableEntities(snap)) byType.set(it.type, [...(byType.get(it.type) ?? []), it])
+    return [...byType.entries()]
+  }, [snap])
   const router = useRouter()
 
   function run(fn: () => void) {
@@ -70,47 +71,21 @@ export function CommandPalette() {
           ))}
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="Leads">
-          {leads.map((l) => (
-            <CommandItem
-              key={l.id}
-              value={`${l.name} ${l.company ?? ""} ${l.id}`}
-              onSelect={() => run(() => router.push(`/pipeline/${l.id}`))}
-            >
-              <AvatarDot userId={l.ownerId} size="xs" />
-              <span className="truncate">{l.name}</span>
-              <span className="truncate text-muted-foreground">{l.company}</span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                {stageLabel(l.stage)} · {money(l.valueCents)}
-              </span>
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Produtos">
-          {products.map((p) => (
-            <CommandItem key={p.id} value={`produto ${p.name} ${p.id}`} onSelect={() => run(() => router.push(`/produtos/${p.id}`))}>
-              <PackageIcon /> {p.name}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Conteúdos">
-          {contents.map((c) => (
-            <CommandItem key={c.id} value={`conteudo ${c.title} ${c.id}`} onSelect={() => run(() => router.push(`/conteudos/${c.id}`))}>
-              <ClapperboardIcon /> <span className="truncate">{c.title}</span>
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Notas">
-          {notes.map((n) => (
-            <CommandItem
-              key={n.id}
-              value={`${n.title} ${n.body.slice(0, 200)} ${n.id}`}
-              onSelect={() => run(() => router.push(`/tarefas?nota=${n.id}`))}
-            >
-              <FileTextIcon /> {n.title || "Sem título"}
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        {/* Busca em TODAS as entidades do OS via registro (módulo novo aparece aqui sozinho). */}
+        {groups.map(([type, list]) => {
+          const Icon = ENTITY_ICON[type]
+          return (
+            <CommandGroup key={type} heading={ENTITY_LABEL[type].many}>
+              {list.map((it) => (
+                <CommandItem key={refKey(it)} value={`${it.title} ${it.subtitle ?? ""} ${refKey(it)}`} onSelect={() => run(() => openEntity(it, router.push))}>
+                  <Icon />
+                  <span className={it.done ? "truncate text-muted-foreground line-through" : "truncate"}>{it.title}</span>
+                  {it.subtitle && <span className="ml-auto max-w-40 shrink-0 truncate text-xs text-muted-foreground">{it.subtitle}</span>}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )
+        })}
       </CommandList>
       </Command>
     </CommandDialog>

@@ -35,3 +35,11 @@ export async function deleteContentFile(path: string) {
   const { error } = await supabaseBrowser().storage.from(BUCKET).remove([path])
   if (error) throw error
 }
+
+/** Anexo de QUALQUER entidade (contexto comum). Mesmo bucket privado, pasta própria. */
+export async function uploadAttachment(entityType: string, entityId: string, file: File) {
+  const path = `anexos/${entityType}/${entityId.replace(/[^A-Za-z0-9-]/g, "_")}/${uid()}-${safeFileName(file.name)}`
+  const { error } = await supabaseBrowser().storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return path
+}

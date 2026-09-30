@@ -37,6 +37,8 @@ import { CountUp } from "@/components/shared/count-up"
 import { ProductFormDialog } from "@/components/products/product-form-dialog"
 import { ProductStatusBadge, productKindLabel } from "@/components/products/product-bits"
 import { RebalanceButton } from "@/components/crm/rebalance-button"
+import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { ContextPanel } from "@/components/entities/context-panel"
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>()
@@ -157,6 +159,8 @@ export default function ProductPage() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <LinksPanel productId={product.id} />
+          <ConnectionsPanel entity={{ type: "product", id: product.id }} />
+          <ContextPanel entity={{ type: "product", id: product.id }} className="lg:col-span-2" />
 
           <Panel
             title="Leads deste produto"

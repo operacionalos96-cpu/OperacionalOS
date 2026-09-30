@@ -10,6 +10,7 @@ import {
   FlagIcon,
   LinkIcon,
   ListChecksIcon,
+  LockIcon,
   MoreHorizontalIcon,
   RepeatIcon,
   SearchIcon,
@@ -38,6 +39,9 @@ import { dueLabel, dueShortcuts } from "@/lib/format"
 import { cycleTaskStatus, deleteTaskWithUndo } from "@/lib/actions"
 import { taskStatus } from "@/lib/domain/mindmap"
 import { StatusButton } from "@/components/shared/status-button"
+import { useEntitySnapshot } from "@/lib/entities/registry"
+import { blockersOf } from "@/lib/entities/relations"
+import { summaryOf } from "@/lib/entities/summary"
 import { useStore } from "@/lib/store"
 import { openTaskDetail, openTaskForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -58,6 +62,18 @@ const DONE_VISIBLE_DAYS = 7
 
 export function TaskList() {
   const tasks = useStore((s) => s.tasks)
+  // Bloqueio automático: tarefa que "depende de" algo ainda não feito.
+  const snap = useEntitySnapshot()
+  const blocked = useMemo(() => {
+    const out = new Map<string, number>()
+    if (!snap.relations.length) return out
+    for (const t of tasks) {
+      if (t.done) continue
+      const n = blockersOf({ type: "task", id: t.id }, snap.relations, (r) => summaryOf(r, snap)?.done ?? true).length
+      if (n) out.set(t.id, n)
+    }
+    return out
+  }, [tasks, snap])
   const meId = useStore((s) => s.meId)
   // Padrão: tarefas da EQUIPE (antes abria em "minhas" e escondia as do sócio).
   // A escolha de cada pessoa fica lembrada neste navegador.
@@ -179,7 +195,7 @@ export function TaskList() {
                     {bucket.label} · {list.length}
                   </GroupLabel>
                 </button>
-                {showDone && <TaskGroup tasks={list} now={now} startIndex={0} />}
+                {showDone && <TaskGroup tasks={list} now={now} startIndex={0} blocked={blocked} />}
               </section>
             )
           }
@@ -192,7 +208,7 @@ export function TaskList() {
                 {bucket.label}
                 <span className="tabular rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{list.length}</span>
               </GroupLabel>
-              <TaskGroup tasks={list} now={now} startIndex={start} />
+              <TaskGroup tasks={list} now={now} startIndex={start} blocked={blocked} />
             </section>
           )
         })
@@ -278,17 +294,17 @@ function FilterMenu({
   )
 }
 
-function TaskGroup({ tasks, now, startIndex }: { tasks: Task[]; now: Date; startIndex: number }) {
+function TaskGroup({ tasks, now, startIndex, blocked }: { tasks: Task[]; now: Date; startIndex: number; blocked: Map<string, number> }) {
   return (
     <ul className="mt-2 divide-y overflow-hidden rounded-xl border bg-card shadow-card">
       {tasks.map((t, i) => (
-        <TaskRow key={t.id} task={t} now={now} index={startIndex + i} />
+        <TaskRow key={t.id} task={t} now={now} index={startIndex + i} blockedBy={blocked.get(t.id) ?? 0} />
       ))}
     </ul>
   )
 }
 
-function TaskRow({ task, now, index }: { task: Task; now: Date; index: number }) {
+function TaskRow({ task, now, index, blockedBy }: { task: Task; now: Date; index: number; blockedBy: number }) {
   const updateTask = useStore((s) => s.updateTask)
   const lead = useStore((s) => (task.leadId ? s.leads.find((l) => l.id === task.leadId) : undefined))
   const [dueOpen, setDueOpen] = useState(false)
@@ -317,8 +333,13 @@ function TaskRow({ task, now, index }: { task: Task; now: Date; index: number })
         <p className={cn("text-sm leading-snug transition-colors", task.done && "text-muted-foreground line-through decoration-muted-foreground/50")}>
           {task.title}
         </p>
-        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status) && (
+        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status || blockedBy > 0) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+            {blockedBy > 0 && (
+              <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-px text-[11px] font-medium text-danger" title="Depende de algo que ainda não foi feito">
+                <LockIcon className="size-3" /> Bloqueada{blockedBy > 1 ? ` (${blockedBy})` : ""}
+              </span>
+            )}
             {!task.done && task.status === "andamento" && (
               <span className="rounded bg-warning-soft px-1.5 py-px text-[11px] font-medium text-warning">Em andamento</span>
             )}
