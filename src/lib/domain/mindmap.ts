@@ -46,7 +46,7 @@ export function nodeStatus(node: Pick<MindMapNode, "status" | "taskId">, tasks: 
 
 /** Progresso do mapa: itens com texto (ignora itens vazios). */
 export function mapProgress(map: Pick<MindMap, "nodes">, tasks: TaskLike[], now = new Date()) {
-  const nodes = map.nodes.filter((n) => n.label.trim())
+  const nodes = ideaNodes(map.nodes).filter((n) => n.label.trim())
   const counts = { afazer: 0, andamento: 0, feito: 0 }
   for (const n of nodes) counts[nodeStatus(n, tasks, now)]++
   return { ...counts, total: nodes.length, pct: nodes.length ? counts.feito / nodes.length : 0 }
@@ -104,12 +104,48 @@ export function nodeKind(node: Pick<MindMapNode, "kind" | "taskId" | "leadId">, 
 }
 
 /** "4 tarefas · 2 ideias · 1 venda": só tipos presentes, na ordem de NODE_KINDS. */
-export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "label">[], leadStage: (leadId: string) => string | undefined = () => undefined) {
+export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "label" | "type">[], leadStage: (leadId: string) => string | undefined = () => undefined) {
   const counts = new Map<NodeKind, number>()
-  for (const n of nodes) {
+  for (const n of ideaNodes(nodes)) {
     if (!n.label.trim()) continue
     const k = nodeKind(n, n.leadId ? leadStage(n.leadId) : undefined)
     counts.set(k, (counts.get(k) ?? 0) + 1)
   }
   return NODE_KINDS.filter((k) => counts.has(k.id)).map((k) => ({ ...k, count: counts.get(k.id)! }))
+}
+
+// ---------- grupos (áreas) ----------
+
+/** Grupo = área visual com título (um registro a mais no mapa, `type: "group"`). */
+export const isArea = (n: Pick<MindMapNode, "type">) => n.type === "group"
+
+/** Só os balões (sem as áreas) — para contar, progresso, prévia. */
+export const ideaNodes = <T extends Pick<MindMapNode, "type">>(nodes: T[]) => nodes.filter((n) => !isArea(n))
+
+type Box = { id: string; x: number; y: number; width: number; height: number }
+
+/** Balões cujo CENTRO está dentro da área: são os que andam junto com ela. */
+export function membersOf(area: Box, boxes: Box[]) {
+  return boxes
+    .filter((b) => b.id !== area.id)
+    .filter((b) => {
+      const cx = b.x + b.width / 2
+      const cy = b.y + b.height / 2
+      return cx >= area.x && cx <= area.x + area.width && cy >= area.y && cy <= area.y + area.height
+    })
+    .map((b) => b.id)
+}
+
+/** Área que envolve os balões escolhidos, com folga (em cima, espaço para o título). */
+export function areaAround(boxes: Box[], pad = 32, titleSpace = 40) {
+  const minX = Math.min(...boxes.map((b) => b.x))
+  const minY = Math.min(...boxes.map((b) => b.y))
+  const maxX = Math.max(...boxes.map((b) => b.x + b.width))
+  const maxY = Math.max(...boxes.map((b) => b.y + b.height))
+  return {
+    x: Math.round(minX - pad),
+    y: Math.round(minY - pad - titleSpace),
+    width: Math.round(maxX - minX + pad * 2),
+    height: Math.round(maxY - minY + pad * 2 + titleSpace),
+  }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { kindCounts, mapProgress, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
+import { areaAround, ideaNodes, kindCounts, mapProgress, membersOf, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
+import type { MindMapNode } from "./types"
 
 const NOW = new Date(2025, 9, 15, 10)
 const node = (p: object) => ({ id: Math.random().toString(), label: "Etapa", x: 0, y: 0, ...p })
@@ -73,5 +74,34 @@ describe("tipos de balão", () => {
   it("contador: só tipos presentes, na ordem, ignora balão sem texto", () => {
     const counts = kindCounts([node({ taskId: "a" }), node({ taskId: "b" }), node({}), node({ label: " " }), node({ kind: "decisao" })])
     expect(counts.map((c) => [c.id, c.count])).toEqual([["ideia", 1], ["tarefa", 2], ["decisao", 1]])
+  })
+})
+
+describe("grupos (áreas)", () => {
+  const area = { id: "g", x: 0, y: 0, width: 300, height: 200 }
+  it("anda junto quem tem o centro dentro da área", () => {
+    const boxes = [
+      area,
+      { id: "dentro", x: 20, y: 60, width: 120, height: 40 },
+      { id: "metade-fora", x: 250, y: 60, width: 120, height: 40 }, // centro em x=310
+      { id: "longe", x: 500, y: 500, width: 120, height: 40 },
+    ]
+    expect(membersOf(area, boxes)).toEqual(["dentro"])
+  })
+
+  it("área criada envolve os balões com folga e espaço para o título", () => {
+    const a = areaAround([
+      { id: "a", x: 100, y: 100, width: 120, height: 40 },
+      { id: "b", x: 300, y: 200, width: 120, height: 40 },
+    ])
+    expect(a).toEqual({ x: 68, y: 28, width: 384, height: 244 })
+    expect(membersOf({ id: "g", ...a }, [{ id: "a", x: 100, y: 100, width: 120, height: 40 }])).toEqual(["a"])
+  })
+
+  it("áreas não contam como itens nem no progresso", () => {
+    const nodes = [node({}), node({ type: "group", label: "Fase 1" })] as MindMapNode[]
+    expect(ideaNodes(nodes)).toHaveLength(1)
+    expect(mapProgress({ nodes }, [], NOW).total).toBe(1)
+    expect(kindCounts(nodes).map((c) => c.count)).toEqual([1])
   })
 })

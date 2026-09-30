@@ -28,9 +28,9 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { BoxSelectIcon, CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
-import { NODE_KINDS, NODE_KIND, NODE_STATUS, fitFontSize, nodeKind, nodeStatus, resolveLinkedTask, type NodeKind } from "@/lib/domain/mindmap"
+import { NODE_KINDS, NODE_KIND, NODE_STATUS, areaAround, fitFontSize, isArea, membersOf, nodeKind, nodeStatus, resolveLinkedTask, type NodeKind } from "@/lib/domain/mindmap"
 import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
 import { setTaskStatus } from "@/lib/actions"
 import { StatusButton } from "@/components/shared/status-button"
@@ -53,7 +53,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind }
-type IdeaNode = Node<IdeaData, "idea">
+/** "idea" = balão; "area" = grupo (retângulo com título que leva junto o que está dentro). */
+type IdeaNode = Node<IdeaData, "idea" | "area">
 
 const CHILD_DX = 240
 const ROW_DY = 64
@@ -76,6 +77,8 @@ interface MapActions {
   setSize: (id: string, width: number | undefined) => void
   /** Tipo (hierarquia/relação) e legenda de uma linha. */
   setEdgeData: (id: string, patch: LinkData) => void
+  /** Cria um balão solto nesta posição do mapa (duplo clique dentro de um grupo). */
+  createAt: (position: { x: number; y: number }) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -84,7 +87,8 @@ const useMap = () => useContext(MapCtx)!
 function flowNode(n: MindMapNode): IdeaNode {
   return {
     id: n.id,
-    type: "idea",
+    type: isArea(n) ? "area" : "idea",
+    ...(isArea(n) ? { zIndex: -1 } : {}),
     position: { x: n.x, y: n.y },
     ...(n.width ? { width: n.width } : {}),
     ...(n.height ? { height: n.height } : {}),
@@ -122,6 +126,7 @@ function toMapNode(n: IdeaNode): MindMapNode {
     description: n.data.description,
     status: n.data.status,
     kind: n.data.kind,
+    type: n.type === "area" ? "group" : undefined,
     width: n.width ? Math.round(n.width) : undefined,
     height: n.height ? Math.round(n.height) : undefined,
   }
@@ -329,6 +334,7 @@ function Editor({ map }: { map: MindMap }) {
       setData: (id, patch) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))),
       setSize: (id, width) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, width, height: undefined } : n))),
       setEdgeData: (id, patch) => setEdges((es) => es.map((e) => (e.id === id ? { ...e, data: { ...(e.data as LinkData | undefined), ...patch } } : e))),
+      createAt: (position) => createNode(position),
     }
   }, [nodes, edges, editingId, setNodes, setEdges, createNode])
 
@@ -360,6 +366,7 @@ function Editor({ map }: { map: MindMap }) {
     if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return
     const selected = nodes.find((n) => n.selected)
     if (!selected) return
+    if (selected.type === "area" && (e.key === "Tab" || e.key === "Enter")) return
     if (e.key === "Tab") {
       e.preventDefault()
       actions.addChild(selected.id)
@@ -377,6 +384,50 @@ function Editor({ map }: { map: MindMap }) {
     createNode(screenToFlowPosition({ x: e.clientX, y: e.clientY }))
   }
 
+  // Grupo: ao arrastar a área, o que tem o centro dentro dela vai junto.
+  const groupDrag = useRef<{ id: string; start: { x: number; y: number }; members: Map<string, { x: number; y: number }> } | null>(null)
+  const onNodeDragStart = useCallback(
+    (_: unknown, node: IdeaNode) => {
+      if (node.type !== "area") return
+      const boxes = nodes.filter((n) => !n.selected || n.id === node.id).map(box)
+      const ids = new Set(membersOf(box(node), boxes))
+      groupDrag.current = {
+        id: node.id,
+        start: { ...node.position },
+        members: new Map(nodes.filter((n) => ids.has(n.id)).map((n) => [n.id, { ...n.position }])),
+      }
+    },
+    [nodes],
+  )
+  const onNodeDrag = useCallback(
+    (_: unknown, node: IdeaNode) => {
+      const drag = groupDrag.current
+      if (!drag || drag.id !== node.id || !drag.members.size) return
+      const dx = node.position.x - drag.start.x
+      const dy = node.position.y - drag.start.y
+      setNodes((ns) => ns.map((n) => {
+        const from = drag.members.get(n.id)
+        return from ? { ...n, position: { x: from.x + dx, y: from.y + dy } } : n
+      }))
+    },
+    [setNodes],
+  )
+  const onNodeDragStop = useCallback(() => {
+    groupDrag.current = null
+  }, [])
+
+  const selectedIdeas = nodes.filter((n) => n.selected && n.type !== "area")
+  function groupSelected() {
+    if (selectedIdeas.length < 2) return
+    const a = areaAround(selectedIdeas.map(box))
+    const id = uid()
+    setNodes((ns) => [
+      { id, type: "area", zIndex: -1, position: { x: a.x, y: a.y }, width: a.width, height: a.height, data: { label: "Grupo" }, selected: true },
+      ...ns.map((n) => ({ ...n, selected: false })),
+    ])
+    setEditingId(id)
+  }
+
   return (
     <MapCtx.Provider value={actions}>
       <div className="relative h-full w-full overflow-hidden" onKeyDown={onKeyDown} onDoubleClick={onDoubleClick}>
@@ -388,6 +439,10 @@ function Editor({ map }: { map: MindMap }) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
+          elevateNodesOnSelect={false}
           connectionMode={ConnectionMode.Loose}
           zoomOnDoubleClick={false}
           deleteKeyCode={editingId ? null : ["Delete", "Backspace"]}
@@ -399,9 +454,16 @@ function Editor({ map }: { map: MindMap }) {
         >
           <Background gap={20} size={1} />
           <MapControls />
+          {selectedIdeas.length >= 2 && !editingId && (
+            <Panel position="top-center">
+              <Button size="sm" variant="outline" className="animate-enter shadow-lift" onClick={groupSelected}>
+                <BoxSelectIcon /> Agrupar {selectedIdeas.length} itens
+              </Button>
+            </Panel>
+          )}
         </ReactFlow>
-        <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-xs whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur lg:block">
-          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga ·
+        <div className="pointer-events-none absolute bottom-3 left-1/2 hidden w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block">
+          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Shift</Kbd>+arrastar seleciona vários ·
           arraste as bolinhas para conectar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
@@ -742,7 +804,7 @@ function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
   )
 }
 
-function NodeInput({ initial, ready, onDone }: { initial: string; ready: boolean; onDone: (v: string) => void }) {
+function NodeInput({ initial, ready, onDone, placeholder = "Digite a ideia…", className }: { initial: string; ready: boolean; onDone: (v: string) => void; placeholder?: string; className?: string }) {
   const [value, setValue] = useState(initial)
   const done = useRef(false)
   const ref = useRef<HTMLInputElement>(null)
@@ -767,8 +829,8 @@ function NodeInput({ initial, ready, onDone }: { initial: string; ready: boolean
         if (e.key === "Enter") finish(value)
         if (e.key === "Escape") finish(initial)
       }}
-      placeholder="Digite a ideia…"
-      className="nodrag w-full min-w-40 bg-transparent text-center outline-none"
+      placeholder={placeholder}
+      className={cn("nodrag w-full min-w-40 bg-transparent text-center outline-none", className)}
     />
   )
 }
@@ -868,7 +930,98 @@ function LinkPicker({ kind, nodeId, label }: { kind: "task" | "lead"; nodeId: st
   )
 }
 
-const NODE_TYPES = { idea: IdeaNodeView }
+/** Tamanho real na tela (medido pelo React Flow) para saber o que está dentro de um grupo. */
+function box(n: IdeaNode) {
+  return {
+    id: n.id,
+    x: n.position.x,
+    y: n.position.y,
+    width: n.measured?.width ?? n.width ?? 120,
+    height: n.measured?.height ?? n.height ?? 40,
+  }
+}
+
+const AREA_HUES = [150, 210, 260, 320, 30, 80]
+
+/**
+ * Grupo: área com título. Arrastar pela área leva junto o que está dentro;
+ * duplo clique no título renomeia, no fundo cria um balão ali.
+ */
+function AreaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
+  const map = useMap()
+  const { screenToFlowPosition } = useReactFlow()
+  const editing = map.editingId === id
+  const hue = data.hue
+  const tint = hue !== undefined ? `oklch(0.7 0.1 ${hue})` : "var(--muted-foreground)"
+  return (
+    <>
+      <NodeResizer
+        isVisible={selected && !editing}
+        minWidth={180}
+        minHeight={120}
+        lineClassName="!border-brand/60"
+        handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
+      />
+      {/* zIndex: a área fica atrás de tudo; a barra dela não pode ficar junto. */}
+      <NodeToolbar isVisible={selected && !editing} position={Position.Top} style={{ zIndex: 1001 }} className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-md">
+        <button
+          type="button"
+          onClick={() => map.setData(id, { hue: undefined })}
+          className={cn("size-5 rounded-full border bg-muted", hue === undefined && "ring-2 ring-foreground/50")}
+          aria-label="Sem cor"
+        />
+        {AREA_HUES.map((h) => (
+          <button
+            key={h}
+            type="button"
+            onClick={() => map.setData(id, { hue: h })}
+            className={cn("size-5 rounded-full", hue === h && "ring-2 ring-foreground/60 ring-offset-1 ring-offset-background")}
+            style={{ background: `oklch(0.68 0.13 ${h})` }}
+            aria-label={`Cor ${h}`}
+          />
+        ))}
+        <ToolbarButton onClick={() => map.remove(id)} label="Desagrupar (os itens continuam no mapa)">
+          <ScissorsIcon /> Desagrupar
+        </ToolbarButton>
+      </NodeToolbar>
+      <div
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          map.createAt(screenToFlowPosition({ x: e.clientX, y: e.clientY }))
+        }}
+        className={cn("h-full w-full rounded-xl border-2 border-dashed", selected && "border-solid")}
+        style={{ borderColor: `color-mix(in oklch, ${tint} ${selected ? 80 : 45}%, transparent)`, background: `color-mix(in oklch, ${tint} 7%, transparent)` }}
+      >
+        <div
+          className="w-fit max-w-full px-3 pt-2"
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            map.setEditingId(id)
+          }}
+        >
+          {editing ? (
+            <NodeInput
+              initial={data.label}
+              ready
+              placeholder="Nome do grupo"
+              className="text-left text-sm font-semibold"
+              onDone={(label) => {
+                map.setLabel(id, label.trim() || data.label || "Grupo")
+                map.setEditingId(null)
+              }}
+            />
+          ) : (
+            <p className="truncate text-sm font-semibold" style={{ color: hue !== undefined ? `light-dark(oklch(0.42 0.1 ${hue}), oklch(0.82 0.08 ${hue}))` : undefined }}>
+              {data.label || "Grupo"}
+            </p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+const NODE_TYPES = { idea: IdeaNodeView, area: AreaNodeView }
 
 /** Legendas prontas (as mesmas das Conexões do resto do OS). */
 const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
@@ -998,6 +1151,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.height ?? null,
       n.status ?? null,
       n.kind ?? null,
+      n.type ?? null,
     ]),
     edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null]),
   ])

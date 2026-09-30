@@ -129,6 +129,8 @@ export interface MindMapNode {
   status?: "andamento" | "feito"
   /** Tipo do balão (Ideia, Projeto, Decisão…). Sem valor: deduzido do vínculo. */
   kind?: "ideia" | "projeto" | "tarefa" | "venda" | "cliente" | "produto" | "meta" | "decisao" | "resumo"
+  /** "group" = área/grupo (retângulo com título). Sem valor = balão comum. */
+  type?: "group"
 }
 
 export interface MindMapEdge {

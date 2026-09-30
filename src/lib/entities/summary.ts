@@ -67,7 +67,7 @@ export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | nu
     }
     case "map": {
       const m = s.mindMaps.find((x) => x.id === ref.id)
-      return m ? { title: m.title, subtitle: `${m.nodes.length} itens`, done: false } : null
+      return m ? { title: m.title, subtitle: `${m.nodes.filter((n) => n.type !== "group").length} itens`, done: false } : null
     }
     case "mapNode": {
       // id = "<mapa>/<balão>"

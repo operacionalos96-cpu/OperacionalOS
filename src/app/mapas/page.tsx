@@ -8,7 +8,7 @@ import { relative } from "@/lib/format"
 import { TEMPLATES } from "@/lib/mindmap-templates"
 import { useStore } from "@/lib/store"
 import { useMindMaps } from "@/lib/maps"
-import { mapProgress } from "@/lib/domain/mindmap"
+import { ideaNodes, mapProgress } from "@/lib/domain/mindmap"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
@@ -44,7 +44,7 @@ export default function MapsPage() {
             {sorted.map((m) => (
               <li key={m.id}>
                 <Link href={`/mapas/${m.id}`} className="block rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20">
-                  <MiniPreview nodes={m.nodes} />
+                  <MiniPreview nodes={ideaNodes(m.nodes)} />
                   <p className="mt-3 truncate text-sm font-medium">{m.title}</p>
                   <p className="text-xs text-muted-foreground">
                     {(() => {
