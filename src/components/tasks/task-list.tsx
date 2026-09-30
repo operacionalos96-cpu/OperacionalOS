@@ -50,13 +50,30 @@ import { AvatarStack } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
 import { LabelChip, PeoplePicker, PriorityFlag } from "./task-bits"
 
+const SCOPE_KEY = "operacional:tarefas-escopo"
+
 /** Concluídas aparecem só por alguns dias; depois somem para não poluir. */
 const DONE_VISIBLE_DAYS = 7
 
 export function TaskList() {
   const tasks = useStore((s) => s.tasks)
   const meId = useStore((s) => s.meId)
-  const [scope, setScope] = useState<"minhas" | "todas">("minhas")
+  // Padrão: tarefas da EQUIPE (antes abria em "minhas" e escondia as do sócio).
+  // A escolha de cada pessoa fica lembrada neste navegador.
+  const [scope, setScopeState] = useState<"minhas" | "todas">(() => {
+    try {
+      return localStorage.getItem(SCOPE_KEY) === "minhas" ? "minhas" : "todas"
+    } catch {
+      return "todas"
+    }
+  })
+  const setScope = (v: "minhas" | "todas") => {
+    setScopeState(v)
+    try {
+      localStorage.setItem(SCOPE_KEY, v)
+    } catch {}
+  }
+  const openOf = (mine: boolean) => tasks.filter((t) => !t.done && (!mine || isTaskFor(t, meId))).length
   const [showDone, setShowDone] = useState(false)
   const [query, setQuery] = useState("")
   const [priority, setPriority] = useState<Priority | null>(null)
@@ -94,7 +111,7 @@ export function TaskList() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 sm:p-6">
-      <DayProgress done={progress.done} total={progress.total} />
+      <DayProgress done={progress.done} total={progress.total} team={scope === "todas"} />
 
       <QuickAdd />
 
@@ -104,8 +121,8 @@ export function TaskList() {
           value={scope}
           onChange={setScope}
           options={[
-            { value: "minhas", label: "Minhas" },
-            { value: "todas", label: "Todas" },
+            { value: "todas", label: <>Equipe <span className="tabular text-muted-foreground">{openOf(false)}</span></> },
+            { value: "minhas", label: <>Minhas <span className="tabular text-muted-foreground">{openOf(true)}</span></> },
           ]}
         />
         <div className="relative min-w-40 flex-1 sm:max-w-56">
@@ -184,7 +201,7 @@ export function TaskList() {
 }
 
 /** Anel de progresso do dia: "o que era para hoje, quanto já foi". */
-function DayProgress({ done, total }: { done: number; total: number }) {
+function DayProgress({ done, total, team }: { done: number; total: number; team: boolean }) {
   const pct = total ? done / total : 0
   const r = 22
   const c = 2 * Math.PI * r
@@ -212,7 +229,7 @@ function DayProgress({ done, total }: { done: number; total: number }) {
         </span>
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">Seu dia</p>
+        <p className="t-label">{team ? "Dia da equipe" : "Seu dia"}</p>
         <p className="text-base font-semibold">
           {total === 0
             ? "Nada com prazo para hoje"

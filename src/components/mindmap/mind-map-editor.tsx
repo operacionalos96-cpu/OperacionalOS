@@ -3,6 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  type EdgeProps,
   Background,
   ConnectionMode,
   Handle,
@@ -22,7 +26,7 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckSquareIcon, MaximizeIcon, MinusIcon, PlusIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CheckSquareIcon, MaximizeIcon, MinusIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { MindMap } from "@/lib/domain/types"
 import { uid } from "@/lib/format"
@@ -167,7 +171,7 @@ function Editor({ map }: { map: MindMap }) {
     const x = new Map(nodes.map((n) => [n.id, n.position.x]))
     return edges.map((e) => {
       const rightward = (x.get(e.target) ?? 0) >= (x.get(e.source) ?? 0)
-      return { ...e, sourceHandle: rightward ? "r" : "l", targetHandle: rightward ? "l" : "r" }
+      return { ...e, type: "unlink", sourceHandle: rightward ? "r" : "l", targetHandle: rightward ? "l" : "r" }
     })
   }, [nodes, edges])
 
@@ -207,6 +211,7 @@ function Editor({ map }: { map: MindMap }) {
           nodes={nodes}
           edges={displayEdges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -224,7 +229,7 @@ function Editor({ map }: { map: MindMap }) {
         </ReactFlow>
         <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-xs whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur lg:block">
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga ·
-          arraste as bolinhas para conectar
+          arraste as bolinhas para conectar · clique na linha para desvincular
         </div>
       </div>
     </MapCtx.Provider>
@@ -349,6 +354,39 @@ function ToolbarButton({ onClick, label, children }: { onClick: () => void; labe
 }
 
 const NODE_TYPES = { idea: IdeaNodeView }
+
+/**
+ * Linha entre ideias. Área de clique larga (a linha é fina); selecionada, fica
+ * destacada e mostra "Desvincular" no meio. Delete/Backspace também desvincula.
+ */
+function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style }: EdgeProps) {
+  const { deleteElements } = useReactFlow()
+  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={path}
+        interactionWidth={24}
+        style={{ ...style, stroke: selected ? "var(--brand)" : undefined, strokeWidth: selected ? 2.5 : 1.5 }}
+      />
+      {selected && (
+        <EdgeLabelRenderer>
+          <button
+            type="button"
+            onClick={() => deleteElements({ edges: [{ id }] })}
+            className="nodrag nopan pointer-events-auto absolute inline-flex animate-enter items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs font-medium text-foreground shadow-lift transition-colors hover:border-danger/50 hover:text-danger"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          >
+            <ScissorsIcon className="size-3.5" /> Desvincular
+          </button>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
+}
+
+const EDGE_TYPES = { unlink: UnlinkEdge }
 
 function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
   return JSON.stringify([
