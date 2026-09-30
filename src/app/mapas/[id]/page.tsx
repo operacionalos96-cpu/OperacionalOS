@@ -13,12 +13,15 @@ import { Button } from "@/components/ui/button"
 import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
 import { MindMapEditor } from "@/components/mindmap/mind-map-editor"
+import { MapOutline } from "@/components/mindmap/map-outline"
+import { cn } from "@/lib/utils"
 
 export default function MapPage() {
   const { id } = useParams<{ id: string }>()
   const map = useMindMap(id)
   const rowsReady = useRowStorageReady()
   const [migrationFailed, setMigrationFailed] = useState(false)
+  const [view, setView] = useState<"mapa" | "lista">("mapa")
   const needsMigration = !!map && rowsReady && !isRowMap(map) && !migrationFailed
 
   // Mapa antigo: passa para 1 registro por balão ao abrir (o formato antigo fica de backup).
@@ -68,6 +71,19 @@ export default function MapPage() {
           </Link>
         </Button>
         <InlineText value={map.title} required onSave={(t) => renameMap(map.id, t)} className="max-w-md text-base font-semibold" />
+        <div className="flex shrink-0 rounded-lg border p-0.5 text-xs" role="tablist" aria-label="Visão">
+          {(["mapa", "lista"] as const).map((v) => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={cn("rounded-md px-2.5 py-1 font-medium capitalize transition-colors", view === v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
         <KindSummary counts={kindCounts(map.nodes, (leadId) => leads.find((l) => l.id === leadId)?.stage)} />
         <MapProgress progress={mapProgress(map, tasks)} />
         <span className="hidden text-xs whitespace-nowrap text-muted-foreground xl:block">Salvo automaticamente</span>
@@ -78,6 +94,8 @@ export default function MapPage() {
       <div className="min-h-0 flex-1">
         {needsMigration ? (
           <p className="grid h-full place-items-center text-sm text-muted-foreground">Preparando o mapa…</p>
+        ) : view === "lista" ? (
+          <MapOutline map={map} />
         ) : (
           // Remonta ao trocar de formato (antigo → por balão).
           <MindMapEditor key={`${map.id}-${map.storage ?? "legacy"}`} map={map} />

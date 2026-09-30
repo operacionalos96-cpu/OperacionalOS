@@ -22,7 +22,7 @@ export interface PresenceSnapshot {
   leads: Pick<Lead, "id" | "productId">[]
   transactions: Pick<Transaction, "id" | "leadId" | "productId">[]
   contents: Pick<ContentItem, "id" | "productId">[]
-  mindMaps: Pick<MindMap, "id" | "nodes">[]
+  mindMaps: Pick<MindMap, "id" | "nodes" | "title">[]
 }
 
 const kindLabel = (kind: Relation["kind"], outgoing: boolean) => {
@@ -42,12 +42,24 @@ export function presenceOf(ref: EntityRef, s: PresenceSnapshot): Presence[] {
     else if (sameRef(r.to, ref)) add({ ref: r.from, via: r.label || kindLabel(r.kind, false), relationId: r.id })
   }
 
-  // Balões de mapa ligados a esta tarefa/lead.
-  if (ref.type === "task" || ref.type === "lead") {
-    for (const m of s.mindMaps)
-      for (const n of m.nodes)
-        if ((ref.type === "task" && n.taskId === ref.id) || (ref.type === "lead" && n.leadId === ref.id))
-          add({ ref: { type: "map", id: m.id }, via: `no mapa · “${n.label || "sem texto"}”` })
+  // Balões de mapa ligados a esta entidade (tarefa, lead, produto, conteúdo…).
+  for (const m of s.mindMaps)
+    for (const n of m.nodes)
+      if (
+        (ref.type === "task" && n.taskId === ref.id) ||
+        (ref.type === "lead" && n.leadId === ref.id) ||
+        (n.ref && n.ref.type === ref.type && n.ref.id === ref.id)
+      )
+        add({ ref: { type: "mapNode", id: `${m.id}/${n.id}` }, via: `no mapa · ${m.title}` })
+
+  // O balão mostra o que ele representa.
+  if (ref.type === "mapNode") {
+    const [mapId, nodeId] = ref.id.split("/")
+    const n = s.mindMaps.find((m) => m.id === mapId)?.nodes.find((x) => x.id === nodeId)
+    if (n?.taskId) add({ ref: { type: "task", id: n.taskId }, via: "tarefa do balão" })
+    if (n?.leadId) add({ ref: { type: "lead", id: n.leadId }, via: "lead do balão" })
+    if (n?.ref) add({ ref: n.ref, via: "ligado ao balão" })
+    if (mapId) add({ ref: { type: "map", id: mapId }, via: "mapa" })
   }
 
   switch (ref.type) {

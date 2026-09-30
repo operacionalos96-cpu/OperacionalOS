@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { ancestors, areaAround, descendants, focusSet, hiddenByCollapse, ideaNodes, kindCounts, mapProgress, membersOf, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
+import { outline, ancestors, areaAround, descendants, focusSet, hiddenByCollapse, ideaNodes, kindCounts, mapProgress, membersOf, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
 import type { MindMapNode } from "./types"
 
 const NOW = new Date(2025, 9, 15, 10)
@@ -128,5 +128,26 @@ describe("ramos: recolher e foco", () => {
   })
   it("foco = item + ramo abaixo + caminho até a raiz", () => {
     expect(focusSet("a", edges)).toEqual(new Set(["a", "a1", "raiz"]))
+  })
+})
+
+describe("lista (outline) e ordem da apresentação", () => {
+  const n = (id: string, x: number, y: number, extra: object = {}) => ({ id, label: id, x, y, ...extra })
+  it("numera raiz → filhos na ordem vertical, sem grupos e sem relações", () => {
+    const nodes = [n("raiz", 0, 0), n("b", 240, 80), n("a", 240, -80), n("a1", 480, -80), n("g", 0, 0, { type: "group" as const }), n("solto", 0, 300)]
+    const edges = [
+      { source: "raiz", target: "b" },
+      { source: "raiz", target: "a" },
+      { source: "a", target: "a1" },
+      { source: "b", target: "solto", kind: "relacao" as const },
+    ]
+    expect(outline(nodes, edges).map((r) => `${r.number} ${r.node.id} ${r.depth}`)).toEqual(["1 raiz 0", "1.1 a 1", "1.1.1 a1 2", "1.2 b 1", "2 solto 0"])
+  })
+  it("ciclo não trava e cada item aparece uma vez", () => {
+    const rows = outline([n("x", 0, 0), n("y", 0, 50)], [{ source: "x", target: "y" }, { source: "y", target: "x" }])
+    expect(rows.map((r) => r.node.id).sort()).toEqual(["x", "y"])
+  })
+  it("balão ligado a produto é do tipo Produto", () => {
+    expect(nodeKind({ ref: { type: "product", id: "p" } })).toBe("produto")
   })
 })

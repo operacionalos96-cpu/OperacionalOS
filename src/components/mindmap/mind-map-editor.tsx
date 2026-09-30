@@ -28,12 +28,11 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { BoxSelectIcon, CheckSquareIcon, CrosshairIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
   NODE_KIND,
-  NODE_STATUS,
   areaAround,
   descendants,
   fitFontSize,
@@ -43,11 +42,15 @@ import {
   membersOf,
   nodeKind,
   nodeStatus,
+  outline,
   resolveLinkedTask,
   type NodeKind,
 } from "@/lib/domain/mindmap"
+import { NodePanel } from "@/components/mindmap/node-panel"
+import { EntityChip } from "@/components/entities/entity-bits"
+import { getUser } from "@/config/team"
 import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
-import { setTaskStatus } from "@/lib/actions"
+import { cycleMapNodeStatus } from "@/lib/actions"
 import { StatusButton } from "@/components/shared/status-button"
 import { toast } from "sonner"
 import { LabelChip, labelHue } from "@/components/tasks/task-bits"
@@ -67,7 +70,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean }
+type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean } & Pick<MindMapNode, "ref" | "decision" | "summaryOf">
 /** "idea" = balão; "area" = grupo (retângulo com título que leva junto o que está dentro). */
 type IdeaNode = Node<IdeaData, "idea" | "area">
 
@@ -100,6 +103,9 @@ interface MapActions {
   /** Modo foco: destaca o ramo, esmaece o resto. */
   focusId: string | null
   setFocus: (id: string | null) => void
+  /** Abre o painel lateral do balão selecionado. */
+  openPanel: () => void
+  areaLabel: (id: string) => string | undefined
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -113,7 +119,7 @@ function flowNode(n: MindMapNode): IdeaNode {
     position: { x: n.x, y: n.y },
     ...(n.width ? { width: n.width } : {}),
     ...(n.height ? { height: n.height } : {}),
-    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status, kind: n.kind, collapsed: n.collapsed },
+    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status, kind: n.kind, collapsed: n.collapsed, ref: n.ref, decision: n.decision, summaryOf: n.summaryOf },
   }
 }
 
@@ -149,6 +155,9 @@ function toMapNode(n: IdeaNode): MindMapNode {
     kind: n.data.kind,
     type: n.type === "area" ? "group" : undefined,
     collapsed: n.data.collapsed || undefined,
+    ref: n.data.ref,
+    decision: n.data.decision && Object.keys(n.data.decision).length ? n.data.decision : undefined,
+    summaryOf: n.data.summaryOf,
     width: n.width ? Math.round(n.width) : undefined,
     height: n.height ? Math.round(n.height) : undefined,
   }
@@ -297,6 +306,8 @@ function Editor({ map }: { map: MindMap }) {
   const { screenToFlowPosition } = useReactFlow()
   useMapSync(map, nodes, edges, setNodes, setEdges)
   const [focusId, setFocus] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [presenting, setPresenting] = useState<number | null>(null)
 
   // Ramos: tamanho de cada um, o que está escondido (recolhido) e o que está em foco.
   const links = useMemo(() => edges.map(toMapEdge), [edges])
@@ -372,6 +383,8 @@ function Editor({ map }: { map: MindMap }) {
       toggleCollapse: (id) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed || undefined } } : n))),
       focusId,
       setFocus,
+      openPanel: () => setPanelOpen(true),
+      areaLabel: (areaId) => nodes.find((n) => n.id === areaId && n.type === "area")?.data.label || (nodes.some((n) => n.id === areaId) ? "Grupo" : undefined),
     }
   }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId])
 
@@ -474,6 +487,49 @@ function Editor({ map }: { map: MindMap }) {
     groupDrag.current = null
   }, [])
 
+  // Apresentação: percorre a árvore (mesma ordem da Lista), centralizando cada balão.
+  const { fitView } = useReactFlow()
+  const slides = useMemo(
+    () => (presenting === null ? [] : outline(nodes.map(toMapNode), links).map((r) => r.node.id).filter((id) => !hidden.has(id))),
+    [presenting !== null, links, hidden], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const slideId = presenting !== null ? slides[presenting] : undefined
+  useEffect(() => {
+    if (!slideId) return
+    setFocus(slideId)
+    fitView({ nodes: [{ id: slideId }], duration: 500, padding: 1.2, maxZoom: 1.6 })
+  }, [slideId, fitView])
+  const stopPresenting = useCallback(() => {
+    setPresenting(null)
+    setFocus(null)
+    fitView({ padding: 0.3, maxZoom: 1, duration: 400 })
+  }, [fitView])
+  useEffect(() => {
+    if (presenting === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stopPresenting()
+      else if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) setPresenting((i) => (i === null ? i : Math.min(i + 1, slides.length - 1)))
+      else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) setPresenting((i) => (i === null ? i : Math.max(i - 1, 0)))
+      else return
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [presenting, slides.length, stopPresenting])
+
+  // Painel lateral: um único balão selecionado (fora da apresentação).
+  const selectedAll = nodes.filter((n) => n.selected)
+  const panelNode = presenting === null && panelOpen && selectedAll.length === 1 && selectedAll[0].type === "idea" ? selectedAll[0] : undefined
+  const leads = useStore((s) => s.leads)
+  const areas = nodes.filter((n) => n.type === "area").map((n) => ({ id: n.id, label: n.data.label }))
+  const membersLabels = (areaId: string) => {
+    const area = nodes.find((n) => n.id === areaId)
+    if (!area) return []
+    const ids = new Set(membersOf(box(area), nodes.filter((n) => n.type === "idea").map(box)))
+    return nodes.filter((n) => ids.has(n.id) && n.id !== panelNode?.id).map((n) => n.data.label || "Sem texto")
+  }
+
   const selectedIdeas = nodes.filter((n) => n.selected && n.type !== "area")
   function groupSelected() {
     if (selectedIdeas.length < 2) return
@@ -511,8 +567,26 @@ function Editor({ map }: { map: MindMap }) {
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} size={1} />
-          <MapControls />
-          {focusId && (
+          <MapControls onPresent={() => setPresenting(0)} />
+          {presenting !== null && (
+            <Panel position="bottom-center" className="!mb-6">
+              <div className="flex animate-enter items-center gap-1 rounded-xl border bg-card p-1 shadow-lift">
+                <Button size="icon-sm" variant="ghost" disabled={presenting === 0} onClick={() => setPresenting(presenting - 1)} aria-label="Anterior">
+                  <ChevronLeftIcon />
+                </Button>
+                <span className="tabular px-2 text-xs font-semibold">
+                  {Math.min(presenting + 1, slides.length)} / {slides.length}
+                </span>
+                <Button size="icon-sm" variant="ghost" disabled={presenting >= slides.length - 1} onClick={() => setPresenting(presenting + 1)} aria-label="Próximo">
+                  <ChevronRightIcon />
+                </Button>
+                <Button size="xs" variant="ghost" onClick={stopPresenting}>
+                  Sair (Esc)
+                </Button>
+              </div>
+            </Panel>
+          )}
+          {focusId && presenting === null && (
             <Panel position="top-center">
               <div className="flex animate-enter items-center gap-2 rounded-lg border bg-card py-1 pr-1 pl-3 text-xs shadow-lift">
                 <CrosshairIcon className="size-3.5 text-brand" />
@@ -525,7 +599,7 @@ function Editor({ map }: { map: MindMap }) {
               </div>
             </Panel>
           )}
-          {selectedIdeas.length >= 2 && !editingId && !focusId && (
+          {selectedIdeas.length >= 2 && !editingId && !focusId && presenting === null && (
             <Panel position="top-center">
               <Button size="sm" variant="outline" className="animate-enter shadow-lift" onClick={groupSelected}>
                 <BoxSelectIcon /> Agrupar {selectedIdeas.length} itens
@@ -533,7 +607,22 @@ function Editor({ map }: { map: MindMap }) {
             </Panel>
           )}
         </ReactFlow>
-        <div className="pointer-events-none absolute bottom-3 left-1/2 hidden w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block">
+        {panelNode && (
+          <NodePanel
+            mapId={map.id}
+            nodeId={panelNode.id}
+            data={panelNode.data}
+            kind={nodeKind(panelNode.data, leads.find((l) => l.id === panelNode.data.leadId)?.stage)}
+            areas={areas}
+            membersOf={membersLabels}
+            style={<StyleFields nodeId={panelNode.id} data={panelNode.data} width={panelNode.width} />}
+            onPatch={(patch) => actions.setData(panelNode.id, patch)}
+            onConvertTask={() => actions.toTask(panelNode.id)}
+            onConvertLead={() => actions.toLead(panelNode.id)}
+            onClose={() => setPanelOpen(false)}
+          />
+        )}
+        <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Shift</Kbd>+arrastar seleciona vários · <Kbd>F</Kbd> foco ·
           arraste as bolinhas para conectar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
@@ -562,7 +651,8 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   const colored = hue !== undefined
   const sized = !!width
   const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
-  const kind = nodeKind({ kind: data.kind, taskId: linked ? data.taskId : undefined, leadId: lead ? data.leadId : undefined }, lead?.stage)
+  const kind = nodeKind({ kind: data.kind, taskId: linked ? data.taskId : undefined, leadId: lead ? data.leadId : undefined, ref: data.ref }, lead?.stage)
+  const summaryArea = data.summaryOf ? map.areaLabel(data.summaryOf) : undefined
   const KindIcon = NODE_KIND_ICON[kind]
   const branchCount = map.branchSize(id)
   const done = status === "feito"
@@ -578,12 +668,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
 
   // Um clique: a fazer → em andamento → feito → a fazer. Com tarefa vinculada, a tarefa muda junto.
   function cycleStatus() {
-    const next = NODE_STATUS[status].next
-    map.setData(id, { status: next === "afazer" ? undefined : next })
-    if (!linked) return
-    // Diária feita hoje e voltando para "a fazer": reabre a de hoje (e some com a de amanhã).
-    if (linked.recurring && linked.doneToday && linked.doneTodayTask && next === "afazer") setTaskStatus(linked.doneTodayTask.id, "afazer")
-    else setTaskStatus(linked.task.id, next)
+    map.setData(id, { status: cycleMapNodeStatus({ status: data.status, taskId: data.taskId }) })
   }
 
   // Desvincular não apaga nada e pode ser desfeito na hora.
@@ -614,7 +699,15 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
           <CrosshairIcon />
         </ToolbarButton>
         <KindPicker nodeId={id} kind={kind} chosen={!!data.kind} />
-        <StylePicker nodeId={id} data={data} width={width} />
+        {/* Tela larga: estilo e tudo mais ficam no painel lateral. */}
+        <span className="lg:hidden">
+          <StylePicker nodeId={id} data={data} width={width} />
+        </span>
+        <span className="hidden lg:inline-flex">
+          <ToolbarButton onClick={map.openPanel} label="Detalhes: vínculo, estilo, conexões e contexto">
+            <PanelRightIcon /> Detalhes
+          </ToolbarButton>
+        </span>
         {(!data.taskId || taskMissing) && <LinkPicker kind="task" nodeId={id} label={data.label} />}
         {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
         <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
@@ -683,8 +776,20 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
             {data.description}
           </p>
         )}
-        {(lead || task || taskMissing) && (
+        {kind === "decisao" && (data.decision?.decidedAt || data.decision?.ownerId) && !editing && (
+          <p className="text-[11px] text-muted-foreground">
+            Decidido{data.decision.decidedAt ? ` em ${data.decision.decidedAt.slice(8, 10)}/${data.decision.decidedAt.slice(5, 7)}` : ""}
+            {data.decision.ownerId ? ` · ${getUser(data.decision.ownerId).name}` : ""}
+          </p>
+        )}
+        {kind === "resumo" && summaryArea && !editing && <p className="text-[11px] text-muted-foreground">Resume: {summaryArea}</p>}
+        {(lead || task || taskMissing || data.ref) && (
           <div className="mt-1 flex w-full flex-col gap-0.5 border-t pt-1 text-left">
+            {data.ref && (
+              <LinkedRow onUnlink={() => map.setData(id, { ref: undefined })} label="Desvincular">
+                <EntityChip entity={data.ref} className="nodrag min-w-0 truncate text-[11px] text-success" showType={false} />
+              </LinkedRow>
+            )}
             {taskMissing && (
               <LinkedRow onUnlink={() => map.linkTask(id, undefined)} label="Remover vínculo com tarefa apagada">
                 <span className="truncate text-warning" title="A tarefa ligada a este item foi excluída">⚠ tarefa apagada</span>
@@ -793,8 +898,24 @@ const SIZES = [
   { id: "g", label: "G", width: 360 },
 ] as const
 
-/** Etiqueta (fase), cor, tamanho e descrição do item. Tudo salva na hora. */
+/** Estilo em popover (telas pequenas; nas largas fica no painel lateral). */
 function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; width?: number }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="Etiqueta, cor, tamanho e descrição">
+          <PaletteIcon /> Estilo
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid w-80 gap-3" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+        <StyleFields nodeId={nodeId} data={data} width={width} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** Etiqueta (fase), cor, tamanho e descrição do item. Tudo salva na hora. */
+function StyleFields({ nodeId, data, width }: { nodeId: string; data: IdeaData; width?: number }) {
   const map = useMap()
   const tasks = useStore((s) => s.tasks)
   const maps = useMindMaps()
@@ -812,13 +933,7 @@ function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
   }
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button size="xs" variant="ghost" title="Etiqueta, cor, tamanho e descrição">
-          <PaletteIcon /> Estilo
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="grid w-80 gap-3" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div className="grid gap-3">
         <div className="grid gap-1.5">
           <p className="t-label">Etiqueta / fase</p>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -894,8 +1009,7 @@ function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
             className="rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-brand"
           />
         </div>
-      </PopoverContent>
-    </Popover>
+    </div>
   )
 }
 
@@ -1253,6 +1367,9 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.kind ?? null,
       n.type ?? null,
       n.collapsed ?? null,
+      n.ref ? `${n.ref.type}:${n.ref.id}` : null,
+      n.decision ? JSON.stringify(n.decision) : null,
+      n.summaryOf ?? null,
     ]),
     edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null]),
   ])
@@ -1262,12 +1379,13 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
  * Zoom e enquadrar com o visual do app (os controles padrão da biblioteca ficavam
  * claro-sobre-claro no tema escuro). Nome de cada botão aparece ao passar o mouse.
  */
-function MapControls() {
+function MapControls({ onPresent }: { onPresent: () => void }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const buttons = [
     { label: "Aproximar", icon: PlusIcon, onClick: () => zoomIn({ duration: 200 }) },
     { label: "Afastar", icon: MinusIcon, onClick: () => zoomOut({ duration: 200 }) },
     { label: "Enquadrar tudo", icon: MaximizeIcon, onClick: () => fitView({ padding: 0.3, maxZoom: 1, duration: 300 }) },
+    { label: "Apresentar (← → para navegar)", icon: PresentationIcon, onClick: onPresent },
   ]
   return (
     <Panel position="bottom-right" className="!mb-16 flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">

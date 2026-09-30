@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo } from "react"
-import { isRowMap, migrationRows, resolveMaps, type MapEdgeRow, type MapNodeRow } from "@/lib/domain/map-rows"
-import type { MindMap } from "@/lib/domain/types"
+import { edgeRow, isRowMap, migrationRows, nodeRow, resolveMaps, rowId, type MapEdgeRow, type MapNodeRow } from "@/lib/domain/map-rows"
+import type { MindMap, MindMapEdge, MindMapNode } from "@/lib/domain/types"
 import { useMapEdges, useMapNodes } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 
@@ -70,4 +70,22 @@ export function restoreMapWithRows(d: DeletedMap) {
   useStore.getState().restoreMap(d.map)
   for (const r of d.nodes) useMapNodes.getState().restore(r)
   for (const r of d.edges) useMapEdges.getState().restore(r)
+}
+
+// ---------- edição fora do editor visual (modo Lista) ----------
+
+/** Grava um balão (só ele). */
+export function saveMapNode(mapId: string, node: MindMapNode) {
+  useMapNodes.getState().save(nodeRow(mapId, node))
+}
+
+export function saveMapEdge(mapId: string, edge: MindMapEdge) {
+  useMapEdges.getState().save(edgeRow(mapId, edge))
+}
+
+/** Apaga o balão e as linhas ligadas a ele. */
+export function removeMapNode(mapId: string, nodeId: string) {
+  for (const r of useMapEdges.getState().items)
+    if (r.mapId === mapId && (r.edge.source === nodeId || r.edge.target === nodeId)) useMapEdges.getState().remove(r.id)
+  useMapNodes.getState().remove(rowId(mapId, nodeId))
 }

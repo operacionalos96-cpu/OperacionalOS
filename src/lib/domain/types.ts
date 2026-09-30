@@ -133,6 +133,12 @@ export interface MindMapNode {
   type?: "group"
   /** Ramo recolhido: filhos escondidos (mostra [n] no balão). */
   collapsed?: boolean
+  /** Ligação com outra coisa do OS (produto, conteúdo, nota…). Tarefa e lead usam taskId/leadId. */
+  ref?: { type: "product" | "content" | "note" | "transaction" | "map"; id: string }
+  /** Balão "Decisão": quando, quem, por quê e o que mais foi considerado. */
+  decision?: { decidedAt?: string; ownerId?: string; reason?: string; alternatives?: string }
+  /** Balão "Resumo": id do grupo (área) que ele resume. */
+  summaryOf?: string
 }
 
 export interface MindMapEdge {

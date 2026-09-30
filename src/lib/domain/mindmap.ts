@@ -96,15 +96,16 @@ export const NODE_KIND = Object.fromEntries(NODE_KINDS.map((k) => [k.id, k])) as
  * Tipo do balão. Escolhido à mão vence; sem escolha, vem do vínculo:
  * tarefa ligada → Tarefa, lead ligado → Venda (ou Cliente, se o lead foi ganho).
  */
-export function nodeKind(node: Pick<MindMapNode, "kind" | "taskId" | "leadId">, leadStage?: string): NodeKind {
+export function nodeKind(node: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "ref">, leadStage?: string): NodeKind {
   if (node.kind) return node.kind
   if (node.taskId) return "tarefa"
+  if (node.ref?.type === "product") return "produto"
   if (node.leadId) return leadStage === "ganho" ? "cliente" : "venda"
   return "ideia"
 }
 
 /** "4 tarefas · 2 ideias · 1 venda": só tipos presentes, na ordem de NODE_KINDS. */
-export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "label" | "type">[], leadStage: (leadId: string) => string | undefined = () => undefined) {
+export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "label" | "type" | "ref">[], leadStage: (leadId: string) => string | undefined = () => undefined) {
   const counts = new Map<NodeKind, number>()
   for (const n of ideaNodes(nodes)) {
     if (!n.label.trim()) continue
@@ -192,4 +193,46 @@ export function hiddenByCollapse(nodes: Pick<MindMapNode, "id" | "collapsed">[],
 /** Modo foco: o item, tudo abaixo dele e o caminho até a raiz. O resto esmaece. */
 export function focusSet(id: string, edges: Link[]): Set<string> {
   return new Set([id, ...descendants(id, edges), ...ancestors(id, edges)])
+}
+
+// ---------- lista (outline) e apresentação ----------
+
+export interface OutlineRow<N> {
+  node: N
+  depth: number
+  /** "1", "1.2", "1.2.3" */
+  number: string
+  parentId?: string
+}
+
+/**
+ * O mapa como lista numerada: raízes (sem pai na hierarquia) de cima para baixo,
+ * filhos logo abaixo de cada item, na ordem em que aparecem no mapa (y, depois x).
+ * Áreas (grupos) ficam de fora. Ciclos não travam: cada item aparece uma vez.
+ */
+export function outline<N extends Pick<MindMapNode, "id" | "x" | "y" | "type">>(nodes: N[], edges: Link[]): OutlineRow<N>[] {
+  const ideas = ideaNodes(nodes)
+  const byId = new Map(ideas.map((n) => [n.id, n]))
+  const order = (a: N, b: N) => a.y - b.y || a.x - b.x
+  const children = new Map<string, N[]>()
+  const hasParent = new Set<string>()
+  for (const e of hierarchy(edges)) {
+    const child = byId.get(e.target)
+    if (!child || !byId.has(e.source) || hasParent.has(e.target)) continue
+    hasParent.add(e.target)
+    children.set(e.source, [...(children.get(e.source) ?? []), child])
+  }
+  const out: OutlineRow<N>[] = []
+  const seen = new Set<string>()
+  const walk = (n: N, depth: number, number: string, parentId?: string) => {
+    if (seen.has(n.id)) return
+    seen.add(n.id)
+    out.push({ node: n, depth, number, parentId })
+    ;[...(children.get(n.id) ?? [])].sort(order).forEach((c, i) => walk(c, depth + 1, `${number}.${i + 1}`, n.id))
+  }
+  let root = 0
+  for (const n of ideas.filter((x) => !hasParent.has(x.id)).sort(order)) walk(n, 0, String(++root))
+  // Sobras de ciclos (todos têm pai): entram como raízes no fim.
+  for (const n of [...ideas].sort(order)) if (!seen.has(n.id)) walk(n, 0, String(++root))
+  return out
 }

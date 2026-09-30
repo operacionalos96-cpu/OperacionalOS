@@ -3,7 +3,7 @@
 import { toast } from "sonner"
 import { dueLabel, money } from "@/lib/format"
 import { useStore } from "@/lib/store"
-import { NODE_STATUS, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
+import { NODE_STATUS, nodeStatus, resolveLinkedTask, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
 
 /**
  * Ações com feedback + "Desfazer". Use estas na UI em vez de chamar a store
@@ -84,4 +84,21 @@ export function setTaskStatus(id: string, next: NodeStatus) {
 export function cycleTaskStatus(id: string) {
   const task = useStore.getState().tasks.find((t) => t.id === id)
   if (task) setTaskStatus(id, NODE_STATUS[taskStatus(task)].next)
+}
+
+/**
+ * Um clique no status de um balão: a fazer → em andamento → feito → a fazer.
+ * Com tarefa ligada, a tarefa muda junto (entende tarefa recorrente: a diária feita
+ * hoje voltando para "a fazer" reabre a de hoje). Devolve o novo status do balão.
+ */
+export function cycleMapNodeStatus(node: { status?: "andamento" | "feito"; taskId?: string }): "andamento" | "feito" | undefined {
+  const tasks = useStore.getState().tasks
+  const linked = resolveLinkedTask(node.taskId, tasks, new Date())
+  const current = nodeStatus({ status: node.status, taskId: linked ? node.taskId : undefined }, tasks)
+  const next = NODE_STATUS[current].next
+  if (linked) {
+    if (linked.recurring && linked.doneToday && linked.doneTodayTask && next === "afazer") setTaskStatus(linked.doneTodayTask.id, "afazer")
+    else setTaskStatus(linked.task.id, next)
+  }
+  return next === "afazer" ? undefined : next
 }

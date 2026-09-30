@@ -73,3 +73,13 @@ O que falta, por plataforma (YouTube Data API, Instagram Graph API, TikTok Conte
 
 Arquivos grandes (bruto de vídeo): o plano Free do Supabase limita 50 MB por arquivo.
 No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "Link".
+
+## Mapa (espaço de pensamento)
+
+- **1 registro por balão** (`map_nodes`, `map_edges`, SQL 0005): cada edição grava só o balão/linha que mudou;
+  o tempo real junta as mudanças do sócio balão a balão (`useMapSync` em `mind-map-editor.tsx`).
+  Mapas antigos migram ao abrir (`migrateMap` em `src/lib/maps.ts`); o jsonb antigo fica como backup.
+- **Balão = entidade** (`mapNode`, id `"<mapa>/<balão>"`): tem Conexões e Contexto no painel lateral e
+  pode representar uma tarefa (`taskId`), um lead (`leadId`) ou outra coisa (`ref`: produto, conteúdo, nota…).
+- Regras puras em `src/lib/domain/mindmap.ts`: tipos de balão, grupos (`membersOf`), ramos
+  (`descendants`, `hiddenByCollapse`, `focusSet`) e a ordem da Lista/Apresentação (`outline`).

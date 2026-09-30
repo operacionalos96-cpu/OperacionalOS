@@ -61,12 +61,12 @@ export default function MapsPage() {
       </div>
 
       <Dialog open={picking} onOpenChange={setPicking}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Novo mapa</DialogTitle>
             <DialogDescription>Escolha um ponto de partida.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
+          <div className="grid max-h-[70vh] gap-2 overflow-y-auto sm:grid-cols-2">
             {TEMPLATES.map((t) => (
               <button
                 key={t.id}

@@ -29,13 +29,15 @@ describe("presença (onde aparece)", () => {
       leads: [{ id: "l1", productId: "p1" }],
       transactions: [{ id: "x1", leadId: "l1", productId: "p1" }],
       contents: [{ id: "c1", productId: "p1" }],
-      mindMaps: [{ id: "m1", nodes: [{ id: "n1", label: "Ligar", x: 0, y: 0, taskId: "t1" }] }],
+      mindMaps: [{ id: "m1", title: "Plano", nodes: [{ id: "n1", label: "Ligar", x: 0, y: 0, taskId: "t1" }, { id: "n2", label: "Oferta", x: 0, y: 60, ref: { type: "product", id: "p1" } }] }],
     }
     const t1 = presenceOf(task("t1"), s)
-    expect(t1.map((p) => `${refKey(p.ref)} ${p.via}`)).toEqual(["task:t2 depende de", "map:m1 no mapa · “Ligar”", "lead:l1 lead da tarefa"])
+    expect(t1.map((p) => `${refKey(p.ref)} ${p.via}`)).toEqual(["task:t2 depende de", "mapNode:m1/n1 no mapa · Plano", "lead:l1 lead da tarefa"])
     expect(presenceOf(task("t2"), s).map((p) => p.via)).toEqual(["é pré-requisito de"])
     const p1 = presenceOf({ type: "product", id: "p1" }, s).map((p) => refKey(p.ref))
-    expect(p1).toEqual(["lead:l1", "transaction:x1", "content:c1"])
+    expect(p1).toEqual(["mapNode:m1/n2", "lead:l1", "transaction:x1", "content:c1"])
+    // O balão mostra o que representa e em que mapa está.
+    expect(presenceOf({ type: "mapNode", id: "m1/n1" }, s).map((p) => refKey(p.ref))).toEqual(["task:t1", "map:m1"])
     expect(presenceOf({ type: "lead", id: "l1" }, s).map((p) => refKey(p.ref))).toEqual(["task:t1", "transaction:x1", "product:p1"])
   })
 })
