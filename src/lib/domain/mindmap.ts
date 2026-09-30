@@ -1,6 +1,6 @@
 /** Status dos itens do mapa mental. Funções puras, testadas em mindmap.test.ts. */
 import { differenceInCalendarDays, parseISO } from "date-fns"
-import type { MindMap, MindMapNode, Task } from "./types"
+import type { MindMap, MindMapEdge, MindMapNode, Task } from "./types"
 
 export type NodeStatus = "afazer" | "andamento" | "feito"
 
@@ -148,4 +148,48 @@ export function areaAround(boxes: Box[], pad = 32, titleSpace = 40) {
     width: Math.round(maxX - minX + pad * 2),
     height: Math.round(maxY - minY + pad * 2 + titleSpace),
   }
+}
+
+// ---------- ramos: recolher e foco ----------
+
+type Link = Pick<MindMapEdge, "source" | "target" | "kind">
+const hierarchy = (edges: Link[]) => edges.filter((e) => e.kind !== "relacao")
+
+/** Todos abaixo do item (filhos, netos…) pela hierarquia. Seguro contra ciclos. */
+export function descendants(id: string, edges: Link[]): Set<string> {
+  const children = new Map<string, string[]>()
+  for (const e of hierarchy(edges)) children.set(e.source, [...(children.get(e.source) ?? []), e.target])
+  const out = new Set<string>()
+  const stack = [...(children.get(id) ?? [])]
+  while (stack.length) {
+    const n = stack.pop()!
+    if (n === id || out.has(n)) continue
+    out.add(n)
+    stack.push(...(children.get(n) ?? []))
+  }
+  return out
+}
+
+/** Caminho até a raiz (pai, avô…). */
+export function ancestors(id: string, edges: Link[]): Set<string> {
+  const parent = new Map(hierarchy(edges).map((e) => [e.target, e.source]))
+  const out = new Set<string>()
+  let cur = parent.get(id)
+  while (cur && cur !== id && !out.has(cur)) {
+    out.add(cur)
+    cur = parent.get(cur)
+  }
+  return out
+}
+
+/** Itens escondidos porque algum item acima deles está recolhido. */
+export function hiddenByCollapse(nodes: Pick<MindMapNode, "id" | "collapsed">[], edges: Link[]): Set<string> {
+  const out = new Set<string>()
+  for (const n of nodes) if (n.collapsed) for (const d of descendants(n.id, edges)) if (d !== n.id) out.add(d)
+  return out
+}
+
+/** Modo foco: o item, tudo abaixo dele e o caminho até a raiz. O resto esmaece. */
+export function focusSet(id: string, edges: Link[]): Set<string> {
+  return new Set([id, ...descendants(id, edges), ...ancestors(id, edges)])
 }

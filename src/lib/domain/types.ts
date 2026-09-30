@@ -131,6 +131,8 @@ export interface MindMapNode {
   kind?: "ideia" | "projeto" | "tarefa" | "venda" | "cliente" | "produto" | "meta" | "decisao" | "resumo"
   /** "group" = área/grupo (retângulo com título). Sem valor = balão comum. */
   type?: "group"
+  /** Ramo recolhido: filhos escondidos (mostra [n] no balão). */
+  collapsed?: boolean
 }
 
 export interface MindMapEdge {

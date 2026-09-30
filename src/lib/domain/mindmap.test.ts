@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { areaAround, ideaNodes, kindCounts, mapProgress, membersOf, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
+import { ancestors, areaAround, descendants, focusSet, hiddenByCollapse, ideaNodes, kindCounts, mapProgress, membersOf, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
 import type { MindMapNode } from "./types"
 
 const NOW = new Date(2025, 9, 15, 10)
@@ -103,5 +103,30 @@ describe("grupos (áreas)", () => {
     expect(ideaNodes(nodes)).toHaveLength(1)
     expect(mapProgress({ nodes }, [], NOW).total).toBe(1)
     expect(kindCounts(nodes).map((c) => c.count)).toEqual([1])
+  })
+})
+
+describe("ramos: recolher e foco", () => {
+  // raiz → a → a1, raiz → b; relação a1 ⇢ b não é hierarquia
+  const edges = [
+    { source: "raiz", target: "a" },
+    { source: "a", target: "a1" },
+    { source: "raiz", target: "b" },
+    { source: "a1", target: "b", kind: "relacao" as const },
+  ]
+  it("descendentes seguem só a hierarquia", () => {
+    expect([...descendants("a", edges)]).toEqual(["a1"])
+    expect(descendants("raiz", edges)).toEqual(new Set(["a", "a1", "b"]))
+  })
+  it("não trava com ciclo", () => {
+    expect(descendants("x", [{ source: "x", target: "y" }, { source: "y", target: "x" }])).toEqual(new Set(["y"]))
+    expect(ancestors("x", [{ source: "x", target: "y" }, { source: "y", target: "x" }])).toEqual(new Set(["y"]))
+  })
+  it("recolher esconde o ramo inteiro, mas não o próprio item", () => {
+    expect(hiddenByCollapse([{ id: "a", collapsed: true }, { id: "raiz" }], edges)).toEqual(new Set(["a1"]))
+    expect(hiddenByCollapse([{ id: "raiz", collapsed: true }], edges)).toEqual(new Set(["a", "a1", "b"]))
+  })
+  it("foco = item + ramo abaixo + caminho até a raiz", () => {
+    expect(focusSet("a", edges)).toEqual(new Set(["a", "a1", "raiz"]))
   })
 })
