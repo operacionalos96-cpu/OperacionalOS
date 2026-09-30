@@ -112,6 +112,15 @@ export interface MindMapNode {
   y: number
   taskId?: string
   leadId?: string
+  /** Etiqueta/fase (mesma cor das etiquetas das tarefas). */
+  tag?: string
+  /** Matiz escolhido à mão (0–360). Sem ele, a cor vem da etiqueta. */
+  hue?: number
+  /** Explicação do que é esta fase/ideia. */
+  description?: string
+  /** Tamanho definido pelo usuário (px). Sem ele, o item se ajusta ao texto. */
+  width?: number
+  height?: number
 }
 
 export interface MindMapEdge {

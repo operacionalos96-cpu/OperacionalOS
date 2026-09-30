@@ -11,6 +11,7 @@ import {
   ConnectionMode,
   Handle,
   Panel,
+  NodeResizer,
   NodeToolbar,
   Position,
   ReactFlow,
@@ -26,7 +27,10 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckSquareIcon, MaximizeIcon, MinusIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { LABEL_HUES } from "@/lib/domain/constants"
+import { LabelChip, labelHue } from "@/components/tasks/task-bits"
+import { Chip } from "@/components/shared/fields"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { MindMap } from "@/lib/domain/types"
 import { uid } from "@/lib/format"
@@ -38,7 +42,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string }
+type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string }
 type IdeaNode = Node<IdeaData, "idea">
 
 const CHILD_DX = 240
@@ -56,6 +60,10 @@ interface MapActions {
   /** Liga (ou desliga, com undefined) uma tarefa/lead que já existe. */
   linkTask: (id: string, taskId: string | undefined) => void
   linkLead: (id: string, leadId: string | undefined) => void
+  /** Etiqueta, cor e descrição do item. */
+  setData: (id: string, patch: Partial<IdeaData>) => void
+  /** Largura fixa (P/M/G) ou undefined = ajusta ao texto. Altura volta a ser automática. */
+  setSize: (id: string, width: number | undefined) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -67,7 +75,9 @@ function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
       id: n.id,
       type: "idea",
       position: { x: n.x, y: n.y },
-      data: { label: n.label, taskId: n.taskId, leadId: n.leadId },
+      ...(n.width ? { width: n.width } : {}),
+      ...(n.height ? { height: n.height } : {}),
+      data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description },
     })),
     edges: map.edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
   }
@@ -103,6 +113,11 @@ function Editor({ map }: { map: MindMap }) {
         y: Math.round(n.position.y),
         taskId: n.data.taskId,
         leadId: n.data.leadId,
+        tag: n.data.tag,
+        hue: n.data.hue,
+        description: n.data.description,
+        width: n.width ? Math.round(n.width) : undefined,
+        height: n.height ? Math.round(n.height) : undefined,
       })),
       edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
     }
@@ -171,6 +186,8 @@ function Editor({ map }: { map: MindMap }) {
       },
       linkTask: (id, taskId) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, taskId } } : n))),
       linkLead: (id, leadId) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, leadId } } : n))),
+      setData: (id, patch) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))),
+      setSize: (id, width) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, width, height: undefined } : n))),
     }
   }, [nodes, edges, editingId, setNodes, setEdges, createNode])
 
@@ -248,37 +265,65 @@ function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-foreground">{children}</kbd>
 }
 
-function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
+function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
   const map = useMap()
   const measured = !!useInternalNode(id)?.measured.width
   const editing = map.editingId === id
   const lead = useStore((s) => (data.leadId ? s.leads.find((l) => l.id === data.leadId) : undefined))
   const task = useStore((s) => (data.taskId ? s.tasks.find((t) => t.id === data.taskId) : undefined))
+  // Cor: escolhida à mão > cor da etiqueta > neutro.
+  const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
+  const colored = hue !== undefined
+  const sized = !!width
 
   return (
     <>
+      <NodeResizer
+        isVisible={selected && !editing}
+        minWidth={120}
+        minHeight={44}
+        lineClassName="!border-brand/60"
+        handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
+      />
       <NodeToolbar isVisible={selected && !editing} position={Position.Top} className="flex gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
         <ToolbarButton onClick={() => map.addChild(id)} label="Adicionar filho (Tab)">
           <PlusIcon /> Filho
         </ToolbarButton>
+        <StylePicker nodeId={id} data={data} width={width} />
         {!data.taskId && <LinkPicker kind="task" nodeId={id} label={data.label} />}
         {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
         <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
           <Trash2Icon />
         </ToolbarButton>
       </NodeToolbar>
-
       <div
         onDoubleClick={(e) => {
           e.stopPropagation()
           map.setEditingId(id)
         }}
         className={cn(
-          "min-w-24 max-w-64 rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-shadow",
-          selected && "border-foreground/40 ring-2 ring-foreground/10",
-          (data.taskId || data.leadId) && "border-l-[3px] border-l-success",
+          "relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-shadow",
+          sized ? "h-full w-full" : "max-w-72 min-w-28",
+          selected && "ring-2 ring-foreground/15",
         )}
+        style={
+          colored
+            ? {
+                background: `color-mix(in oklch, var(--card), oklch(0.7 0.1 ${hue}) 12%)`,
+                borderColor: `oklch(0.7 0.1 ${hue} / ${selected ? 90 : 45}%)`,
+              }
+            : undefined
+        }
       >
+        {colored && <span className="absolute inset-y-0 left-0 w-1" style={{ background: `oklch(0.68 0.13 ${hue})` }} />}
+        {data.tag && (
+          <span
+            className="w-fit rounded px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase"
+            style={{ background: `oklch(0.7 0.1 ${hue} / 18%)`, color: `light-dark(oklch(0.42 0.1 ${hue}), oklch(0.82 0.08 ${hue}))` }}
+          >
+            {data.tag}
+          </span>
+        )}
         {editing ? (
           <NodeInput
             initial={data.label}
@@ -290,10 +335,13 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
             }}
           />
         ) : (
-          <p className={cn("break-words whitespace-pre-wrap", !data.label && "text-muted-foreground")}>{data.label || "Sem texto"}</p>
+          <p className={cn("font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground")}>{data.label || "Sem texto"}</p>
+        )}
+        {data.description && !editing && (
+          <p className={cn("text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}>{data.description}</p>
         )}
         {(lead || task) && (
-          <div className="mt-1 flex flex-col gap-0.5 border-t pt-1">
+          <div className="mt-auto flex flex-col gap-0.5 border-t pt-1">
             {task && (
               <LinkedRow onUnlink={() => map.linkTask(id, undefined)} label="Desvincular tarefa">
                 <button onClick={() => openTaskDetail(task.id)} className={cn("nodrag truncate text-left hover:underline", task.done && "line-through opacity-70")}>
@@ -315,6 +363,119 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
     </>
+  )
+}
+
+const SIZES = [
+  { id: "auto", label: "Auto", width: undefined },
+  { id: "p", label: "P", width: 180 },
+  { id: "m", label: "M", width: 260 },
+  { id: "g", label: "G", width: 360 },
+] as const
+
+/** Etiqueta (fase), cor, tamanho e descrição do item. Tudo salva na hora. */
+function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; width?: number }) {
+  const map = useMap()
+  const tasks = useStore((s) => s.tasks)
+  const maps = useStore((s) => s.mindMaps)
+  const [tag, setTag] = useState("")
+  const known = [
+    ...new Set([...maps.flatMap((m) => m.nodes.map((n) => n.tag).filter((t): t is string => !!t)), ...tasks.flatMap((t) => t.labels ?? [])]),
+  ]
+    .filter((t) => t !== data.tag)
+    .sort()
+
+  function applyTag(raw: string) {
+    const t = raw.trim().replace(/^#/, "").toLowerCase()
+    if (t) map.setData(nodeId, { tag: t })
+    setTag("")
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="Etiqueta, cor, tamanho e descrição">
+          <PaletteIcon /> Estilo
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid w-80 gap-3" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+        <div className="grid gap-1.5">
+          <p className="t-label">Etiqueta / fase</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {data.tag && <LabelChip label={data.tag} onRemove={() => map.setData(nodeId, { tag: undefined })} />}
+            <input
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  applyTag(tag)
+                }
+              }}
+              onBlur={() => tag && applyTag(tag)}
+              placeholder={data.tag ? "trocar…" : "ex.: prospecção (Enter)"}
+              className="h-6 min-w-28 flex-1 rounded-md border bg-background px-2 text-xs outline-none focus:border-brand"
+            />
+          </div>
+          {known.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {known.slice(0, 10).map((l) => (
+                <button key={l} type="button" onClick={() => applyTag(l)} className="rounded-full opacity-75 transition-opacity hover:opacity-100">
+                  <LabelChip label={l} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-1.5">
+          <p className="t-label">Cor{data.tag && data.hue === undefined ? " · da etiqueta" : ""}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => map.setData(nodeId, { hue: undefined })}
+              className={cn("flex size-6 items-center justify-center rounded-full border text-[10px] text-muted-foreground", data.hue === undefined && "ring-2 ring-foreground/40")}
+              title={data.tag ? "Usar a cor da etiqueta" : "Sem cor"}
+            >
+              {data.tag ? "A" : "—"}
+            </button>
+            {LABEL_HUES.map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => map.setData(nodeId, { hue: h })}
+                className={cn("size-6 rounded-full transition-transform hover:scale-110", data.hue === h && "ring-2 ring-foreground/60 ring-offset-2 ring-offset-popover")}
+                style={{ background: `oklch(0.68 0.13 ${h})` }}
+                aria-label={`Cor ${h}`}
+              />
+            ))}
+          </div>
+          {data.tag && data.hue === undefined && <p className="t-desc text-[11px]">A cor segue a etiqueta: mesma etiqueta, mesma cor em todo o sistema.</p>}
+        </div>
+
+        <div className="grid gap-1.5">
+          <p className="t-label">Tamanho · ou arraste os cantos</p>
+          <div className="flex gap-1.5">
+            {SIZES.map((s) => (
+              <Chip key={s.id} active={s.width === undefined ? !width : width === s.width} onClick={() => map.setSize(nodeId, s.width)}>
+                {s.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <p className="t-label">Descrição</p>
+          <textarea
+            defaultValue={data.description ?? ""}
+            onBlur={(e) => map.setData(nodeId, { description: e.target.value.trim() || undefined })}
+            placeholder="O que é esta fase, objetivo, critério de pronto…"
+            rows={3}
+            className="rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-brand"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -476,7 +637,19 @@ const EDGE_TYPES = { unlink: UnlinkEdge }
 
 function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
   return JSON.stringify([
-    nodes.map((n) => [n.id, n.label, Math.round(n.x), Math.round(n.y), n.taskId ?? null, n.leadId ?? null]),
+    nodes.map((n) => [
+      n.id,
+      n.label,
+      Math.round(n.x),
+      Math.round(n.y),
+      n.taskId ?? null,
+      n.leadId ?? null,
+      n.tag ?? null,
+      n.hue ?? null,
+      n.description ?? null,
+      n.width ?? null,
+      n.height ?? null,
+    ]),
     edges.map((e) => [e.id, e.source, e.target]),
   ])
 }
