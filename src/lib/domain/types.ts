@@ -32,6 +32,8 @@ export interface Lead {
   lostReason?: string
   /** Produto de interesse (rastreio de leads por produto). */
   productId?: string
+  /** Site atual do lead (só http/https). */
+  website?: string
 }
 
 export type ActivityKind = "nota" | "ligacao" | "reuniao" | "mensagem" | "estagio" | "acao_concluida" | "criado"

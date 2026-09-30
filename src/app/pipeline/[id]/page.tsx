@@ -19,6 +19,10 @@ import { daysSince, leadUrgency } from "@/lib/domain/rules"
 import { dateTime, dueLabel, money, parseMoney, relative, shortDate } from "@/lib/format"
 import { deleteLeadWithUndo, deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
 import { useStore } from "@/lib/store"
+import { whatsappLink } from "@/lib/domain/contact"
+import { safeUrl } from "@/lib/domain/products"
+import { toast } from "sonner"
+import { ExternalLinkIcon, MessageCircleIcon } from "lucide-react"
 import { openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -308,13 +312,50 @@ function Properties({ lead }: { lead: Lead }) {
       <Prop label="Produto">
         <ProductSelect value={lead.productId} onChange={(productId) => updateLead(lead.id, { productId })} />
       </Prop>
-      <Prop label="Contato">
-        <InlineText
-          value={lead.contact ?? ""}
-          placeholder="WhatsApp ou e-mail"
-          onSave={(contact) => updateLead(lead.id, { contact: contact || undefined })}
-          className="text-sm"
-        />
+      <Prop label="WhatsApp / contato">
+        <div className="flex items-center gap-2">
+          <InlineText
+            value={lead.contact ?? ""}
+            placeholder="(11) 90000-0000 ou e-mail"
+            onSave={(contact) => updateLead(lead.id, { contact: contact || undefined })}
+            className="min-w-0 flex-1 text-sm"
+          />
+          {whatsappLink(lead.contact) && (
+            <a
+              href={whatsappLink(lead.contact)!}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-medium text-success transition-colors hover:bg-success-soft"
+            >
+              <MessageCircleIcon className="size-3.5" /> Conversar
+            </a>
+          )}
+        </div>
+      </Prop>
+      <Prop label="Site">
+        <div className="flex items-center gap-2">
+          <InlineText
+            value={lead.website ?? ""}
+            placeholder="https://site-do-cliente.com.br"
+            onSave={(v) => {
+              if (!v.trim()) return updateLead(lead.id, { website: undefined })
+              const clean = safeUrl(v)
+              if (clean) updateLead(lead.id, { website: clean })
+              else toast.error("Link inválido (use http/https).")
+            }}
+            className="min-w-0 flex-1 truncate text-sm"
+          />
+          {lead.website && (
+            <a
+              href={lead.website}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <ExternalLinkIcon className="size-3.5" /> Abrir
+            </a>
+          )}
+        </div>
       </Prop>
       <p className="text-xs text-muted-foreground">Criado {relative(lead.createdAt)}</p>
     </section>

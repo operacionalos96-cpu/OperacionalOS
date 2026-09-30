@@ -46,6 +46,7 @@ export default function ProductPage() {
   const transactions = useStore((s) => s.transactions)
   const contents = useContentItems((s) => s.items)
   const [editing, setEditing] = useState(false)
+  const updateLead = useStore((s) => s.updateLead)
 
   const data = useMemo(() => {
     const now = new Date()
@@ -160,9 +161,33 @@ export default function ProductPage() {
             title="Leads deste produto"
             description="Do mais recente para o mais antigo."
             aside={
-              <Button size="sm" variant="outline" onClick={() => openLeadForm({ prefill: { productId: product.id } })}>
-                <PlusIcon /> Lead
-              </Button>
+              <div className="flex gap-1.5">
+                {(() => {
+                  // Leads abertos com valor diferente do preço atual do produto.
+                  const price = product.priceCents
+                  const off = price ? data.leads.filter((l) => l.stage !== "ganho" && l.stage !== "perdido" && l.valueCents !== price) : []
+                  if (!price || !off.length) return null
+                  return (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Atualiza o valor estimado dos leads abertos para o preço do produto"
+                      onClick={() => {
+                        const before = off.map((l) => ({ id: l.id, valueCents: l.valueCents }))
+                        for (const l of off) updateLead(l.id, { valueCents: price })
+                        toast.success(`${off.length} leads agora valem ${money(price)}`, {
+                          action: { label: "Desfazer", onClick: () => before.forEach((b) => useStore.getState().updateLead(b.id, { valueCents: b.valueCents })) },
+                        })
+                      }}
+                    >
+                      Aplicar {moneyCompact(price)} em {off.length}
+                    </Button>
+                  )
+                })()}
+                <Button size="sm" variant="outline" onClick={() => openLeadForm({ prefill: { productId: product.id } })}>
+                  <PlusIcon /> Lead
+                </Button>
+              </div>
             }
           >
             {data.leads.length === 0 ? (

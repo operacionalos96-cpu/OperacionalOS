@@ -4,6 +4,7 @@
  * Função pura, testada em lead-import.test.ts.
  */
 import type { Temperature } from "./types"
+import { safeUrl as safeHttpUrl } from "./products"
 
 export type ImportField = "nome" | "empresa" | "contato" | "email" | "site" | "segmento" | "prioridade" | "valor" | "ignorar"
 
@@ -69,6 +70,7 @@ export interface ImportedLead {
   name: string
   company?: string
   contact?: string
+  website?: string
   temperature?: Temperature
   valueCents: number
   /** Tudo que não virou campo: vai como anotação no histórico do lead. */
@@ -79,6 +81,8 @@ export interface ImportedLead {
 
 export interface ImportResult {
   leads: ImportedLead[]
+  /** Linhas de empresas que já existem no sistema (servem para completar campos vazios). */
+  existing: ImportedLead[]
   skipped: { row: number; reason: string }[]
 }
 
@@ -89,8 +93,9 @@ export interface ImportResult {
 export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number; existingNames: string[] }): ImportResult {
   const [header = [], ...body] = rows
   const fields = detectColumns(header)
-  const seen = new Set(opts.existingNames.map(normalizeHeader))
-  const result: ImportResult = { leads: [], skipped: [] }
+  const already = new Set(opts.existingNames.map(normalizeHeader))
+  const seen = new Set<string>()
+  const result: ImportResult = { leads: [], existing: [], skipped: [] }
 
   body.forEach((raw, i) => {
     const row = i + 2
@@ -110,25 +115,33 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
     }
     const key = normalizeHeader(name)
     if (seen.has(key)) {
-      result.skipped.push({ row, reason: `"${name}" já existe` })
+      result.skipped.push({ row, reason: `"${name}" repetido na planilha` })
       return
     }
     seen.add(key)
+    const isExisting = already.has(key)
 
     const whats = get("contato")
-    // "WhatsApp no site" não é um número: fica na anotação, e o contato vira o site.
-    const contact = /\d{8,}/.test(whats.replace(/\D/g, "")) ? whats : get("email") || get("site") || undefined
+    // Contato = telefone de verdade (ou e-mail). "WhatsApp no site" não é número: fica na anotação.
+    const hasPhone = whats.replace(/\D/g, "").length >= 8
+    const contact = hasPhone ? whats : get("email") || undefined
+    const website = safeHttpUrl(get("site"))
 
+    // O que já virou campo não se repete na anotação.
+    const asField = new Set<ImportField>(["nome", "empresa", "valor", "site", "segmento", "prioridade"])
+    if (hasPhone) asField.add("contato")
+    if (contact && !hasPhone) asField.add("email")
     const noteLines = header
       .map((h, c) => ({ label: cell(h), value: values[c], field: fields[c] }))
-      .filter((x) => x.value && x.field !== "nome" && x.field !== "empresa" && x.field !== "valor")
+      .filter((x) => x.value && !(asField.has(x.field) && (x.field !== "site" || website)))
       .map((x) => `${x.label}: ${x.value}`)
 
     const valueIdx = fields.indexOf("valor")
-    result.leads.push({
+    ;(isExisting ? result.existing : result.leads).push({
       name,
       company: nome && empresa ? empresa : get("segmento") || undefined,
       contact,
+      website: website ?? undefined,
       temperature: temperatureFrom(get("prioridade")),
       valueCents: valueIdx >= 0 ? moneyToCents(raw[valueIdx]) || opts.defaultValueCents : opts.defaultValueCents,
       note: noteLines.join("\n"),

@@ -7,6 +7,7 @@ import { stageLabel } from "@/lib/domain/constants"
 import type { Temperature } from "@/lib/domain/types"
 import { dueShortcuts, moneyInputValue, parseMoney } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { safeUrl } from "@/lib/domain/products"
 import { useUI } from "@/lib/ui-store"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -29,6 +30,7 @@ export function LeadFormDialog() {
   const [name, setName] = useState("")
   const [company, setCompany] = useState("")
   const [contact, setContact] = useState("")
+  const [website, setWebsite] = useState("")
   const [valueText, setValueText] = useState("")
   const [ownerId, setOwnerId] = useState(meId)
   const [temperature, setTemperature] = useState<Temperature | undefined>()
@@ -45,6 +47,7 @@ export function LeadFormDialog() {
     setName(p.name ?? "")
     setCompany(p.company ?? "")
     setContact(p.contact ?? "")
+    setWebsite(p.website ?? "")
     setValueText(moneyInputValue(p.valueCents))
     setOwnerId(p.ownerId ?? meId)
     setTemperature(p.temperature)
@@ -79,6 +82,7 @@ export function LeadFormDialog() {
       name,
       company,
       contact,
+      website: safeUrl(website) ?? undefined,
       valueCents: valueCents!,
       ownerId,
       temperature,
@@ -118,8 +122,11 @@ export function LeadFormDialog() {
             <Field label="Valor estimado *" htmlFor="lead-value">
               <MoneyInput id="lead-value" value={valueText} onChange={(t) => setValueText(t)} />
             </Field>
-            <Field label="Contato" htmlFor="lead-contact">
-              <Input id="lead-contact" placeholder="WhatsApp ou e-mail" value={contact} onChange={(e) => setContact(e.target.value)} />
+            <Field label="WhatsApp / contato" htmlFor="lead-contact">
+              <Input id="lead-contact" placeholder="(11) 90000-0000 ou e-mail" value={contact} onChange={(e) => setContact(e.target.value)} />
+            </Field>
+            <Field label="Site" hint="opcional" htmlFor="lead-site">
+              <Input id="lead-site" placeholder="https://…" inputMode="url" value={website} onChange={(e) => setWebsite(e.target.value)} />
             </Field>
           </div>
 

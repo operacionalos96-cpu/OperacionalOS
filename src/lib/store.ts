@@ -46,6 +46,7 @@ export interface NewLeadInput {
   temperature?: Temperature
   nextAction: NextAction
   productId?: string
+  website?: string
 }
 
 export interface NewTaskInput {
@@ -237,6 +238,7 @@ export const useStore = create<State>((set, get) => {
         valueCents: input.valueCents,
         temperature: input.temperature,
         productId: input.productId,
+        website: input.website,
         nextAction: { text: input.nextAction.text.trim(), dueDate: input.nextAction.dueDate },
         lastActivityAt: now,
         createdAt: now,

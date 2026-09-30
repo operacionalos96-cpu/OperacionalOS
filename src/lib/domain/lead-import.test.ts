@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { detectColumns, rowsToLeads, temperatureFrom } from "./lead-import"
+import { whatsappLink } from "./contact"
 
 const HEADER = ["Empresa", "Segmento", "CNPJ", "WhatsApp", "Site", "Situação CNPJ", "Nota oportunidade (0-10)", "Diagnóstico", "Prioridade"]
 
@@ -30,11 +31,34 @@ describe("importar leads de planilha", () => {
       { defaultValueCents: 250000, existingNames: ["ja existe"] },
     )
     expect(r.leads).toHaveLength(2)
-    expect(r.leads[0]).toMatchObject({ name: "Costa Lion", company: "Materiais", contact: "(11) 5564-8966", temperature: "quente", valueCents: 250000, row: 2 })
+    expect(r.leads[0]).toMatchObject({
+      name: "Costa Lion",
+      company: "Materiais",
+      contact: "(11) 5564-8966",
+      website: "https://costalion.com.br/",
+      temperature: "quente",
+      valueCents: 250000,
+      row: 2,
+    })
     expect(r.leads[0].note).toContain("CNPJ: 60.600.046/0001-73")
     expect(r.leads[0].note).toContain("Diagnóstico: Site antigo")
-    expect(r.leads[1]).toMatchObject({ name: "Aloicia", contact: "https://aloicia.com.br/", temperature: "morno" })
+    // WhatsApp e site viraram campos: não se repetem na anotação.
+    expect(r.leads[0].note).not.toContain("WhatsApp:")
+    expect(r.leads[0].note).not.toContain("Site:")
+    expect(r.leads[1]).toMatchObject({ name: "Aloicia", contact: undefined, website: "https://aloicia.com.br/", temperature: "morno" })
     expect(r.leads[1].note).toContain("WhatsApp: WhatsApp no site")
-    expect(r.skipped.map((s) => s.row)).toEqual([5, 6, 7])
+    expect(r.skipped.map((s) => s.row)).toEqual([5, 7])
+    // "Já Existe" não vira lead novo: vai para `existing` (para completar campos vazios).
+    expect(r.existing.map((l) => l.name)).toEqual(["Já Existe"])
+  })
+})
+
+describe("whatsappLink", () => {
+  it("monta o link com 55 e só números; recusa o que não é telefone", () => {
+    expect(whatsappLink("(11) 96111-0797")).toBe("https://wa.me/5511961110797")
+    expect(whatsappLink("(11) 5564-8966")).toBe("https://wa.me/551155648966")
+    expect(whatsappLink("+55 11 96111-0797")).toBe("https://wa.me/5511961110797")
+    expect(whatsappLink("WhatsApp no site")).toBeNull()
+    expect(whatsappLink("contato@empresa.com")).toBeNull()
   })
 })

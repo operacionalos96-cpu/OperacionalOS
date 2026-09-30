@@ -60,6 +60,7 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
   const meId = useStore((s) => s.meId)
   const leads = useStore((s) => s.leads)
   const createLead = useStore((s) => s.createLead)
+  const updateLead = useStore((s) => s.updateLead)
   const logInteraction = useStore((s) => s.logInteraction)
   const createNote = useStore((s) => s.createNote)
   const updateNote = useStore((s) => s.updateNote)
@@ -72,8 +73,10 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
   const [owner, setOwner] = useState<string>("dividir")
   const [action, setAction] = useState("Primeiro contato pelo WhatsApp")
   const [dueDate, setDueDate] = useState<string | undefined>(dueShortcuts()[0].value)
-  const [saveScript, setSaveScript] = useState(true)
+  // Desligado por padrão: o roteiro só vira nota se a pessoa marcar.
+  const [saveScript, setSaveScript] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [fillExisting, setFillExisting] = useState(true)
 
   const leadSheets = sheets.filter((s) => s !== scriptSheet(sheets))
   const sheet = leadSheets[sheetIdx]
@@ -105,20 +108,44 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
     }
   }
 
+  /** Só preenche o que está vazio (nunca sobrescreve o que alguém já editou). */
+  function completeExisting() {
+    let updated = 0
+    for (const row of preview?.existing ?? []) {
+      const lead = leads.find((l) => normalizeHeader(l.name) === normalizeHeader(row.name))
+      if (!lead) continue
+      const patch: Parameters<typeof updateLead>[1] = {}
+      if (!lead.website && row.website) patch.website = row.website
+      // Contato que era só o link do site (importação antiga) dá lugar ao telefone.
+      const contactIsUrl = !!lead.contact && /^https?:\/\//.test(lead.contact)
+      if ((!lead.contact || contactIsUrl) && row.contact !== lead.contact) patch.contact = row.contact
+      if (!lead.productId && productId) patch.productId = productId
+      if (Object.keys(patch).length) {
+        updateLead(lead.id, patch)
+        updated++
+      }
+    }
+    return updated
+  }
+
   function run() {
-    if (!preview?.leads.length || !action.trim() || !dueDate) return
+    const creating = preview?.leads.length ?? 0
+    const updating = fillExisting ? (preview?.existing.length ?? 0) : 0
+    if (!preview || (!creating && !updating) || (creating && (!action.trim() || !dueDate))) return
     setBusy(true)
+    const updated = fillExisting ? completeExisting() : 0
     preview.leads.forEach((l, i) => {
       const ownerId = owner === "dividir" ? TEAM[i % TEAM.length].id : owner
       const lead = createLead({
         name: l.name,
         company: l.company,
         contact: l.contact,
+        website: l.website,
         valueCents: l.valueCents,
         temperature: l.temperature,
         ownerId,
         productId,
-        nextAction: { text: action.trim(), dueDate },
+        nextAction: { text: action.trim(), dueDate: dueDate! },
       })
       if (l.note) logInteraction(lead.id, "nota", `Importado de ${fileName}\n${l.note}`)
     })
@@ -131,8 +158,8 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
       const note = createNote()
       updateNote(note.id, { title: `${script.name} — ${fileName.replace(/\.[^.]+$/, "")}`, body })
     }
-    toast.success(`${preview.leads.length} leads importados`, {
-      description: preview.skipped.length ? `${preview.skipped.length} linhas puladas (vazias ou já existentes).` : undefined,
+    toast.success([creating && `${creating} leads importados`, updated && `${updated} atualizados`].filter(Boolean).join(" · ") || "Nada para mudar", {
+      description: preview.skipped.length ? `${preview.skipped.length} linhas puladas (vazias ou repetidas).` : undefined,
     })
     reset()
     onClose()
@@ -203,6 +230,15 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
                 <DueDateField value={dueDate} onChange={setDueDate} />
               </Field>
             </div>
+            {!!preview?.existing.length && (
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox className="mt-0.5" checked={fillExisting} onCheckedChange={(v) => setFillExisting(!!v)} />
+                <span>
+                  Completar os <span className="font-medium">{preview.existing.length} leads que já existem</span>
+                  <span className="t-desc block text-xs">Só preenche o que está vazio (site, WhatsApp, produto). Nada que vocês editaram é sobrescrito.</span>
+                </span>
+              </label>
+            )}
             {script && (
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox checked={saveScript} onCheckedChange={(v) => setSaveScript(!!v)} />
@@ -214,7 +250,8 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
               <div className="rounded-lg border">
                 <div className="flex items-center justify-between border-b px-3 py-2">
                   <p className="text-sm font-semibold">
-                    {preview.leads.length} leads prontos
+                    {preview.leads.length} novos
+                    {!!preview.existing.length && <span className="t-desc font-normal"> · {preview.existing.length} já existem</span>}
                     {preview.skipped.length > 0 && <span className="t-desc font-normal"> · {preview.skipped.length} linhas puladas</span>}
                   </p>
                 </div>
@@ -224,7 +261,8 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
                       <TemperatureDot lead={{ temperature: l.temperature } as never} />
                       <span className="min-w-0 flex-1 truncate font-medium">{l.name}</span>
                       <span className="t-desc hidden w-40 truncate text-xs sm:block">{l.company}</span>
-                      <span className="t-desc w-36 truncate text-right text-xs">{l.contact}</span>
+                      <span className="t-desc w-32 truncate text-right text-xs">{l.contact ?? "—"}</span>
+                      <span className="t-desc hidden w-40 truncate text-right text-xs md:block">{l.website?.replace(/^https?:\/\//, "")}</span>
                     </li>
                   ))}
                   {preview.skipped.map((s) => (
@@ -240,8 +278,19 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
               <Button variant="ghost" onClick={() => (reset(), onClose())}>
                 Cancelar
               </Button>
-              <Button onClick={run} disabled={busy || !preview?.leads.length || !action.trim() || !dueDate}>
-                {busy ? <Loader2Icon className="animate-spin" /> : <UploadIcon />} Importar {preview?.leads.length ?? 0} leads
+              <Button
+                onClick={run}
+                disabled={
+                  busy ||
+                  !preview ||
+                  (!preview.leads.length && !(fillExisting && preview.existing.length)) ||
+                  (!!preview.leads.length && (!action.trim() || !dueDate))
+                }
+              >
+                {busy ? <Loader2Icon className="animate-spin" /> : <UploadIcon />}
+                {preview?.leads.length
+                  ? `Importar ${preview.leads.length}${fillExisting && preview.existing.length ? ` e completar ${preview.existing.length}` : ""}`
+                  : `Completar ${preview?.existing.length ?? 0} leads`}
               </Button>
             </div>
             <p className={cn("t-desc text-xs", !productId && "text-warning")}>
