@@ -31,7 +31,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { MindMap } from "@/lib/domain/types"
 import { uid } from "@/lib/format"
 import { useStore } from "@/lib/store"
-import { openLeadForm, openTaskForm } from "@/lib/ui-store"
+import { openLeadForm, openTaskDetail, openTaskForm } from "@/lib/ui-store"
+import { dueLabel } from "@/lib/format"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -50,6 +53,9 @@ interface MapActions {
   remove: (id: string) => void
   toTask: (id: string) => void
   toLead: (id: string) => void
+  /** Liga (ou desliga, com undefined) uma tarefa/lead que já existe. */
+  linkTask: (id: string, taskId: string | undefined) => void
+  linkLead: (id: string, leadId: string | undefined) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -163,6 +169,8 @@ function Editor({ map }: { map: MindMap }) {
             setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, leadId: lead.id } } : n))),
         })
       },
+      linkTask: (id, taskId) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, taskId } } : n))),
+      linkLead: (id, leadId) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, leadId } } : n))),
     }
   }, [nodes, edges, editingId, setNodes, setEdges, createNode])
 
@@ -253,16 +261,8 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         <ToolbarButton onClick={() => map.addChild(id)} label="Adicionar filho (Tab)">
           <PlusIcon /> Filho
         </ToolbarButton>
-        {!data.taskId && (
-          <ToolbarButton onClick={() => map.toTask(id)} label="Transformar em tarefa">
-            <CheckSquareIcon /> Tarefa
-          </ToolbarButton>
-        )}
-        {!data.leadId && (
-          <ToolbarButton onClick={() => map.toLead(id)} label="Transformar em lead">
-            <UserPlusIcon /> Lead
-          </ToolbarButton>
-        )}
+        {!data.taskId && <LinkPicker kind="task" nodeId={id} label={data.label} />}
+        {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
         <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
           <Trash2Icon />
         </ToolbarButton>
@@ -295,14 +295,18 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         {(lead || task) && (
           <div className="mt-1 flex flex-col gap-0.5 border-t pt-1">
             {task && (
-              <Link href="/tarefas" className="nodrag text-[11px] text-success hover:underline">
-                ✓ Tarefa{task.done ? " (feita)" : ""}
-              </Link>
+              <LinkedRow onUnlink={() => map.linkTask(id, undefined)} label="Desvincular tarefa">
+                <button onClick={() => openTaskDetail(task.id)} className={cn("nodrag truncate text-left hover:underline", task.done && "line-through opacity-70")}>
+                  ✓ {task.title}
+                </button>
+              </LinkedRow>
             )}
             {lead && (
-              <Link href={`/pipeline/${lead.id}`} className="nodrag text-[11px] text-success hover:underline">
-                → Lead: {lead.name}
-              </Link>
+              <LinkedRow onUnlink={() => map.linkLead(id, undefined)} label="Desvincular lead">
+                <Link href={`/pipeline/${lead.id}`} className="nodrag truncate hover:underline">
+                  → Lead: {lead.name}
+                </Link>
+              </LinkedRow>
             )}
           </div>
         )}
@@ -350,6 +354,88 @@ function ToolbarButton({ onClick, label, children }: { onClick: () => void; labe
     <Button size="xs" variant="ghost" onClick={onClick} title={label} aria-label={label}>
       {children}
     </Button>
+  )
+}
+
+function LinkedRow({ children, onUnlink, label }: { children: React.ReactNode; onUnlink: () => void; label: string }) {
+  return (
+    <div className="group/link flex min-w-0 items-center gap-1 text-[11px] text-success">
+      {children}
+      <button
+        onClick={onUnlink}
+        className="nodrag ml-auto shrink-0 rounded px-0.5 text-muted-foreground opacity-0 group-hover/link:opacity-100 hover:text-danger focus:opacity-100"
+        title={label}
+        aria-label={label}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+/**
+ * "Tarefa" / "Lead" no nó: criar novo OU vincular um que já existe (com busca).
+ * Eventos param aqui dentro para não disparar atalhos do mapa (Del, duplo clique).
+ */
+function LinkPicker({ kind, nodeId, label }: { kind: "task" | "lead"; nodeId: string; label: string }) {
+  const map = useMap()
+  const [open, setOpen] = useState(false)
+  const tasks = useStore((s) => s.tasks)
+  const leads = useStore((s) => s.leads)
+  const items =
+    kind === "task"
+      ? [...tasks].sort((a, b) => Number(a.done) - Number(b.done) || a.title.localeCompare(b.title)).map((t) => ({ id: t.id, title: t.title, hint: t.done ? "feita" : t.dueDate ? dueLabel(t.dueDate) : "" }))
+      : [...leads].sort((a, b) => a.name.localeCompare(b.name)).map((l) => ({ id: l.id, title: l.name, hint: l.company ?? "" }))
+
+  function pick(itemId: string) {
+    if (kind === "task") map.linkTask(nodeId, itemId)
+    else map.linkLead(nodeId, itemId)
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title={kind === "task" ? "Criar ou vincular tarefa" : "Criar ou vincular lead"}>
+          {kind === "task" ? <CheckSquareIcon /> : <UserPlusIcon />} {kind === "task" ? "Tarefa" : "Lead"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-72 p-0"
+        onKeyDown={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <Command>
+          <CommandInput placeholder={kind === "task" ? "Buscar tarefa existente…" : "Buscar lead existente…"} />
+          <CommandList className="max-h-64">
+            <CommandGroup>
+              <CommandItem
+                value={`__novo ${label}`}
+                onSelect={() => {
+                  setOpen(false)
+                  if (kind === "task") map.toTask(nodeId)
+                  else map.toLead(nodeId)
+                }}
+              >
+                <PlusIcon /> Criar {kind === "task" ? "tarefa" : "lead"} “{label || "nova ideia"}”
+              </CommandItem>
+            </CommandGroup>
+            <CommandEmpty>Nada encontrado.</CommandEmpty>
+            {items.length > 0 && (
+              <CommandGroup heading={kind === "task" ? "Vincular tarefa existente" : "Vincular lead existente"}>
+                {items.map((it) => (
+                  <CommandItem key={it.id} value={`${it.title} ${it.id}`} onSelect={() => pick(it.id)}>
+                    <span className="min-w-0 flex-1 truncate">{it.title}</span>
+                    {it.hint && <span className="shrink-0 text-xs text-muted-foreground">{it.hint}</span>}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
