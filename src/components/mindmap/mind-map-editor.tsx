@@ -28,7 +28,7 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
@@ -47,6 +47,7 @@ import {
   type NodeKind,
 } from "@/lib/domain/mindmap"
 import { NodePanel } from "@/components/mindmap/node-panel"
+import { outlineText, type AiAction, type AiResult } from "@/lib/domain/ai-map"
 import { EntityChip } from "@/components/entities/entity-bits"
 import { getUser } from "@/config/team"
 import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
@@ -106,6 +107,12 @@ interface MapActions {
   /** Abre o painel lateral do balão selecionado. */
   openPanel: () => void
   areaLabel: (id: string) => string | undefined
+  /** IA: contexto do pedido (título, mapa/ramo em lista, textos que já existem). */
+  aiContext: (id: string, action: AiAction) => { mapTitle: string; outline: string; existing: string[] }
+  /** Aceitar sugestões: cada texto vira um filho do balão. */
+  addChildren: (id: string, labels: string[]) => void
+  /** Aceitar resumo: vira um balão "Resumo" filho do balão. */
+  addSummary: (id: string, text: string) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -384,9 +391,43 @@ function Editor({ map }: { map: MindMap }) {
       focusId,
       setFocus,
       openPanel: () => setPanelOpen(true),
+      aiContext: (nodeId, action) => {
+        const all = outline(nodes.map(toMapNode), links)
+        const branch = action === "resumir" ? new Set([nodeId, ...descendants(nodeId, links)]) : null
+        const rows = branch ? all.filter((r) => branch.has(r.node.id)) : all
+        return { mapTitle: map.title, outline: outlineText(rows), existing: nodes.map((n) => n.data.label).filter(Boolean) }
+      },
+      addChildren: (parentId, labels) => {
+        const parent = findNode(parentId)
+        if (!parent || !labels.length) return
+        const start = edges.filter((e) => e.source === parentId && isHierarchy(e)).length
+        const created = labels.map((label, i) => ({
+          id: uid(),
+          type: "idea" as const,
+          position: { x: parent.position.x + CHILD_DX, y: parent.position.y + (start + i) * ROW_DY },
+          data: { label },
+        }))
+        setNodes((ns) => [...ns, ...created])
+        setEdges((es) => [...es, ...created.map((c) => ({ id: uid(), source: parentId, target: c.id }))])
+      },
+      addSummary: (parentId, text) => {
+        const parent = findNode(parentId)
+        if (!parent) return
+        const id = uid()
+        setNodes((ns) => [
+          ...ns,
+          {
+            id,
+            type: "idea",
+            position: { x: parent.position.x + CHILD_DX, y: parent.position.y - ROW_DY },
+            data: { label: `Resumo: ${parent.data.label}`, description: text, kind: "resumo" },
+          },
+        ])
+        setEdges((es) => [...es, { id: uid(), source: parentId, target: id }])
+      },
       areaLabel: (areaId) => nodes.find((n) => n.id === areaId && n.type === "area")?.data.label || (nodes.some((n) => n.id === areaId) ? "Grupo" : undefined),
     }
-  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId])
+  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId, links, map.title])
 
   const displayNodes = useMemo(
     () =>
@@ -698,6 +739,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         <ToolbarButton onClick={() => map.setFocus(map.focusId === id ? null : id)} label="Modo foco: destaca este ramo (F)">
           <CrosshairIcon />
         </ToolbarButton>
+        <AiMenu nodeId={id} label={data.label} description={data.description} />
         <KindPicker nodeId={id} kind={kind} chosen={!!data.kind} />
         {/* Tela larga: estilo e tudo mais ficam no painel lateral. */}
         <span className="lg:hidden">
@@ -843,6 +885,146 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
     </>
+  )
+}
+
+const AI_ACTIONS: { id: AiAction; label: string; hint: string }[] = [
+  { id: "expandir", label: "Sugerir filhos", hint: "Próximos passos ou subtópicos deste balão" },
+  { id: "lacunas", label: "Achar lacunas", hint: "O que está faltando no mapa" },
+  { id: "resumir", label: "Resumir ramo", hint: "Este balão e tudo abaixo em 3 frases" },
+]
+
+/**
+ * IA no balão. As sugestões chegam como RASCUNHO: nada entra no mapa até você
+ * aceitar. Só o texto do mapa vai para a IA (nada de leads, valores ou contatos).
+ */
+function AiMenu({ nodeId, label, description }: { nodeId: string; label: string; description?: string }) {
+  const map = useMap()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState<AiAction | null>(null)
+  const [result, setResult] = useState<(AiResult & { action: AiAction }) | null>(null)
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+
+  async function run(action: AiAction) {
+    if (!label.trim()) return setError("Escreva algo no balão primeiro.")
+    setBusy(action)
+    setError(null)
+    setResult(null)
+    try {
+      const ctx = map.aiContext(nodeId, action)
+      const res = await fetch("/api/ia/mapa", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, mapTitle: ctx.mapTitle, outline: ctx.outline, existing: ctx.existing, focus: { label, description } }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.erro || "Falha na IA.")
+      setResult({ ...data, action })
+      if ("items" in data) setPicked(new Set(data.items.map((_: string, i: number) => i)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha na IA.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function reset() {
+    setResult(null)
+    setError(null)
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) reset()
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="IA: sugerir, achar lacunas, resumir">
+          <SparklesIcon /> IA
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid w-80 gap-2 p-2" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+        {!result &&
+          AI_ACTIONS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              disabled={!!busy}
+              onClick={() => run(a.id)}
+              className="flex items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+            >
+              {busy === a.id ? <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-brand" /> : <SparklesIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
+              <span className="grid">
+                <span className="font-medium">{busy === a.id ? "Pensando…" : a.label}</span>
+                <span className="text-[11px] text-muted-foreground">{a.hint}</span>
+              </span>
+            </button>
+          ))}
+        {error && <p className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger">{error}</p>}
+        {result && "items" in result && (
+          <>
+            <p className="t-label px-1">Sugestões (rascunho)</p>
+            <ul className="grid gap-0.5">
+              {result.items.map((it, i) => (
+                <li key={i}>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-accent/60">
+                    <input
+                      type="checkbox"
+                      checked={picked.has(i)}
+                      onChange={() => setPicked((p) => (p.has(i) ? new Set([...p].filter((x) => x !== i)) : new Set([...p, i])))}
+                      className="mt-1 accent-[var(--brand)]"
+                    />
+                    {it}
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                disabled={!picked.size}
+                onClick={() => {
+                  map.addChildren(nodeId, result.items.filter((_, i) => picked.has(i)))
+                  setOpen(false)
+                  reset()
+                }}
+              >
+                Adicionar {picked.size}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={reset}>
+                Descartar
+              </Button>
+            </div>
+          </>
+        )}
+        {result && "summary" in result && (
+          <>
+            <p className="t-label px-1">Resumo (rascunho)</p>
+            <p className="rounded-md bg-muted/60 px-2 py-1.5 text-sm">{result.summary}</p>
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                onClick={() => {
+                  map.addSummary(nodeId, result.summary)
+                  setOpen(false)
+                  reset()
+                }}
+              >
+                Criar balão Resumo
+              </Button>
+              <Button size="sm" variant="ghost" onClick={reset}>
+                Descartar
+              </Button>
+            </div>
+          </>
+        )}
+        <p className="px-1 text-[10px] text-muted-foreground">Vai para a IA só o texto deste mapa.</p>
+      </PopoverContent>
+    </Popover>
   )
 }
 

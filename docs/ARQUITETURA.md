@@ -96,3 +96,10 @@ No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "
   URL para colar na plataforma: `https://operacional-os.vercel.app/api/webhooks/hotmart` (ou `/kiwify`).
   Plataforma nova = mais um item em `SALES_PROVIDERS`.
 - **Volume**: tudo carrega em páginas de 1000 (`src/lib/repositories/select-all.ts`); índices no SQL 0007.
+
+## IA no mapa
+
+- Botão **IA** no balão: sugerir filhos, achar lacunas, resumir ramo. Tudo chega como **rascunho**.
+- Regras puras em `src/lib/domain/ai-map.ts` (o que vai, limites, leitura da resposta); modelo no servidor em
+  `src/lib/server/ai.ts` (hoje Gemini: `GEMINI_API_KEY`, opcional `GEMINI_MODEL`); rota `POST /api/ia/mapa`
+  só para membros, com limite de 10 pedidos/min por pessoa. Só vai o texto do mapa.
