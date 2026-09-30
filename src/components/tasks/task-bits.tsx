@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { FlagIcon, PlusIcon, RepeatIcon, XIcon } from "lucide-react"
+import { FlagIcon, PlusIcon, RepeatIcon, UsersIcon, XIcon } from "lucide-react"
+import { TEAM } from "@/config/team"
 import { LABEL_HUES, PRIORITIES, RECURRENCES, priorityMeta } from "@/lib/domain/constants"
 import type { Priority, Recurrence } from "@/lib/domain/types"
 import { useStore } from "@/lib/store"
@@ -122,6 +123,32 @@ export function LabelEditor({ value, onChange }: { value: string[]; onChange: (l
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Responsáveis da tarefa (um ou vários). Cada pessoa liga/desliga; sempre fica
+ * pelo menos uma. O primeiro da lista é o principal (dono padrão da tarefa).
+ */
+export function PeoplePicker({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const all = TEAM.map((u) => u.id)
+  const everyone = all.every((id) => value.includes(id))
+  function toggle(id: string) {
+    const next = value.includes(id) ? value.filter((x) => x !== id) : [...value, id]
+    if (next.length) onChange(next)
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {TEAM.map((u) => (
+        <Chip key={u.id} active={value.includes(u.id) && !everyone} onClick={() => (everyone ? onChange([u.id]) : toggle(u.id))}>
+          <span className="size-2 rounded-full" style={{ backgroundColor: u.color }} />
+          {u.name}
+        </Chip>
+      ))}
+      <Chip active={everyone} onClick={() => onChange(everyone ? [value[0]] : [value[0], ...all.filter((id) => id !== value[0])])} title="Tarefa colaborativa: aparece para todos">
+        <UsersIcon className="size-3.5" /> {TEAM.length === 2 ? "Os dois" : "Todos"}
+      </Chip>
     </div>
   )
 }

@@ -212,6 +212,22 @@ export function taskBucket(task: Task, now: Date): TaskBucket {
   return task.done ? "feitas" : dueBucket(task.dueDate, now)
 }
 
+/** Todos os responsáveis da tarefa (principal + colaboradores), sem repetir. */
+export function taskPeople(task: Pick<Task, "ownerId" | "collaborators">) {
+  return [...new Set([task.ownerId, ...(task.collaborators ?? [])])]
+}
+
+/** A tarefa é (também) desta pessoa? */
+export function isTaskFor(task: Pick<Task, "ownerId" | "collaborators">, userId: string) {
+  return task.ownerId === userId || !!task.collaborators?.includes(userId)
+}
+
+/** Lista de responsáveis → { ownerId, collaborators } (o primeiro é o principal). */
+export function assignPeople(ids: string[]): { ownerId: string; collaborators?: string[] } {
+  const [ownerId, ...rest] = [...new Set(ids)]
+  return { ownerId, collaborators: rest.length ? rest : undefined }
+}
+
 const PRIORITY_WEIGHT: Record<Priority, number> = { urgente: 0, alta: 1, media: 2, baixa: 3 }
 
 export type TaskSort = "prazo" | "prioridade"
@@ -274,7 +290,7 @@ export function parseQuickAdd(input: string): { title: string; priority?: Priori
 /** Progresso do dia: tarefas com prazo hoje (ou atrasadas) já concluídas vs. total. */
 export function dayProgress(tasks: Task[], userId: string | null, now: Date) {
   const todayKey = format(now, "yyyy-MM-dd")
-  const mine = tasks.filter((t) => (userId === null || t.ownerId === userId) && t.dueDate)
+  const mine = tasks.filter((t) => (userId === null || isTaskFor(t, userId)) && t.dueDate)
   const doneToday = mine.filter((t) => t.done && t.doneAt && daysSince(t.doneAt, now) === 0 && t.dueDate! <= todayKey).length
   const pending = mine.filter((t) => !t.done && t.dueDate! <= todayKey).length
   const total = doneToday + pending
@@ -295,7 +311,7 @@ export interface AgendaItem {
 export function myAgenda(userId: string, leads: Lead[], tasks: Task[], now: Date): AgendaItem[] {
   const items: AgendaItem[] = []
   for (const t of tasks) {
-    if (t.done || t.ownerId !== userId || !t.dueDate) continue
+    if (t.done || !isTaskFor(t, userId) || !t.dueDate) continue
     const bucket = dueBucket(t.dueDate, now)
     if (bucket === "atrasadas" || bucket === "hoje" || bucket === "semana") {
       const lead = t.leadId ? leads.find((l) => l.id === t.leadId) : undefined

@@ -5,8 +5,8 @@ import Link from "next/link"
 import {
   Background,
   ConnectionMode,
-  Controls,
   Handle,
+  Panel,
   NodeToolbar,
   Position,
   ReactFlow,
@@ -22,7 +22,8 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckSquareIcon, PlusIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CheckSquareIcon, MaximizeIcon, MinusIcon, PlusIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { MindMap } from "@/lib/domain/types"
 import { uid } from "@/lib/format"
 import { useStore } from "@/lib/store"
@@ -219,7 +220,7 @@ function Editor({ map }: { map: MindMap }) {
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} size={1} />
-          <Controls showInteractive={false} position="bottom-right" />
+          <MapControls />
         </ReactFlow>
         <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-xs whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur lg:block">
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga ·
@@ -354,4 +355,39 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
     nodes.map((n) => [n.id, n.label, Math.round(n.x), Math.round(n.y), n.taskId ?? null, n.leadId ?? null]),
     edges.map((e) => [e.id, e.source, e.target]),
   ])
+}
+
+/**
+ * Zoom e enquadrar com o visual do app (os controles padrão da biblioteca ficavam
+ * claro-sobre-claro no tema escuro). Nome de cada botão aparece ao passar o mouse.
+ */
+function MapControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  const buttons = [
+    { label: "Aproximar", icon: PlusIcon, onClick: () => zoomIn({ duration: 200 }) },
+    { label: "Afastar", icon: MinusIcon, onClick: () => zoomOut({ duration: 200 }) },
+    { label: "Enquadrar tudo", icon: MaximizeIcon, onClick: () => fitView({ padding: 0.3, maxZoom: 1, duration: 300 }) },
+  ]
+  return (
+    <Panel position="bottom-right" className="flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
+      {buttons.map((b, i) => (
+        <Tooltip key={b.label}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={b.onClick}
+              aria-label={b.label}
+              className={cn(
+                "flex size-9 items-center justify-center text-foreground/80 transition-colors hover:bg-accent hover:text-foreground",
+                i > 0 && "border-t",
+              )}
+            >
+              <b.icon className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">{b.label}</TooltipContent>
+        </Tooltip>
+      ))}
+    </Panel>
+  )
 }

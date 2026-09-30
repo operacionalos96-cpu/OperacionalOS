@@ -22,6 +22,9 @@ import { PRIORITIES } from "@/lib/domain/constants"
 import type { Priority, Task } from "@/lib/domain/types"
 import {
   TASK_BUCKETS,
+  assignPeople,
+  isTaskFor,
+  taskPeople,
   type TaskBucket,
   type TaskSort,
   checklistProgress,
@@ -43,9 +46,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Chip, DueDateField, Segmented } from "@/components/shared/fields"
 import { EmptyState, GroupLabel } from "@/components/shared/layout"
-import { AvatarDot } from "@/components/shared/user-avatar"
+import { AvatarStack } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
-import { LabelChip, PriorityFlag } from "./task-bits"
+import { LabelChip, PeoplePicker, PriorityFlag } from "./task-bits"
 
 /** Concluídas aparecem só por alguns dias; depois somem para não poluir. */
 const DONE_VISIBLE_DAYS = 7
@@ -69,7 +72,7 @@ export function TaskList() {
     const q = query.trim().toLowerCase()
     const visible = tasks.filter(
       (t) =>
-        (scope === "todas" || t.ownerId === meId) &&
+        (scope === "todas" || isTaskFor(t, meId)) &&
         (!t.done || !t.doneAt || daysSince(t.doneAt, n) <= DONE_VISIBLE_DAYS) &&
         (!priority || t.priority === priority) &&
         (!label || t.labels?.includes(label)) &&
@@ -272,7 +275,12 @@ function TaskRow({ task, now, index }: { task: Task; now: Date; index: number })
   const lead = useStore((s) => (task.leadId ? s.leads.find((l) => l.id === task.leadId) : undefined))
   const [dueOpen, setDueOpen] = useState(false)
   const overdue = !task.done && task.dueDate && daysSince(task.dueDate, now) > 0
-  const other = TEAM.find((u) => u.id !== task.ownerId)!
+  const people = taskPeople(task)
+  // Clique no avatar alterna: uma pessoa → a outra → os dois → ...
+  const options: string[][] = [...TEAM.map((u) => [u.id]), TEAM.map((u) => u.id)]
+  const current = options.findIndex((o) => o.length === people.length && o.every((id) => people.includes(id)))
+  const next = options[(current + 1) % options.length]
+  const nameOf = (ids: string[]) => (ids.length === TEAM.length && ids.length > 1 ? "os dois" : ids.map((id) => getUser(id).name).join(" e "))
   const progress = checklistProgress(task)
   const accent = task.priority === "urgente" ? "var(--danger)" : task.priority === "alta" ? "var(--warning)" : undefined
 
@@ -346,15 +354,16 @@ function TaskRow({ task, now, index }: { task: Task; now: Date; index: number })
       </Popover>
       </div>
 
-      {/* Com 2 pessoas, clicar no avatar passa a tarefa para a outra. */}
+      {/* Largura fixa: 1 ou 2 avatares não desalinham a lista. */}
       <Tooltip>
         <TooltipTrigger asChild>
-          <button onClick={() => updateTask(task.id, { ownerId: other.id })} className="shrink-0 rounded-full transition-transform hover:scale-110">
-            <AvatarDot userId={task.ownerId} />
+          <button onClick={() => updateTask(task.id, assignPeople(next))} className="flex w-9 shrink-0 justify-end rounded-full transition-transform hover:scale-110">
+            <AvatarStack userIds={people} />
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          {getUser(task.ownerId).name} · clique para passar para {other.name}
+          {people.length > 1 ? "Colaborativa: " : ""}
+          {nameOf(people)} · clique para passar para {nameOf(next)}
         </TooltipContent>
       </Tooltip>
 
@@ -374,11 +383,11 @@ function QuickAdd() {
   const meId = useStore((s) => s.meId)
   const createTask = useStore((s) => s.createTask)
   const [title, setTitle] = useState("")
-  const [ownerId, setOwnerId] = useState<string | null>(null)
+  const [people, setPeople] = useState<string[] | null>(null)
   const [dueDate, setDueDate] = useState<string | undefined>()
   const [priority, setPriority] = useState<Priority | undefined>()
   const inputRef = useRef<HTMLInputElement>(null)
-  const owner = ownerId ?? meId
+  const assignees = people ?? [meId]
   const shortcuts = dueShortcuts().slice(0, 2)
   const parsed = parseQuickAdd(title)
   const effectivePriority = parsed.priority ?? priority
@@ -386,7 +395,7 @@ function QuickAdd() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!parsed.title) return
-    createTask({ title: parsed.title, ownerId: owner, dueDate, priority: effectivePriority, labels: parsed.labels })
+    createTask({ title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels })
     setTitle("")
     setPriority(undefined)
     inputRef.current?.focus()
@@ -420,12 +429,7 @@ function QuickAdd() {
           </Chip>
         ))}
         <span className="mx-1 h-4 w-px bg-border" />
-        {TEAM.map((u) => (
-          <Chip key={u.id} active={owner === u.id} onClick={() => setOwnerId(u.id)}>
-            <span className="size-2 rounded-full ring-1 ring-white/40" style={{ backgroundColor: u.color }} />
-            {u.name}
-          </Chip>
-        ))}
+        <PeoplePicker value={assignees} onChange={setPeople} />
         <span className="mx-1 h-4 w-px bg-border" />
         {PRIORITIES.slice(0, 2).map((p) => (
           <Chip
@@ -445,7 +449,7 @@ function QuickAdd() {
           aria-label="Mais opções (data, lead, checklist, repetir)"
           title="Mais opções: data específica, lead, checklist, repetir"
           onClick={() => {
-            openTaskForm({ prefill: { title: parsed.title, ownerId: owner, dueDate, priority: effectivePriority, labels: parsed.labels } })
+            openTaskForm({ prefill: { title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels } })
             setTitle("")
           }}
         >

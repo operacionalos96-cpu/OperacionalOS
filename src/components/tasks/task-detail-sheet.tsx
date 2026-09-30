@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { CheckIcon, GripVerticalIcon, LinkIcon, ListChecksIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
-import { checklistProgress } from "@/lib/domain/rules"
+import { assignPeople, checklistProgress, taskPeople } from "@/lib/domain/rules"
 import { dateTime, dueLabel, uid } from "@/lib/format"
 import { deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
 import { useStore } from "@/lib/store"
@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { DueDateField, Field, LeadSelect, OwnerToggle } from "@/components/shared/fields"
-import { LabelEditor, PriorityPicker, RecurrencePicker } from "./task-bits"
+import { DueDateField, Field, LeadSelect } from "@/components/shared/fields"
+import { LabelEditor, PeoplePicker, PriorityPicker, RecurrencePicker } from "./task-bits"
 
 /** Painel lateral: tudo que dá para personalizar em uma tarefa, salvo na hora. */
 export function TaskDetailSheet() {
@@ -75,8 +75,8 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
         <Field label="Prioridade">
           <PriorityPicker value={task.priority} onChange={(priority) => set({ priority })} />
         </Field>
-        <Field label="Responsável">
-          <OwnerToggle value={task.ownerId} onChange={(ownerId) => set({ ownerId })} />
+        <Field label="Responsáveis" hint="tarefa colaborativa: marque mais de um">
+          <PeoplePicker value={taskPeople(task)} onChange={(ids) => set(assignPeople(ids))} />
         </Field>
         <Field label="Etiquetas">
           <div className="rounded-lg border bg-background px-2.5 py-2">
@@ -110,7 +110,7 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
       </div>
 
       <div className="mt-auto flex items-center gap-2 border-t px-5 py-3">
-        <span className="text-xs text-muted-foreground">Salvo automaticamente · {getUser(task.ownerId).name}</span>
+        <span className="text-xs text-muted-foreground">Salvo automaticamente · {taskPeople(task).map((id) => getUser(id).name).join(" e ")}</span>
         <Button
           variant="ghost"
           size="sm"

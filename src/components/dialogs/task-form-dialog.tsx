@@ -10,8 +10,9 @@ import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { DueDateField, Field, LeadSelect, OwnerToggle, SubmitRow, submitOnModEnter } from "@/components/shared/fields"
-import { LabelEditor, PriorityPicker, RecurrencePicker } from "@/components/tasks/task-bits"
+import { DueDateField, Field, LeadSelect, SubmitRow, submitOnModEnter } from "@/components/shared/fields"
+import { LabelEditor, PeoplePicker, PriorityPicker, RecurrencePicker } from "@/components/tasks/task-bits"
+import { assignPeople } from "@/lib/domain/rules"
 import { dueLabel } from "@/lib/format"
 
 export function TaskFormDialog() {
@@ -21,7 +22,7 @@ export function TaskFormDialog() {
   const createTask = useStore((s) => s.createTask)
 
   const [title, setTitle] = useState("")
-  const [ownerId, setOwnerId] = useState(meId)
+  const [people, setPeople] = useState<string[]>([meId])
   const [dueDate, setDueDate] = useState<string | undefined>()
   const [leadId, setLeadId] = useState<string | undefined>()
   const [priority, setPriority] = useState<Priority | undefined>()
@@ -33,7 +34,7 @@ export function TaskFormDialog() {
   useEffect(() => {
     if (!form) return
     setTitle(form.prefill?.title ?? "")
-    setOwnerId(form.prefill?.ownerId ?? meId)
+    setPeople([form.prefill?.ownerId ?? meId, ...(form.prefill?.collaborators ?? [])])
     setDueDate(form.prefill?.dueDate)
     setLeadId(form.prefill?.leadId)
     setPriority(form.prefill?.priority)
@@ -50,7 +51,7 @@ export function TaskFormDialog() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    const task = createTask({ title, ownerId, dueDate, leadId, priority, labels, recurrence, description })
+    const task = createTask({ title, ...assignPeople(people), dueDate, leadId, priority, labels, recurrence, description })
     form?.onCreated?.(task)
     close()
     toast.success("Tarefa criada", {
@@ -72,8 +73,8 @@ export function TaskFormDialog() {
             <DueDateField value={dueDate} onChange={setDueDate} allowEmpty />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Responsável">
-              <OwnerToggle value={ownerId} onChange={setOwnerId} />
+            <Field label="Responsáveis" hint="um ou mais">
+              <PeoplePicker value={people} onChange={setPeople} />
             </Field>
             <Field label="Vincular a um lead" hint="opcional">
               <LeadSelect value={leadId} onChange={setLeadId} />

@@ -59,6 +59,7 @@ export interface NewTaskInput {
   description?: string
   checklist?: ChecklistItem[]
   recurrence?: Recurrence
+  collaborators?: string[]
 }
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
@@ -321,6 +322,7 @@ export const useStore = create<State>((set, get) => {
         description: input.description?.trim() || undefined,
         checklist: input.checklist?.length ? input.checklist : undefined,
         recurrence: input.recurrence,
+        collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
       persist(repos().tasks.upsert(task))

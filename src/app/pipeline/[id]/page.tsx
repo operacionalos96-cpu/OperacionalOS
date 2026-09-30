@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import { ACTIVITY_LABELS, INTERACTION_KINDS, STAGES, isOpenStage } from "@/lib/domain/constants"
 import type { Activity, ActivityKind, Lead } from "@/lib/domain/types"
-import { daysSince, leadUrgency } from "@/lib/domain/rules"
+import { daysSince, leadUrgency, taskPeople } from "@/lib/domain/rules"
 import { dateTime, dueLabel, money, parseMoney, relative, shortDate } from "@/lib/format"
 import { deleteLeadWithUndo, deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
 import { useStore } from "@/lib/store"
@@ -32,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } from "@/components/shared/fields"
 import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
-import { UserAvatar } from "@/components/shared/user-avatar"
+import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -397,7 +397,7 @@ function LinkedTasks({ lead }: { lead: Lead }) {
               <div className="min-w-0 flex-1">
                 <p className={cn("text-sm leading-tight", t.done && "text-muted-foreground line-through")}>{t.title}</p>
                 <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <UserAvatar userId={t.ownerId} size="xs" />
+                  <AvatarStack userIds={taskPeople(t)} size="xs" />
                   {t.dueDate && dueLabel(t.dueDate)}
                 </p>
               </div>

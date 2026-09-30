@@ -18,6 +18,9 @@ import {
   myAgenda,
   nextOccurrence,
   parseQuickAdd,
+  assignPeople,
+  isTaskFor,
+  taskPeople,
   pipelineSummary,
 } from "./rules"
 
@@ -219,5 +222,23 @@ describe("gráficos do financeiro", () => {
       { category: "Marketing", cents: 300, pct: 0.75 },
       { category: "Impostos", cents: 100, pct: 0.25 },
     ])
+  })
+})
+
+describe("tarefas colaborativas", () => {
+  const base = { id: "t", title: "Gravar vídeo", done: false, createdAt: NOW.toISOString(), dueDate: "2025-10-15" }
+
+  it("assignPeople: primeiro é o principal, o resto colaboradores", () => {
+    expect(assignPeople(["u2", "u1"])).toEqual({ ownerId: "u2", collaborators: ["u1"] })
+    expect(assignPeople(["u1", "u1"])).toEqual({ ownerId: "u1", collaborators: undefined })
+  })
+
+  it("tarefa dos dois aparece na agenda e no progresso de cada um", () => {
+    const shared: Task = { ...base, ownerId: "u1", collaborators: ["u2"] }
+    expect(taskPeople(shared)).toEqual(["u1", "u2"])
+    expect(isTaskFor(shared, "u2")).toBe(true)
+    expect(myAgenda("u2", [], [shared], NOW).map((i) => i.id)).toEqual(["t"])
+    expect(dayProgress([shared], "u2", NOW).total).toBe(1)
+    expect(isTaskFor({ ...base, ownerId: "u1" }, "u2")).toBe(false)
   })
 })

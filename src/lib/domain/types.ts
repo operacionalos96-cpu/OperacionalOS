@@ -72,6 +72,8 @@ export interface Task {
   checklist?: ChecklistItem[]
   /** Ao concluir, cria a próxima ocorrência automaticamente. */
   recurrence?: Recurrence
+  /** Tarefa colaborativa: outras pessoas também responsáveis (além de ownerId). */
+  collaborators?: string[]
 }
 
 export interface Note {

@@ -55,3 +55,14 @@ export function UserAvatar({
     </Tooltip>
   )
 }
+
+/** Vários responsáveis: avatares sobrepostos com anel da cor do fundo (ex.: tarefa dos dois). */
+export function AvatarStack({ userIds, size = "sm", className }: { userIds: string[]; size?: Size; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center", className)}>
+      {userIds.map((id, i) => (
+        <AvatarDot key={id} userId={id} size={size} className={cn("ring-2 ring-card", i > 0 && "-ml-1.5")} />
+      ))}
+    </span>
+  )
+}

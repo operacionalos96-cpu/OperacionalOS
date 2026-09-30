@@ -21,7 +21,7 @@ import {
   WifiOffIcon,
 } from "lucide-react"
 import { TEAM, getUser } from "@/config/team"
-import { isOverdue, leadsNeedingAction } from "@/lib/domain/rules"
+import { isOverdue, isTaskFor, leadsNeedingAction } from "@/lib/domain/rules"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
 import { openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
@@ -119,7 +119,7 @@ function useBadges() {
     const now = new Date()
     return {
       "/pipeline": leadsNeedingAction(leads, now).length,
-      "/tarefas": tasks.filter((t) => !t.done && t.ownerId === meId && isOverdue(t.dueDate, now)).length,
+      "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length,
     } as Record<string, number>
   }, [leads, tasks, meId])
 }
