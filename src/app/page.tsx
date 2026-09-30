@@ -46,6 +46,7 @@ import { GoalBar } from "@/components/dashboard/goal-bar"
 import { GoalEditor } from "@/components/finance/goal-editor"
 import { BalanceChart, Sparkline } from "@/components/finance/charts"
 import { PriorityFlag } from "@/components/tasks/task-bits"
+import { GoalsPanel, TeamFeedPanel } from "@/components/dashboard/team-panels"
 
 export default function DashboardPage() {
   const { leads, tasks, transactions, financeSettings, meId } = useStore()
@@ -113,7 +114,13 @@ export default function DashboardPage() {
         <AgendaPanel items={data.agenda} className="lg:col-span-2" />
       </div>
 
-      {/* Linha 3: tendência. */}
+      {/* Linha 3: onde queremos chegar e o que a equipe anda fazendo. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GoalsPanel />
+        <TeamFeedPanel />
+      </div>
+
+      {/* Linha 4: tendência. */}
       <BalanceChart settings={financeSettings} transactions={transactions} />
     </div>
   )

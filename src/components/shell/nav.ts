@@ -1,4 +1,4 @@
-import { CheckSquareIcon, ClapperboardIcon, HomeIcon, KanbanIcon, NetworkIcon, PackageIcon, WalletIcon, type LucideIcon } from "lucide-react"
+import { CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
 
 export interface NavItem {
   href: string
@@ -21,6 +21,7 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
     title: "Vendas",
     items: [
       { href: "/pipeline", label: "Pipeline", icon: KanbanIcon },
+      { href: "/clientes", label: "Clientes", icon: HandshakeIcon },
       { href: "/produtos", label: "Produtos", icon: PackageIcon },
     ],
   },
@@ -34,6 +35,7 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
       { href: "/financeiro", label: "Financeiro", short: "Finanças", icon: WalletIcon },
       { href: "/tarefas", label: "Tarefas & Notas", short: "Tarefas", icon: CheckSquareIcon },
       { href: "/mapas", label: "Mapas", icon: NetworkIcon },
+      { href: "/metas", label: "Metas", icon: TargetIcon },
     ],
   },
 

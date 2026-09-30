@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { searchableEntities, summaryOf, type EntitySnapshot } from "./summary"
 
-const base: EntitySnapshot = { leads: [], tasks: [], notes: [], transactions: [], mindMaps: [], products: [], contents: [], relations: [] }
+const base: EntitySnapshot = { leads: [], tasks: [], notes: [], transactions: [], mindMaps: [], products: [], contents: [], relations: [], goals: [] }
 
 describe("resumo de entidades", () => {
   const s: EntitySnapshot = {

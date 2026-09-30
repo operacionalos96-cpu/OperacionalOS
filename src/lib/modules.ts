@@ -5,6 +5,7 @@ import type { Product } from "@/lib/domain/products"
 import type { ContentAccount, ContentItem } from "@/lib/domain/content"
 import type { EntityContext, Relation } from "@/lib/entities/types"
 import type { MapEdgeRow, MapNodeRow } from "@/lib/domain/map-rows"
+import type { Goal } from "@/lib/domain/insights"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -21,3 +22,6 @@ export const useEntityContexts = createCollection<EntityContext>("entity_context
 // Mapa em 1 registro por balão/linha: cada sócio grava só o que mudou.
 export const useMapNodes = createCollection<MapNodeRow>("map_nodes")
 export const useMapEdges = createCollection<MapEdgeRow>("map_edges")
+
+// Metas (SQL 0006): entidade própria, progresso automático por receita, vendas ou tarefas ligadas.
+export const useGoals = createCollection<Goal>("goals")

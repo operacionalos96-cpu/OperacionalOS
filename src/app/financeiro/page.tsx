@@ -5,7 +5,7 @@ import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
-import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, ScaleIcon, TargetIcon, Trash2Icon, WalletIcon } from "lucide-react"
+import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, ScaleIcon, TargetIcon, Trash2Icon, WalletIcon, Link2Icon } from "lucide-react"
 import type { Transaction, TransactionType } from "@/lib/domain/types"
 import { balance, daysSince, goalProgress, monthDelta, monthKey, monthStats } from "@/lib/domain/rules"
 import { money, moneyCompact, moneyInputValue, parseMoney } from "@/lib/format"
@@ -13,8 +13,9 @@ import { deleteTransactionWithUndo } from "@/lib/actions"
 import { useStore } from "@/lib/store"
 import { openTxForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { Button } from "@/components/ui/button"
 import { MoneyInput, Segmented } from "@/components/shared/fields"
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/shared/layout"
 import { CountUp } from "@/components/shared/count-up"
@@ -261,6 +262,17 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
                         {t.type === "entrada" ? "+" : "−"}
                         {money(t.amountCents)}
                       </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus:opacity-100 data-[state=open]:opacity-100" aria-label="Conexões do lançamento" title="Conectar a uma meta, tarefa, conteúdo…">
+                            <Link2Icon className="size-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-80 p-0">
+                          <p className="t-label px-4 pt-3">Conexões</p>
+                          <ConnectionsPanel entity={{ type: "transaction", id: t.id }} bare />
+                        </PopoverContent>
+                      </Popover>
                       <button
                         onClick={() => deleteTransactionWithUndo(t.id)}
                         className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus:opacity-100"

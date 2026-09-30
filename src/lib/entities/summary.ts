@@ -6,6 +6,7 @@
 import type { ContentItem } from "@/lib/domain/content"
 import type { Product } from "@/lib/domain/products"
 import type { Lead, MindMap, Note, Task, Transaction } from "@/lib/domain/types"
+import type { Goal } from "../domain/insights"
 import { money } from "../format"
 import type { EntityRef, EntityType, Relation } from "./types"
 
@@ -18,6 +19,7 @@ export interface EntitySnapshot {
   products: Product[]
   contents: ContentItem[]
   relations: Relation[]
+  goals: Pick<Goal, "id" | "title" | "end">[]
 }
 
 export interface EntitySummary {
@@ -76,8 +78,10 @@ export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | nu
       const n = m?.nodes.find((x) => x.id === nodeId)
       return n ? { title: n.label || "Sem texto", subtitle: m!.title, done: n.status === "feito" } : null
     }
-    case "goal":
-      return null
+    case "goal": {
+      const g = s.goals.find((x) => x.id === ref.id)
+      return g ? { title: g.title, subtitle: `até ${g.end.slice(8, 10)}/${g.end.slice(5, 7)}`, done: false } : null
+    }
   }
 }
 
@@ -91,6 +95,7 @@ export function searchableEntities(s: EntitySnapshot): (EntityRef & EntitySummar
     ...s.notes.map((x) => ({ type: "note" as const, id: x.id })),
     ...s.mindMaps.map((x) => ({ type: "map" as const, id: x.id })),
     ...s.transactions.map((x) => ({ type: "transaction" as const, id: x.id })),
+    ...s.goals.map((x) => ({ type: "goal" as const, id: x.id })),
   ]
   return refs.flatMap((r) => {
     const sum = summaryOf(r, s)

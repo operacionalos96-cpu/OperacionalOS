@@ -33,6 +33,7 @@ import {
 import { dueLabel } from "@/lib/format"
 import { useContentAccounts, useContentItems, useProducts } from "@/lib/modules"
 import { cn } from "@/lib/utils"
+import { setContentStage } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { Segmented } from "@/components/shared/fields"
 import { EmptyState, GroupLabel, PageHeader, Panel, StatCard } from "@/components/shared/layout"
@@ -180,7 +181,6 @@ function Production({ onNew }: { onNew: () => void }) {
 
 function ContentCard({ item, index }: { item: ContentItem; index: number }) {
   const product = useProducts((s) => s.items.find((p) => p.id === item.productId))
-  const patch = useContentItems((s) => s.patch)
   const stageIdx = CONTENT_STAGES.findIndex((s) => s.id === item.stage)
   const next = CONTENT_STAGES[stageIdx + 1]
   const assetsDone = new Set(item.assets.map((a) => a.kind)).size
@@ -215,7 +215,7 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
         <UserAvatar userId={item.ownerId} />
         {next && (
           <button
-            onClick={() => patch(item.id, { stage: next.id as ContentStage })}
+            onClick={() => setContentStage(item, next.id as ContentStage)}
             className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             title={`Mover para ${next.label}`}
           >

@@ -38,6 +38,7 @@ import { deleteContentFile, signedContentUrl, uploadContentFile, uploadProblem }
 import { useContentAccounts, useContentItems } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { setContentStage } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -97,7 +98,7 @@ export default function ContentItemPage() {
           {CONTENT_STAGES.map((s, i) => {
             const current = CONTENT_STAGES.findIndex((x) => x.id === item.stage)
             return (
-              <Chip key={s.id} active={item.stage === s.id} onClick={() => set({ stage: s.id })} className={cn(i < current && "text-foreground")}>
+              <Chip key={s.id} active={item.stage === s.id} onClick={() => setContentStage(item, s.id)} className={cn(i < current && "text-foreground")}>
                 {i < current && <CheckIcon className="size-3 text-success" />}
                 {s.label}
               </Chip>

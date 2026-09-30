@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { FileTextIcon, LinkIcon, PackageIcon, PlusIcon, SquareCheckIcon, UserPlusIcon, VideoIcon, XIcon } from "lucide-react"
+import { FileTextIcon, LinkIcon, PackageIcon, PlusIcon, SquareCheckIcon, TargetIcon, UserPlusIcon, VideoIcon, XIcon } from "lucide-react"
 import { TEAM } from "@/config/team"
 import { NODE_KIND, type NodeKind } from "@/lib/domain/mindmap"
 import type { MindMapNode } from "@/lib/domain/types"
 import type { EntityRef } from "@/lib/entities/types"
 import { uid } from "@/lib/format"
-import { useContentItems, useProducts } from "@/lib/modules"
+import { useContentItems, useGoals, useProducts } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -152,7 +152,7 @@ function LinkSection({
   function link(ref: EntityRef) {
     if (ref.type === "task") onPatch({ taskId: ref.id })
     else if (ref.type === "lead") onPatch({ leadId: ref.id })
-    else if (ref.type === "product" || ref.type === "content" || ref.type === "note" || ref.type === "transaction" || ref.type === "map")
+    else if (ref.type === "product" || ref.type === "content" || ref.type === "note" || ref.type === "transaction" || ref.type === "map" || ref.type === "goal")
       onPatch({ ref: { type: ref.type, id: ref.id } })
   }
 
@@ -173,6 +173,22 @@ function LinkSection({
       const c = useContentItems.getState().save({ id: uid(), title: data.label || "Novo conteúdo", format: "outro", stage: "ideia", ownerId: meId, notes: data.description, assets: [], posts: [], createdAt: now() })
       onPatch({ ref: { type: "content", id: c.id } })
       toast.success("Conteúdo criado e ligado ao balão")
+    },
+    meta: () => {
+      const today = new Date()
+      const iso = (d: Date) => d.toISOString().slice(0, 10)
+      const g = useGoals.getState().save({
+        id: uid(),
+        title: data.label || "Nova meta",
+        source: "tarefas",
+        target: 0,
+        start: iso(new Date(today.getFullYear(), today.getMonth(), 1)),
+        end: iso(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+        ownerId: meId,
+        createdAt: now(),
+      })
+      onPatch({ ref: { type: "goal", id: g.id } })
+      toast.success("Meta criada e ligada ao balão", { description: "Conecte tarefas a ela para o progresso andar sozinho." })
     },
     nota: () => {
       const s = useStore.getState()
@@ -212,11 +228,12 @@ function LinkSection({
             <ConvertItem icon={PackageIcon} label="Produto" disabled={!!data.ref} onClick={convert.produto} />
             <ConvertItem icon={VideoIcon} label="Conteúdo" disabled={!!data.ref} onClick={convert.conteudo} />
             <ConvertItem icon={FileTextIcon} label="Nota" disabled={!!data.ref} onClick={convert.nota} />
+            <ConvertItem icon={TargetIcon} label="Meta" disabled={!!data.ref} onClick={convert.meta} />
             {!!data.ref && <p className="px-2 py-1 text-[11px] text-muted-foreground">Desvincule o item atual para converter em outro.</p>}
           </PopoverContent>
         </Popover>
         <EntityPicker
-          types={["task", "lead", "product", "content", "note", "map"]}
+          types={["task", "lead", "product", "content", "note", "map", "goal"]}
           onPick={link}
           trigger={
             <Button size="sm" variant="outline">

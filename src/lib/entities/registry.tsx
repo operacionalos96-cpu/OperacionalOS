@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useStore } from "@/lib/store"
-import { useContentItems, useProducts, useRelations } from "@/lib/modules"
+import { useContentItems, useProducts, useGoals, useRelations } from "@/lib/modules"
 import { openTaskDetail } from "@/lib/ui-store"
 import type { EntityRef, EntityType } from "./types"
 import type { EntitySnapshot } from "./summary"
@@ -55,7 +55,7 @@ export function entityHref(ref: EntityRef): string | null {
     case "mapNode":
       return `/mapas/${ref.id.split("/")[0]}`
     case "goal":
-      return "/financeiro"
+      return `/metas/${ref.id}`
     case "task":
       return null
   }
@@ -78,8 +78,9 @@ export function useEntitySnapshot(): EntitySnapshot {
   const products = useProducts((s) => s.items)
   const contents = useContentItems((s) => s.items)
   const relations = useRelations((s) => s.items)
+  const goals = useGoals((s) => s.items)
   return useMemo(
-    () => ({ leads, tasks, notes, transactions, mindMaps, products, contents, relations }),
-    [leads, tasks, notes, transactions, mindMaps, products, contents, relations],
+    () => ({ leads, tasks, notes, transactions, mindMaps, products, contents, relations, goals }),
+    [leads, tasks, notes, transactions, mindMaps, products, contents, relations, goals],
   )
 }

@@ -38,6 +38,7 @@ import { ProductFormDialog } from "@/components/products/product-form-dialog"
 import { ProductStatusBadge, productKindLabel } from "@/components/products/product-bits"
 import { RebalanceButton } from "@/components/crm/rebalance-button"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
+import { ProductMapPanel } from "@/components/products/product-map-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
 
 export default function ProductPage() {
@@ -159,6 +160,7 @@ export default function ProductPage() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <LinksPanel productId={product.id} />
+          <ProductMapPanel product={product} />
           <ConnectionsPanel entity={{ type: "product", id: product.id }} />
           <ContextPanel entity={{ type: "product", id: product.id }} className="lg:col-span-2" />
 

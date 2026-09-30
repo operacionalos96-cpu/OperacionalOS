@@ -3,6 +3,10 @@
 import { toast } from "sonner"
 import { dueLabel, money } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { CONTENT_STAGES, type ContentItem, type ContentStage } from "@/lib/domain/content"
+import { sameRef } from "@/lib/entities/types"
+import { useContentItems, useRelations } from "@/lib/modules"
+import { uid } from "@/lib/format"
 import { NODE_STATUS, nodeStatus, resolveLinkedTask, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
 
 /**
@@ -101,4 +105,35 @@ export function cycleMapNodeStatus(node: { status?: "andamento" | "feito"; taskI
     else setTaskStatus(linked.task.id, next)
   }
   return next === "afazer" ? undefined : next
+}
+
+/**
+ * Conteúdo muda de etapa → a tarefa da etapa anterior (gerada por ele) é concluída e
+ * nasce a tarefa da nova etapa ("Roteiro: título"), ligada ao conteúdo ("gera").
+ * Ideia e Publicado não geram tarefa. Tudo pode ser desfeito.
+ */
+export function setContentStage(item: ContentItem, stage: ContentStage) {
+  if (item.stage === stage) return
+  useContentItems.getState().patch(item.id, { stage })
+  const s = useStore.getState()
+  const rels = useRelations.getState()
+  const ref = { type: "content" as const, id: item.id }
+  const generated = rels.items.filter((r) => r.kind === "gera" && sameRef(r.from, ref) && r.to.type === "task").map((r) => r.to.id)
+  const closed = generated.filter((id) => s.tasks.some((t) => t.id === id && !t.done))
+  for (const id of closed) s.toggleTask(id)
+  if (stage === "ideia" || stage === "publicado") return
+  const label = CONTENT_STAGES.find((x) => x.id === stage)?.label ?? stage
+  const task = s.createTask({ title: `${label}: ${item.title}`, ownerId: item.ownerId, dueDate: item.dueDate, labels: ["conteúdo"] })
+  const relation = rels.save({ id: uid(), from: ref, to: { type: "task", id: task.id }, kind: "gera", createdBy: s.meId, createdAt: new Date().toISOString() })
+  toast(`Tarefa criada: ${label}`, {
+    description: item.title,
+    action: {
+      label: "Desfazer",
+      onClick: () => {
+        useStore.getState().deleteTask(task.id)
+        useRelations.getState().remove(relation.id)
+        for (const id of closed) useStore.getState().toggleTask(id)
+      },
+    },
+  })
 }
