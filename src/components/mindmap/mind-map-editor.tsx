@@ -27,8 +27,10 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CheckIcon, CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
+import { NODE_STATUS, nodeStatus, type NodeStatus } from "@/lib/domain/mindmap"
+import { toggleTaskWithFeedback } from "@/lib/actions"
 import { LabelChip, labelHue } from "@/components/tasks/task-bits"
 import { Chip } from "@/components/shared/fields"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -42,7 +44,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string }
+type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito" }
 type IdeaNode = Node<IdeaData, "idea">
 
 const CHILD_DX = 240
@@ -77,7 +79,7 @@ function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
       position: { x: n.x, y: n.y },
       ...(n.width ? { width: n.width } : {}),
       ...(n.height ? { height: n.height } : {}),
-      data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description },
+      data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status },
     })),
     edges: map.edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
   }
@@ -116,6 +118,7 @@ function Editor({ map }: { map: MindMap }) {
         tag: n.data.tag,
         hue: n.data.hue,
         description: n.data.description,
+        status: n.data.status,
         width: n.width ? Math.round(n.width) : undefined,
         height: n.height ? Math.round(n.height) : undefined,
       })),
@@ -254,7 +257,7 @@ function Editor({ map }: { map: MindMap }) {
         </ReactFlow>
         <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-xs whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur lg:block">
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga ·
-          arraste as bolinhas para conectar · clique na linha para desvincular
+          arraste as bolinhas para conectar · clique na linha para desvincular · ○ no canto marca o andamento
         </div>
       </div>
     </MapCtx.Provider>
@@ -275,6 +278,18 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
   const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
   const colored = hue !== undefined
   const sized = !!width
+  const status = nodeStatus({ status: data.status, taskId: task ? data.taskId : undefined }, task ? [task] : [])
+  const done = status === "feito"
+
+  // Um clique: a fazer → em andamento → feito → a fazer. Com tarefa vinculada, conclui/reabre a tarefa junto.
+  function cycleStatus() {
+    const next = NODE_STATUS[status].next
+    map.setData(id, { status: next === "afazer" ? undefined : next })
+    if (task) {
+      if (next === "feito" && !task.done) toggleTaskWithFeedback(task.id)
+      if (next !== "feito" && task.done) useStore.getState().updateTask(task.id, { done: false, doneAt: undefined })
+    }
+  }
 
   return (
     <>
@@ -305,6 +320,7 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
           "relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-shadow",
           sized ? "h-full w-full" : "max-w-72 min-w-28",
           selected && "ring-2 ring-foreground/15",
+          done && "outline outline-1 outline-success/60",
         )}
         style={
           colored
@@ -316,6 +332,7 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
         }
       >
         {colored && <span className="absolute inset-y-0 left-0 w-1" style={{ background: `oklch(0.68 0.13 ${hue})` }} />}
+        <StatusButton status={status} onClick={cycleStatus} />
         {data.tag && (
           <span
             className="w-fit rounded px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase"
@@ -335,7 +352,9 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
             }}
           />
         ) : (
-          <p className={cn("font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground")}>{data.label || "Sem texto"}</p>
+          <p className={cn("pr-5 font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground", done && "text-muted-foreground")}>
+            {data.label || "Sem texto"}
+          </p>
         )}
         {data.description && !editing && (
           <p className={cn("text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}>{data.description}</p>
@@ -363,6 +382,32 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
     </>
+  )
+}
+
+/** Círculo no canto do item: vazio (a fazer), meio cheio (em andamento), check verde (feito). */
+function StatusButton({ status, onClick }: { status: NodeStatus; onClick: () => void }) {
+  const label = `${NODE_STATUS[status].label} · clique para “${NODE_STATUS[NODE_STATUS[status].next].label}”`
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "nodrag absolute top-2 right-2 flex size-4 items-center justify-center rounded-full border-[1.5px] transition-colors",
+        status === "afazer" && "border-muted-foreground/50 hover:border-foreground",
+        status === "andamento" && "border-warning",
+        status === "feito" && "border-success bg-success text-brand-foreground",
+      )}
+    >
+      {status === "andamento" && <span className="size-2 rounded-full bg-warning" style={{ clipPath: "inset(0 50% 0 0)" }} />}
+      {status === "feito" && <CheckIcon className="size-3" strokeWidth={3} />}
+    </button>
   )
 }
 
@@ -649,6 +694,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.description ?? null,
       n.width ?? null,
       n.height ?? null,
+      n.status ?? null,
     ]),
     edges.map((e) => [e.id, e.source, e.target]),
   ])

@@ -121,6 +121,8 @@ export interface MindMapNode {
   /** Tamanho definido pelo usuário (px). Sem ele, o item se ajusta ao texto. */
   width?: number
   height?: number
+  /** Andamento do processo. Sem valor = a fazer. */
+  status?: "andamento" | "feito"
 }
 
 export interface MindMapEdge {

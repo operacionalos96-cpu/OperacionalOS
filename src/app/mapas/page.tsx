@@ -7,6 +7,7 @@ import { NetworkIcon, PlusIcon } from "lucide-react"
 import { relative } from "@/lib/format"
 import { TEMPLATES } from "@/lib/mindmap-templates"
 import { useStore } from "@/lib/store"
+import { mapProgress } from "@/lib/domain/mindmap"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
@@ -16,6 +17,7 @@ export default function MapsPage() {
   const createMap = useStore((s) => s.createMap)
   const router = useRouter()
   const [picking, setPicking] = useState(false)
+  const tasks = useStore((s) => s.tasks)
   const sorted = [...maps].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
   const newButton = (
@@ -44,7 +46,11 @@ export default function MapsPage() {
                   <MiniPreview nodes={m.nodes} />
                   <p className="mt-3 truncate text-sm font-medium">{m.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {m.nodes.length} nós · editado {relative(m.updatedAt)}
+                    {(() => {
+                      const p = mapProgress(m, tasks)
+                      return p.total ? `${p.feito} de ${p.total} feitos · ` : ""
+                    })()}
+                    editado {relative(m.updatedAt)}
                   </p>
                 </Link>
               </li>
