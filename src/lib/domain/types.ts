@@ -141,4 +141,9 @@ export interface MindMap {
   nodes: MindMapNode[]
   edges: MindMapEdge[]
   updatedAt: ISODate
+  /**
+   * "rows": balões em map_nodes/map_edges (1 registro cada). `nodes/edges` acima
+   * ficam como backup do formato antigo. Sem valor: formato antigo (tudo aqui).
+   */
+  storage?: "rows"
 }

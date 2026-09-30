@@ -434,7 +434,11 @@ export const useStore = create<State>((set, get) => {
     },
 
     saveMap(map) {
-      const updated = { ...map, updatedAt: nowIso() }
+      // Mapa já em 1 registro por balão: aqui só muda título/marcação. Os balões
+      // antigos (backup) nunca são sobrescritos pelos que vêm das linhas.
+      const stored = get().mindMaps.find((m) => m.id === map.id)
+      const backup = stored?.storage === "rows" ? { nodes: stored.nodes, edges: stored.edges } : {}
+      const updated = { ...map, ...backup, updatedAt: nowIso() }
       set((s) => ({ mindMaps: s.mindMaps.map((m) => (m.id === map.id ? updated : m)) }))
       persist(repos().mindMaps.upsert(updated))
     },

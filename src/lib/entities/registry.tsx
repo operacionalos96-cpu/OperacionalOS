@@ -18,6 +18,7 @@ import { useContentItems, useProducts, useRelations } from "@/lib/modules"
 import { openTaskDetail } from "@/lib/ui-store"
 import type { EntityRef, EntityType } from "./types"
 import type { EntitySnapshot } from "./summary"
+import { useMindMaps } from "@/lib/maps"
 
 /**
  * Registro de entidades (lado da tela): ícone e para onde cada tipo abre.
@@ -73,7 +74,7 @@ export function useEntitySnapshot(): EntitySnapshot {
   const tasks = useStore((s) => s.tasks)
   const notes = useStore((s) => s.notes)
   const transactions = useStore((s) => s.transactions)
-  const mindMaps = useStore((s) => s.mindMaps)
+  const mindMaps = useMindMaps()
   const products = useProducts((s) => s.items)
   const contents = useContentItems((s) => s.items)
   const relations = useRelations((s) => s.items)

@@ -36,7 +36,10 @@ import { toast } from "sonner"
 import { LabelChip, labelHue } from "@/components/tasks/task-bits"
 import { Chip } from "@/components/shared/fields"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { MindMap } from "@/lib/domain/types"
+import type { MindMap, MindMapEdge, MindMapNode } from "@/lib/domain/types"
+import { diffItems, edgeRow, isRowMap, nodeRow, rowId, signature } from "@/lib/domain/map-rows"
+import { useMindMaps } from "@/lib/maps"
+import { useMapEdges, useMapNodes } from "@/lib/modules"
 import { uid } from "@/lib/format"
 import { useStore } from "@/lib/store"
 import { openLeadForm, openTaskDetail, openTaskForm } from "@/lib/ui-store"
@@ -73,18 +76,163 @@ interface MapActions {
 const MapCtx = createContext<MapActions | null>(null)
 const useMap = () => useContext(MapCtx)!
 
-function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
+function flowNode(n: MindMapNode): IdeaNode {
   return {
-    nodes: map.nodes.map((n) => ({
-      id: n.id,
-      type: "idea",
-      position: { x: n.x, y: n.y },
-      ...(n.width ? { width: n.width } : {}),
-      ...(n.height ? { height: n.height } : {}),
-      data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status },
-    })),
-    edges: map.edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+    id: n.id,
+    type: "idea",
+    position: { x: n.x, y: n.y },
+    ...(n.width ? { width: n.width } : {}),
+    ...(n.height ? { height: n.height } : {}),
+    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status },
   }
+}
+
+const flowEdge = (e: MindMapEdge): Edge => ({ id: e.id, source: e.source, target: e.target })
+
+function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
+  return { nodes: map.nodes.map(flowNode), edges: map.edges.map(flowEdge) }
+}
+
+/** Nó do React Flow -> balão como é gravado. */
+function toMapNode(n: IdeaNode): MindMapNode {
+  return {
+    id: n.id,
+    label: n.data.label,
+    x: Math.round(n.position.x),
+    y: Math.round(n.position.y),
+    taskId: n.data.taskId,
+    leadId: n.data.leadId,
+    tag: n.data.tag,
+    hue: n.data.hue,
+    description: n.data.description,
+    status: n.data.status,
+    width: n.width ? Math.round(n.width) : undefined,
+    height: n.height ? Math.round(n.height) : undefined,
+  }
+}
+
+const toMapEdge = (e: Edge): MindMapEdge => ({ id: e.id, source: e.source, target: e.target })
+
+const signatures = <T extends MindMapNode | MindMapEdge>(items: T[]) => new Map(items.map((x) => [x.id, signature(x)]))
+
+/**
+ * Gravação e tempo real do mapa.
+ * - Por balão (formato novo): grava só balões/linhas que mudaram; o que o sócio muda
+ *   entra balão a balão, sem desfazer o que está sendo editado aqui.
+ * - Formato antigo (SQL 0005 ainda não rodado): grava o mapa inteiro, como antes.
+ */
+function useMapSync(
+  map: MindMap,
+  nodes: IdeaNode[],
+  edges: Edge[],
+  setNodes: React.Dispatch<React.SetStateAction<IdeaNode[]>>,
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>,
+) {
+  const saveMap = useStore((s) => s.saveMap)
+  const rows = isRowMap(map)
+  const mapRef = useRef(map)
+  mapRef.current = map
+  const savedNodes = useRef(signatures(map.nodes))
+  const savedEdges = useRef(signatures(map.edges))
+  const lastSaved = useRef(serialize(map.nodes, map.edges))
+
+  // Autosave (debounce): seleção e medições do React Flow não contam como edição.
+  useEffect(() => {
+    const content = { nodes: nodes.map(toMapNode), edges: edges.map(toMapEdge) }
+    if (rows) {
+      const n = diffItems(savedNodes.current, content.nodes)
+      const e = diffItems(savedEdges.current, content.edges)
+      if (!n.upsert.length && !n.remove.length && !e.upsert.length && !e.remove.length) return
+      const t = setTimeout(() => {
+        const mapId = mapRef.current.id
+        const nodeStore = useMapNodes.getState()
+        const edgeStore = useMapEdges.getState()
+        for (const x of n.upsert) {
+          savedNodes.current.set(x.id, signature(x))
+          nodeStore.save(nodeRow(mapId, x))
+        }
+        for (const id of n.remove) {
+          savedNodes.current.delete(id)
+          nodeStore.remove(rowId(mapId, id))
+        }
+        for (const x of e.upsert) {
+          savedEdges.current.set(x.id, signature(x))
+          edgeStore.save(edgeRow(mapId, x))
+        }
+        for (const id of e.remove) {
+          savedEdges.current.delete(id)
+          edgeStore.remove(rowId(mapId, id))
+        }
+      }, 400)
+      return () => clearTimeout(t)
+    }
+    const key = serialize(content.nodes, content.edges)
+    if (key === lastSaved.current) return
+    const t = setTimeout(() => {
+      lastSaved.current = key
+      saveMap({ ...mapRef.current, ...content })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [nodes, edges, rows, saveMap])
+
+  // Mudança que veio do SÓCIO (tempo real).
+  useEffect(() => {
+    if (!rows) {
+      const key = serialize(map.nodes, map.edges)
+      if (key === lastSaved.current) return
+      lastSaved.current = key
+      const fresh = toFlow(map)
+      setNodes((current) => {
+        const selected = new Set(current.filter((n) => n.selected).map((n) => n.id))
+        return fresh.nodes.map((n) => ({ ...n, selected: selected.has(n.id) }))
+      })
+      setEdges(fresh.edges)
+      return
+    }
+
+    // Balões: só o que difere do que este editor gravou por último é mudança do sócio.
+    const before = new Map(savedNodes.current)
+    const remote = new Map(map.nodes.map((n) => [n.id, n]))
+    const changed = map.nodes.filter((n) => before.get(n.id) !== signature(n))
+    const gone = [...before.keys()].filter((id) => !remote.has(id))
+    if (changed.length || gone.length) {
+      for (const n of changed) savedNodes.current.set(n.id, signature(n))
+      for (const id of gone) savedNodes.current.delete(id)
+      const goneSet = new Set(gone)
+      const changedIds = new Set(changed.map((n) => n.id))
+      setNodes((current) => {
+        const next: IdeaNode[] = []
+        for (const n of current) {
+          if (goneSet.has(n.id)) continue
+          const r = changedIds.has(n.id) ? remote.get(n.id) : undefined
+          // Balão sendo editado aqui (ainda não gravado) fica como está; a gravação daqui vence.
+          const dirty = before.has(n.id) && before.get(n.id) !== signature(toMapNode(n))
+          next.push(r && !dirty ? { ...flowNode(r), selected: n.selected } : n)
+        }
+        const have = new Set(current.map((n) => n.id))
+        for (const n of changed) if (!have.has(n.id)) next.push(flowNode(n))
+        return next
+      })
+    }
+
+    const beforeE = new Map(savedEdges.current)
+    const remoteE = new Set(map.edges.map((e) => e.id))
+    const changedE = map.edges.filter((e) => beforeE.get(e.id) !== signature(e))
+    const goneE = [...beforeE.keys()].filter((id) => !remoteE.has(id))
+    if (changedE.length || goneE.length) {
+      for (const e of changedE) savedEdges.current.set(e.id, signature(e))
+      for (const id of goneE) savedEdges.current.delete(id)
+      const goneSet = new Set(goneE)
+      const byId = new Map(changedE.map((e) => [e.id, e]))
+      setEdges((current) => {
+        const kept = current.filter((e) => !goneSet.has(e.id))
+        const next = kept.map((e) => (byId.has(e.id) ? { ...flowEdge(byId.get(e.id)!), selected: e.selected } : e))
+        const have = new Set(kept.map((e) => e.id))
+        for (const e of changedE) if (!have.has(e.id)) next.push(flowEdge(e))
+        return next
+      })
+    }
+  }, [map, rows, setNodes, setEdges])
 }
 
 export function MindMapEditor({ map }: { map: MindMap }) {
@@ -96,58 +244,12 @@ export function MindMapEditor({ map }: { map: MindMap }) {
 }
 
 function Editor({ map }: { map: MindMap }) {
-  const saveMap = useStore((s) => s.saveMap)
   const initial = useMemo(() => toFlow(map), [map.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<IdeaNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges)
   const [editingId, setEditingId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
-  const mapRef = useRef(map)
-  mapRef.current = map
-
-  // Autosave (debounce) de posições, textos e conexões — só se o conteúdo mudou
-  // (seleção e medições do React Flow não contam como edição).
-  const lastSaved = useRef(serialize(map.nodes, map.edges))
-  useEffect(() => {
-    const content = {
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        label: n.data.label,
-        x: Math.round(n.position.x),
-        y: Math.round(n.position.y),
-        taskId: n.data.taskId,
-        leadId: n.data.leadId,
-        tag: n.data.tag,
-        hue: n.data.hue,
-        description: n.data.description,
-        status: n.data.status,
-        width: n.width ? Math.round(n.width) : undefined,
-        height: n.height ? Math.round(n.height) : undefined,
-      })),
-      edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
-    }
-    const key = serialize(content.nodes, content.edges)
-    if (key === lastSaved.current) return
-    const t = setTimeout(() => {
-      lastSaved.current = key
-      saveMap({ ...mapRef.current, ...content })
-    }, 400)
-    return () => clearTimeout(t)
-  }, [nodes, edges, saveMap])
-
-  // Mudança que veio do SÓCIO (tempo real): o mapa do banco mudou e não foi este editor
-  // que salvou. Aplica aqui para ninguém sobrescrever o trabalho do outro.
-  useEffect(() => {
-    const key = serialize(map.nodes, map.edges)
-    if (key === lastSaved.current) return
-    lastSaved.current = key
-    const fresh = toFlow(map)
-    setNodes((current) => {
-      const selected = new Set(current.filter((n) => n.selected).map((n) => n.id))
-      return fresh.nodes.map((n) => ({ ...n, selected: selected.has(n.id) }))
-    })
-    setEdges(fresh.edges)
-  }, [map, setNodes, setEdges])
+  useMapSync(map, nodes, edges, setNodes, setEdges)
 
   const createNode = useCallback(
     (position: { x: number; y: number }, parentId?: string) => {
@@ -458,7 +560,7 @@ const SIZES = [
 function StylePicker({ nodeId, data, width }: { nodeId: string; data: IdeaData; width?: number }) {
   const map = useMap()
   const tasks = useStore((s) => s.tasks)
-  const maps = useStore((s) => s.mindMaps)
+  const maps = useMindMaps()
   const [tag, setTag] = useState("")
   const known = [
     ...new Set([...maps.flatMap((m) => m.nodes.map((n) => n.tag).filter((t): t is string => !!t)), ...tasks.flatMap((t) => t.labels ?? [])]),

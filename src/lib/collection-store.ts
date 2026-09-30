@@ -18,6 +18,8 @@ export interface CollectionState<T extends { id: string }> {
   load(): Promise<void>
   /** Cria ou atualiza. Carimba updatedAt. */
   save(item: T): T
+  /** Grava vários de uma vez e ESPERA o banco confirmar (migrações). Lança erro se falhar. */
+  saveMany(items: T[]): Promise<void>
   patch(id: string, patch: Partial<T>): void
   remove(id: string): T | undefined
   restore(item: T): void
@@ -58,6 +60,18 @@ export function createCollection<T extends { id: string; updatedAt?: string }>(t
       set((s) => ({ items: s.items.some((x) => x.id === item.id) ? s.items.map((x) => (x.id === item.id ? item : x)) : [...s.items, item] }))
       persist(queueWrite(`${table}:${item.id}`, () => db().upsert({ id: item.id, data: item })))
       return item
+    },
+
+    async saveMany(input) {
+      if (!input.length) return
+      const now = new Date().toISOString()
+      const items = input.map((x) => ({ ...x, updatedAt: now }) as T)
+      for (let i = 0; i < items.length; i += 200) {
+        const { error } = await db().upsert(items.slice(i, i + 200).map((item) => ({ id: item.id, data: item })))
+        if (error) throw error
+      }
+      const byId = new Map(items.map((x) => [x.id, x]))
+      set((s) => ({ items: [...s.items.filter((x) => !byId.has(x.id)), ...items] }))
     },
 
     patch(id, patch) {

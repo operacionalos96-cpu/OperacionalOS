@@ -7,13 +7,14 @@ import { NetworkIcon, PlusIcon } from "lucide-react"
 import { relative } from "@/lib/format"
 import { TEMPLATES } from "@/lib/mindmap-templates"
 import { useStore } from "@/lib/store"
+import { useMindMaps } from "@/lib/maps"
 import { mapProgress } from "@/lib/domain/mindmap"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
 
 export default function MapsPage() {
-  const maps = useStore((s) => s.mindMaps)
+  const maps = useMindMaps()
   const createMap = useStore((s) => s.createMap)
   const router = useRouter()
   const [picking, setPicking] = useState(false)

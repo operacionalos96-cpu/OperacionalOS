@@ -4,7 +4,10 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeftIcon, SearchXIcon, Trash2Icon } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store"
+import { deleteMapWithRows, migrateMap, restoreMapWithRows, useMindMap, useRowStorageReady } from "@/lib/maps"
+import { isRowMap } from "@/lib/domain/map-rows"
 import { mapProgress } from "@/lib/domain/mindmap"
 import { Button } from "@/components/ui/button"
 import { InlineText } from "@/components/shared/inline-edit"
@@ -13,7 +16,19 @@ import { MindMapEditor } from "@/components/mindmap/mind-map-editor"
 
 export default function MapPage() {
   const { id } = useParams<{ id: string }>()
-  const map = useStore((s) => s.mindMaps.find((m) => m.id === id))
+  const map = useMindMap(id)
+  const rowsReady = useRowStorageReady()
+  const [migrationFailed, setMigrationFailed] = useState(false)
+  const needsMigration = !!map && rowsReady && !isRowMap(map) && !migrationFailed
+
+  // Mapa antigo: passa para 1 registro por balão ao abrir (o formato antigo fica de backup).
+  useEffect(() => {
+    if (!needsMigration || !map) return
+    migrateMap(map).catch(() => {
+      setMigrationFailed(true)
+      toast.error("Não deu para atualizar o formato do mapa", { description: "Ele continua funcionando no formato antigo." })
+    })
+  }, [needsMigration]) // eslint-disable-line react-hooks/exhaustive-deps
   const renameMap = useStore((s) => s.renameMap)
   const tasks = useStore((s) => s.tasks)
   const router = useRouter()
@@ -34,14 +49,12 @@ export default function MapPage() {
   }
 
   function remove() {
-    const snapshot = map!
+    const title = map!.title
     router.push("/mapas")
-    useStore.getState().deleteMap(snapshot.id)
-    toast(`Mapa "${snapshot.title}" excluído`, {
-      action: {
-        label: "Desfazer",
-        onClick: () => useStore.getState().restoreMap(snapshot),
-      },
+    const deleted = deleteMapWithRows(map!.id)
+    if (!deleted) return
+    toast(`Mapa "${title}" excluído`, {
+      action: { label: "Desfazer", onClick: () => restoreMapWithRows(deleted) },
     })
   }
 
@@ -61,7 +74,12 @@ export default function MapPage() {
         </Button>
       </header>
       <div className="min-h-0 flex-1">
-        <MindMapEditor key={map.id} map={map} />
+        {needsMigration ? (
+          <p className="grid h-full place-items-center text-sm text-muted-foreground">Preparando o mapa…</p>
+        ) : (
+          // Remonta ao trocar de formato (antigo → por balão).
+          <MindMapEditor key={`${map.id}-${map.storage ?? "legacy"}`} map={map} />
+        )}
       </div>
     </div>
   )
