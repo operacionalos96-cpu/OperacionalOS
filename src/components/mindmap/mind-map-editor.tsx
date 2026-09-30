@@ -29,7 +29,7 @@ import {
 import "@xyflow/react/dist/style.css"
 import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
-import { NODE_STATUS, nodeStatus, resolveLinkedTask } from "@/lib/domain/mindmap"
+import { NODE_STATUS, fitFontSize, nodeStatus, resolveLinkedTask } from "@/lib/domain/mindmap"
 import { setTaskStatus } from "@/lib/actions"
 import { StatusButton } from "@/components/shared/status-button"
 import { toast } from "sonner"
@@ -59,7 +59,7 @@ interface MapActions {
   addChild: (id: string) => void
   addSibling: (id: string) => void
   remove: (id: string) => void
-  toTask: (id: string) => void
+  toTask: (id: string, title?: string) => void
   toLead: (id: string) => void
   /** Liga (ou desliga, com undefined) uma tarefa/lead que já existe. */
   linkTask: (id: string, taskId: string | undefined) => void
@@ -135,6 +135,20 @@ function Editor({ map }: { map: MindMap }) {
     return () => clearTimeout(t)
   }, [nodes, edges, saveMap])
 
+  // Mudança que veio do SÓCIO (tempo real): o mapa do banco mudou e não foi este editor
+  // que salvou. Aplica aqui para ninguém sobrescrever o trabalho do outro.
+  useEffect(() => {
+    const key = serialize(map.nodes, map.edges)
+    if (key === lastSaved.current) return
+    lastSaved.current = key
+    const fresh = toFlow(map)
+    setNodes((current) => {
+      const selected = new Set(current.filter((n) => n.selected).map((n) => n.id))
+      return fresh.nodes.map((n) => ({ ...n, selected: selected.has(n.id) }))
+    })
+    setEdges(fresh.edges)
+  }, [map, setNodes, setEdges])
+
   const createNode = useCallback(
     (position: { x: number; y: number }, parentId?: string) => {
       const id = uid()
@@ -171,11 +185,11 @@ function Editor({ map }: { map: MindMap }) {
         setNodes((ns) => ns.filter((n) => n.id !== id))
         setEdges((es) => es.filter((e) => e.source !== id && e.target !== id))
       },
-      toTask: (id) => {
+      toTask: (id, title) => {
         const node = findNode(id)
         if (!node) return
         openTaskForm({
-          prefill: { title: node.data.label },
+          prefill: { title: title || node.data.label },
           onCreated: (task) =>
             setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, taskId: task.id } } : n))),
         })
@@ -270,7 +284,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-foreground">{children}</kbd>
 }
 
-function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
+function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>) {
   const map = useMap()
   const measured = !!useInternalNode(id)?.measured.width
   const editing = map.editingId === id
@@ -279,6 +293,8 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
   // Tarefa recorrente: acompanha a SÉRIE (a ocorrência atual), não só a primeira tarefa.
   const linked = resolveLinkedTask(data.taskId, tasks, new Date())
   const task = linked?.task
+  // Vínculo para uma tarefa que não existe mais (foi excluída): não pode travar o item.
+  const taskMissing = !!data.taskId && !linked
   // Cor: escolhida à mão > cor da etiqueta > neutro.
   const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
   const colored = hue !== undefined
@@ -286,7 +302,14 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
   const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
   const done = status === "feito"
   // Texto cresce junto com o balão (ao aumentar pelos cantos ou P/M/G).
-  const titleSize = sized ? Math.round(Math.min(34, Math.max(14, width! / 15))) : undefined
+  // Cresce com o MENOR lado do balão (largura ou altura), para caber sempre.
+  // Texto preenche o balão: maior fonte em que título + descrição cabem na caixa.
+  const titleSize = sized
+    ? fitFontSize(
+        { width: width!, height: height ?? width! * 0.4 },
+        { title: data.label, description: data.description, extraTop: data.tag ? 22 : 0, extraBottom: data.taskId || data.leadId ? 28 : 0 },
+      )
+    : undefined
 
   // Um clique: a fazer → em andamento → feito → a fazer. Com tarefa vinculada, a tarefa muda junto.
   function cycleStatus() {
@@ -323,7 +346,7 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
           <PlusIcon /> Filho
         </ToolbarButton>
         <StylePicker nodeId={id} data={data} width={width} />
-        {!data.taskId && <LinkPicker kind="task" nodeId={id} label={data.label} />}
+        {(!data.taskId || taskMissing) && <LinkPicker kind="task" nodeId={id} label={data.label} />}
         {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
         <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
           <Trash2Icon />
@@ -335,8 +358,9 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
           map.setEditingId(id)
         }}
         className={cn(
-          "relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-shadow",
-          sized ? "h-full w-full" : "max-w-72 min-w-28",
+          // Conteúdo sempre centralizado (horizontal e, no balão redimensionado, vertical).
+          "relative flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-card px-7 py-2 text-center text-sm shadow-xs transition-shadow",
+          sized ? "h-full w-full justify-center" : "max-w-72 min-w-28",
           selected && "ring-2 ring-foreground/15",
           done && "outline outline-1 outline-success/60",
         )}
@@ -371,7 +395,7 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
           />
         ) : (
           <p
-            className={cn("pr-6 leading-tight font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground", done && "text-muted-foreground")}
+            className={cn("w-full leading-tight font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground", done && "text-muted-foreground")}
             style={titleSize ? { fontSize: titleSize } : undefined}
           >
             {data.label || "Sem texto"}
@@ -379,14 +403,19 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
         )}
         {data.description && !editing && (
           <p
-            className={cn("text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}
+            className={cn("w-full text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}
             style={titleSize ? { fontSize: Math.round(titleSize * 0.62) } : undefined}
           >
             {data.description}
           </p>
         )}
-        {(lead || task) && (
-          <div className="mt-auto flex flex-col gap-0.5 border-t pt-1">
+        {(lead || task || taskMissing) && (
+          <div className="mt-1 flex w-full flex-col gap-0.5 border-t pt-1 text-left">
+            {taskMissing && (
+              <LinkedRow onUnlink={() => map.linkTask(id, undefined)} label="Remover vínculo com tarefa apagada">
+                <span className="truncate text-warning" title="A tarefa ligada a este item foi excluída">⚠ tarefa apagada</span>
+              </LinkedRow>
+            )}
             {task && (
               <LinkedRow onUnlink={() => unlink("task")} label="Desvincular tarefa">
                 <button onClick={() => openTaskDetail(task.id)} className={cn("nodrag truncate text-left hover:underline", task.done && "line-through opacity-70")}>
@@ -557,7 +586,7 @@ function NodeInput({ initial, ready, onDone }: { initial: string; ready: boolean
         if (e.key === "Escape") finish(initial)
       }}
       placeholder="Digite a ideia…"
-      className="nodrag w-full min-w-40 bg-transparent outline-none"
+      className="nodrag w-full min-w-40 bg-transparent text-center outline-none"
     />
   )
 }
@@ -593,8 +622,10 @@ function LinkedRow({ children, onUnlink, label }: { children: React.ReactNode; o
 function LinkPicker({ kind, nodeId, label }: { kind: "task" | "lead"; nodeId: string; label: string }) {
   const map = useMap()
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
   const tasks = useStore((s) => s.tasks)
   const leads = useStore((s) => s.leads)
+  const newName = search.trim() || label
   const items =
     kind === "task"
       ? [...tasks].sort((a, b) => Number(a.done) - Number(b.done) || a.title.localeCompare(b.title)).map((t) => ({ id: t.id, title: t.title, hint: t.done ? "feita" : t.dueDate ? dueLabel(t.dueDate) : "" }))
@@ -620,18 +651,21 @@ function LinkPicker({ kind, nodeId, label }: { kind: "task" | "lead"; nodeId: st
         onDoubleClick={(e) => e.stopPropagation()}
       >
         <Command>
-          <CommandInput placeholder={kind === "task" ? "Buscar tarefa existente…" : "Buscar lead existente…"} />
+          <CommandInput value={search} onValueChange={setSearch} placeholder={kind === "task" ? "Buscar ou criar tarefa…" : "Buscar ou criar lead…"} />
           <CommandList className="max-h-64">
             <CommandGroup>
+              {/* forceMount: continua visível mesmo filtrando; cria com o que foi digitado. */}
               <CommandItem
-                value={`__novo ${label}`}
+                forceMount
+                value="__criar_novo__"
                 onSelect={() => {
                   setOpen(false)
-                  if (kind === "task") map.toTask(nodeId)
+                  setSearch("")
+                  if (kind === "task") map.toTask(nodeId, newName)
                   else map.toLead(nodeId)
                 }}
               >
-                <PlusIcon /> Criar {kind === "task" ? "tarefa" : "lead"} “{label || "nova ideia"}”
+                <PlusIcon /> Criar {kind === "task" ? "tarefa" : "lead"} “{newName || "nova ideia"}”
               </CommandItem>
             </CommandGroup>
             <CommandEmpty>Nada encontrado.</CommandEmpty>
@@ -719,7 +753,7 @@ function MapControls() {
     { label: "Enquadrar tudo", icon: MaximizeIcon, onClick: () => fitView({ padding: 0.3, maxZoom: 1, duration: 300 }) },
   ]
   return (
-    <Panel position="bottom-right" className="flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
+    <Panel position="bottom-right" className="!mb-16 flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
       {buttons.map((b, i) => (
         <Tooltip key={b.label}>
           <TooltipTrigger asChild>

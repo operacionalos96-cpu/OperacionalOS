@@ -38,3 +38,22 @@ describe("status do mapa", () => {
     expect(p).toEqual({ afazer: 1, andamento: 1, feito: 1, total: 3, pct: 1 / 3 })
   })
 })
+
+describe("texto proporcional ao balão", () => {
+  it("caixa maior → letra maior, já nos primeiros aumentos", async () => {
+    const { fitFontSize } = await import("./mindmap")
+    const t = { title: "Prospecção" }
+    const small = fitFontSize({ width: 160, height: 50 }, t)
+    const medium = fitFontSize({ width: 220, height: 70 }, t)
+    const large = fitFontSize({ width: 360, height: 120 }, t)
+    expect(small).toBeLessThan(medium)
+    expect(medium).toBeLessThan(large)
+    expect(medium).toBeGreaterThanOrEqual(small + 4) // cresce logo, não só em caixas enormes
+  })
+  it("texto longo ou com descrição fica menor para caber", async () => {
+    const { fitFontSize } = await import("./mindmap")
+    const box = { width: 300, height: 100 }
+    expect(fitFontSize(box, { title: "Prospecção de 50 empresas por semana no WhatsApp" })).toBeLessThan(fitFontSize(box, { title: "Prospecção" }))
+    expect(fitFontSize(box, { title: "Prospecção", description: "Ligar e mandar mensagem para as empresas da lista" })).toBeLessThan(fitFontSize(box, { title: "Prospecção" }))
+  })
+})

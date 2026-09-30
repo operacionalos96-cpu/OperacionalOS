@@ -51,3 +51,24 @@ export function mapProgress(map: Pick<MindMap, "nodes">, tasks: TaskLike[], now 
   for (const n of nodes) counts[nodeStatus(n, tasks, now)]++
   return { ...counts, total: nodes.length, pct: nodes.length ? counts.feito / nodes.length : 0 }
 }
+
+/**
+ * Maior fonte (px) em que título + descrição cabem no balão redimensionado.
+ * O texto passa a "preencher" a caixa: qualquer aumento do balão já aumenta a letra.
+ * Estimativa por largura média de caractere (sem medir o DOM, para ser instantâneo).
+ */
+export function fitFontSize(box: { width: number; height: number }, text: { title: string; description?: string; extraTop?: number; extraBottom?: number }) {
+  const innerW = Math.max(40, box.width - 56) // px-7 dos dois lados
+  const innerH = Math.max(20, box.height - 16 - (text.extraTop ?? 0) - (text.extraBottom ?? 0))
+  const lines = (s: string, perLine: number) => s.split("\n").reduce((acc, l) => acc + Math.max(1, Math.ceil(l.length / perLine)), 0)
+  for (let fs = 64; fs > 12; fs--) {
+    const titleLines = lines(text.title || " ", Math.max(1, Math.floor(innerW / (0.56 * fs))))
+    let h = titleLines * fs * 1.2
+    if (text.description) {
+      const dfs = fs * 0.62
+      h += 4 + lines(text.description, Math.max(1, Math.floor(innerW / (0.52 * dfs)))) * dfs * 1.4
+    }
+    if (h <= innerH) return fs
+  }
+  return 12
+}
