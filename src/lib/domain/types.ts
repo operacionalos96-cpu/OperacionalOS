@@ -127,6 +127,8 @@ export interface MindMapNode {
   height?: number
   /** Andamento do processo. Sem valor = a fazer. */
   status?: "andamento" | "feito"
+  /** Tipo do balão (Ideia, Projeto, Decisão…). Sem valor: deduzido do vínculo. */
+  kind?: "ideia" | "projeto" | "tarefa" | "venda" | "cliente" | "produto" | "meta" | "decisao" | "resumo"
 }
 
 export interface MindMapEdge {

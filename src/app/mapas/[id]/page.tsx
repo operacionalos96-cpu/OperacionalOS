@@ -8,7 +8,7 @@ import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store"
 import { deleteMapWithRows, migrateMap, restoreMapWithRows, useMindMap, useRowStorageReady } from "@/lib/maps"
 import { isRowMap } from "@/lib/domain/map-rows"
-import { mapProgress } from "@/lib/domain/mindmap"
+import { kindCounts, mapProgress } from "@/lib/domain/mindmap"
 import { Button } from "@/components/ui/button"
 import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
@@ -31,6 +31,7 @@ export default function MapPage() {
   }, [needsMigration]) // eslint-disable-line react-hooks/exhaustive-deps
   const renameMap = useStore((s) => s.renameMap)
   const tasks = useStore((s) => s.tasks)
+  const leads = useStore((s) => s.leads)
   const router = useRouter()
 
   if (!map) {
@@ -67,8 +68,9 @@ export default function MapPage() {
           </Link>
         </Button>
         <InlineText value={map.title} required onSave={(t) => renameMap(map.id, t)} className="max-w-md text-base font-semibold" />
+        <KindSummary counts={kindCounts(map.nodes, (leadId) => leads.find((l) => l.id === leadId)?.stage)} />
         <MapProgress progress={mapProgress(map, tasks)} />
-        <span className="hidden text-xs text-muted-foreground lg:block">Salvo automaticamente</span>
+        <span className="hidden text-xs whitespace-nowrap text-muted-foreground xl:block">Salvo automaticamente</span>
         <Button variant="ghost" size="icon-sm" onClick={remove} aria-label="Excluir mapa">
           <Trash2Icon />
         </Button>
@@ -85,6 +87,16 @@ export default function MapPage() {
   )
 }
 
+/** "4 tarefas · 2 ideias · 1 venda" (só tipos presentes). */
+function KindSummary({ counts }: { counts: ReturnType<typeof kindCounts> }) {
+  if (!counts.length) return null
+  return (
+    <p className="hidden min-w-0 truncate text-xs text-muted-foreground xl:block">
+      {counts.map((c) => `${c.count} ${c.count === 1 ? c.label.toLowerCase() : c.plural}`).join(" · ")}
+    </p>
+  )
+}
+
 /** "3 de 7 feitos" + barra. Em andamento aparece à parte para não parecer concluído. */
 function MapProgress({ progress }: { progress: ReturnType<typeof mapProgress> }) {
   if (!progress.total) return <span className="ml-auto" />
@@ -92,7 +104,7 @@ function MapProgress({ progress }: { progress: ReturnType<typeof mapProgress> })
   return (
     <div className="ml-auto flex items-center gap-3" title={`${progress.feito} feitos · ${progress.andamento} em andamento · ${progress.afazer} a fazer`}>
       <div className="hidden text-right sm:block">
-        <p className="tabular text-xs font-semibold">
+        <p className="tabular text-xs font-semibold whitespace-nowrap">
           {progress.feito} de {progress.total} feitos
         </p>
         {progress.andamento > 0 && <p className="text-[11px] text-warning">{progress.andamento} em andamento</p>}

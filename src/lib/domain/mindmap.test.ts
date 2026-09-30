@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { mapProgress, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
+import { kindCounts, mapProgress, nodeKind, nodeStatus, resolveLinkedTask, taskStatus } from "./mindmap"
 
 const NOW = new Date(2025, 9, 15, 10)
 const node = (p: object) => ({ id: Math.random().toString(), label: "Etapa", x: 0, y: 0, ...p })
@@ -55,5 +55,23 @@ describe("texto proporcional ao balão", () => {
     const box = { width: 300, height: 100 }
     expect(fitFontSize(box, { title: "Prospecção de 50 empresas por semana no WhatsApp" })).toBeLessThan(fitFontSize(box, { title: "Prospecção" }))
     expect(fitFontSize(box, { title: "Prospecção", description: "Ligar e mandar mensagem para as empresas da lista" })).toBeLessThan(fitFontSize(box, { title: "Prospecção" }))
+  })
+})
+
+describe("tipos de balão", () => {
+  it("sem escolha: deduz pelo vínculo", () => {
+    expect(nodeKind({})).toBe("ideia")
+    expect(nodeKind({ taskId: "t" })).toBe("tarefa")
+    expect(nodeKind({ leadId: "l" }, "proposta")).toBe("venda")
+    expect(nodeKind({ leadId: "l" }, "ganho")).toBe("cliente")
+  })
+
+  it("escolhido à mão vence o vínculo", () => {
+    expect(nodeKind({ kind: "meta", taskId: "t" })).toBe("meta")
+  })
+
+  it("contador: só tipos presentes, na ordem, ignora balão sem texto", () => {
+    const counts = kindCounts([node({ taskId: "a" }), node({ taskId: "b" }), node({}), node({ label: " " }), node({ kind: "decisao" })])
+    expect(counts.map((c) => [c.id, c.count])).toEqual([["ideia", 1], ["tarefa", 2], ["decisao", 1]])
   })
 })

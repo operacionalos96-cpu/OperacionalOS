@@ -29,7 +29,8 @@ import {
 import "@xyflow/react/dist/style.css"
 import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
-import { NODE_STATUS, fitFontSize, nodeStatus, resolveLinkedTask } from "@/lib/domain/mindmap"
+import { NODE_KINDS, NODE_KIND, NODE_STATUS, fitFontSize, nodeKind, nodeStatus, resolveLinkedTask, type NodeKind } from "@/lib/domain/mindmap"
+import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
 import { setTaskStatus } from "@/lib/actions"
 import { StatusButton } from "@/components/shared/status-button"
 import { toast } from "sonner"
@@ -49,7 +50,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito" }
+type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind }
 type IdeaNode = Node<IdeaData, "idea">
 
 const CHILD_DX = 240
@@ -83,7 +84,7 @@ function flowNode(n: MindMapNode): IdeaNode {
     position: { x: n.x, y: n.y },
     ...(n.width ? { width: n.width } : {}),
     ...(n.height ? { height: n.height } : {}),
-    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status },
+    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status, kind: n.kind },
   }
 }
 
@@ -106,6 +107,7 @@ function toMapNode(n: IdeaNode): MindMapNode {
     hue: n.data.hue,
     description: n.data.description,
     status: n.data.status,
+    kind: n.data.kind,
     width: n.width ? Math.round(n.width) : undefined,
     height: n.height ? Math.round(n.height) : undefined,
   }
@@ -402,6 +404,8 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   const colored = hue !== undefined
   const sized = !!width
   const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
+  const kind = nodeKind({ kind: data.kind, taskId: linked ? data.taskId : undefined, leadId: lead ? data.leadId : undefined }, lead?.stage)
+  const KindIcon = NODE_KIND_ICON[kind]
   const done = status === "feito"
   // Texto cresce junto com o balão (ao aumentar pelos cantos ou P/M/G).
   // Cresce com o MENOR lado do balão (largura ou altura), para caber sempre.
@@ -447,6 +451,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         <ToolbarButton onClick={() => map.addChild(id)} label="Adicionar filho (Tab)">
           <PlusIcon /> Filho
         </ToolbarButton>
+        <KindPicker nodeId={id} kind={kind} chosen={!!data.kind} />
         <StylePicker nodeId={id} data={data} width={width} />
         {(!data.taskId || taskMissing) && <LinkPicker kind="task" nodeId={id} label={data.label} />}
         {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
@@ -476,6 +481,11 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         }
       >
         {colored && <span className="absolute inset-y-0 left-0 w-1" style={{ background: `oklch(0.68 0.13 ${hue})` }} />}
+        {kind !== "ideia" && (
+          <span className="absolute top-2 left-2 text-muted-foreground" title={NODE_KIND[kind].label} aria-label={NODE_KIND[kind].label}>
+            <KindIcon className="size-3.5" />
+          </span>
+        )}
         <StatusButton status={status} onClick={cycleStatus} className="absolute top-2 right-2" />
         {data.tag && (
           <span
@@ -546,6 +556,51 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
     </>
+  )
+}
+
+/** Tipo do balão. "Automático" volta a deduzir pelo vínculo (tarefa, lead). */
+function KindPicker({ nodeId, kind, chosen }: { nodeId: string; kind: NodeKind; chosen: boolean }) {
+  const map = useMap()
+  const [open, setOpen] = useState(false)
+  const Icon = NODE_KIND_ICON[kind]
+  const pick = (k: NodeKind | undefined) => {
+    map.setData(nodeId, { kind: k })
+    setOpen(false)
+  }
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="Tipo do item">
+          <Icon /> {NODE_KIND[kind].label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid w-64 gap-0.5 p-1" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+        {NODE_KINDS.map((k) => {
+          const KIcon = NODE_KIND_ICON[k.id]
+          const active = k.id === kind
+          return (
+            <button
+              key={k.id}
+              type="button"
+              onClick={() => pick(k.id)}
+              className={cn("flex items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent", active && "bg-accent")}
+            >
+              <KIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="grid">
+                <span className="font-medium">{k.label}</span>
+                <span className="text-[11px] text-muted-foreground">{k.hint}</span>
+              </span>
+            </button>
+          )
+        })}
+        {chosen && (
+          <button type="button" onClick={() => pick(undefined)} className="mt-0.5 rounded-md border-t px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent">
+            Automático (pelo vínculo)
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -838,6 +893,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.width ?? null,
       n.height ?? null,
       n.status ?? null,
+      n.kind ?? null,
     ]),
     edges.map((e) => [e.id, e.source, e.target]),
   ])

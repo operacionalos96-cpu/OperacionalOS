@@ -72,3 +72,44 @@ export function fitFontSize(box: { width: number; height: number }, text: { titl
   }
   return 12
 }
+
+// ---------- tipos de balão ----------
+
+export type NodeKind = "ideia" | "projeto" | "tarefa" | "venda" | "cliente" | "produto" | "meta" | "decisao" | "resumo"
+
+/** Ordem = ordem no seletor e no contador. `plural` para "4 tarefas · 2 ideias". */
+export const NODE_KINDS: { id: NodeKind; label: string; plural: string; hint: string }[] = [
+  { id: "ideia", label: "Ideia", plural: "ideias", hint: "Algo a pensar ou explorar" },
+  { id: "projeto", label: "Projeto", plural: "projetos", hint: "Agrupa várias entregas" },
+  { id: "tarefa", label: "Tarefa", plural: "tarefas", hint: "Algo a fazer (ligue a uma tarefa)" },
+  { id: "venda", label: "Venda", plural: "vendas", hint: "Oportunidade (ligue a um lead)" },
+  { id: "cliente", label: "Cliente", plural: "clientes", hint: "Quem já comprou" },
+  { id: "produto", label: "Produto", plural: "produtos", hint: "O que vendemos" },
+  { id: "meta", label: "Meta", plural: "metas", hint: "Resultado que queremos alcançar" },
+  { id: "decisao", label: "Decisão", plural: "decisões", hint: "O que foi decidido e por quê" },
+  { id: "resumo", label: "Resumo", plural: "resumos", hint: "Conclusão de uma parte do mapa" },
+]
+
+export const NODE_KIND = Object.fromEntries(NODE_KINDS.map((k) => [k.id, k])) as Record<NodeKind, (typeof NODE_KINDS)[number]>
+
+/**
+ * Tipo do balão. Escolhido à mão vence; sem escolha, vem do vínculo:
+ * tarefa ligada → Tarefa, lead ligado → Venda (ou Cliente, se o lead foi ganho).
+ */
+export function nodeKind(node: Pick<MindMapNode, "kind" | "taskId" | "leadId">, leadStage?: string): NodeKind {
+  if (node.kind) return node.kind
+  if (node.taskId) return "tarefa"
+  if (node.leadId) return leadStage === "ganho" ? "cliente" : "venda"
+  return "ideia"
+}
+
+/** "4 tarefas · 2 ideias · 1 venda": só tipos presentes, na ordem de NODE_KINDS. */
+export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId" | "label">[], leadStage: (leadId: string) => string | undefined = () => undefined) {
+  const counts = new Map<NodeKind, number>()
+  for (const n of nodes) {
+    if (!n.label.trim()) continue
+    const k = nodeKind(n, n.leadId ? leadStage(n.leadId) : undefined)
+    counts.set(k, (counts.get(k) ?? 0) + 1)
+  }
+  return NODE_KINDS.filter((k) => counts.has(k.id)).map((k) => ({ ...k, count: counts.get(k.id)! }))
+}
