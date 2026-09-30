@@ -10,6 +10,7 @@ import {
   Background,
   ConnectionMode,
   Handle,
+  MarkerType,
   Panel,
   NodeResizer,
   NodeToolbar,
@@ -40,6 +41,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { MindMap, MindMapEdge, MindMapNode } from "@/lib/domain/types"
 import { diffItems, edgeRow, isRowMap, nodeRow, rowId, signature } from "@/lib/domain/map-rows"
 import { useMindMaps } from "@/lib/maps"
+import { RELATION_KINDS } from "@/lib/entities/types"
 import { useMapEdges, useMapNodes } from "@/lib/modules"
 import { uid } from "@/lib/format"
 import { useStore } from "@/lib/store"
@@ -72,6 +74,8 @@ interface MapActions {
   setData: (id: string, patch: Partial<IdeaData>) => void
   /** Largura fixa (P/M/G) ou undefined = ajusta ao texto. Altura volta a ser automática. */
   setSize: (id: string, width: number | undefined) => void
+  /** Tipo (hierarquia/relação) e legenda de uma linha. */
+  setEdgeData: (id: string, patch: LinkData) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
@@ -88,7 +92,17 @@ function flowNode(n: MindMapNode): IdeaNode {
   }
 }
 
-const flowEdge = (e: MindMapEdge): Edge => ({ id: e.id, source: e.source, target: e.target })
+type LinkData = { kind?: "relacao"; label?: string }
+
+const flowEdge = (e: MindMapEdge): Edge<LinkData> => ({
+  id: e.id,
+  source: e.source,
+  target: e.target,
+  ...(e.kind || e.label ? { data: { kind: e.kind, label: e.label } } : {}),
+})
+
+/** Linha de hierarquia (pai → filho). Relações livres não contam como filhos. */
+const isHierarchy = (e: Edge) => (e.data as LinkData | undefined)?.kind !== "relacao"
 
 function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
   return { nodes: map.nodes.map(flowNode), edges: map.edges.map(flowEdge) }
@@ -113,7 +127,10 @@ function toMapNode(n: IdeaNode): MindMapNode {
   }
 }
 
-const toMapEdge = (e: Edge): MindMapEdge => ({ id: e.id, source: e.source, target: e.target })
+const toMapEdge = (e: Edge): MindMapEdge => {
+  const d = e.data as LinkData | undefined
+  return { id: e.id, source: e.source, target: e.target, kind: d?.kind, label: d?.label?.trim() || undefined }
+}
 
 const signatures = <T extends MindMapNode | MindMapEdge>(items: T[]) => new Map(items.map((x) => [x.id, signature(x)]))
 
@@ -276,13 +293,13 @@ function Editor({ map }: { map: MindMap }) {
       addChild: (id) => {
         const parent = findNode(id)
         if (!parent) return
-        const children = edges.filter((e) => e.source === id).length
+        const children = edges.filter((e) => e.source === id && isHierarchy(e)).length
         createNode({ x: parent.position.x + CHILD_DX, y: parent.position.y + children * ROW_DY }, id)
       },
       addSibling: (id) => {
         const node = findNode(id)
         if (!node) return
-        const parentId = edges.find((e) => e.target === id)?.source
+        const parentId = edges.find((e) => e.target === id && isHierarchy(e))?.source
         createNode({ x: node.position.x, y: node.position.y + ROW_DY }, parentId)
       },
       remove: (id) => {
@@ -311,6 +328,7 @@ function Editor({ map }: { map: MindMap }) {
       linkLead: (id, leadId) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, leadId } } : n))),
       setData: (id, patch) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))),
       setSize: (id, width) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, width, height: undefined } : n))),
+      setEdgeData: (id, patch) => setEdges((es) => es.map((e) => (e.id === id ? { ...e, data: { ...(e.data as LinkData | undefined), ...patch } } : e))),
     }
   }, [nodes, edges, editingId, setNodes, setEdges, createNode])
 
@@ -319,7 +337,14 @@ function Editor({ map }: { map: MindMap }) {
     const x = new Map(nodes.map((n) => [n.id, n.position.x]))
     return edges.map((e) => {
       const rightward = (x.get(e.target) ?? 0) >= (x.get(e.source) ?? 0)
-      return { ...e, type: "unlink", sourceHandle: rightward ? "r" : "l", targetHandle: rightward ? "l" : "r" }
+      const relation = !isHierarchy(e)
+      return {
+        ...e,
+        type: "unlink",
+        sourceHandle: rightward ? "r" : "l",
+        targetHandle: rightward ? "l" : "r",
+        ...(relation ? { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 } } : {}),
+      }
     })
   }, [nodes, edges])
 
@@ -354,7 +379,7 @@ function Editor({ map }: { map: MindMap }) {
 
   return (
     <MapCtx.Provider value={actions}>
-      <div className="relative h-full w-full" onKeyDown={onKeyDown} onDoubleClick={onDoubleClick}>
+      <div className="relative h-full w-full overflow-hidden" onKeyDown={onKeyDown} onDoubleClick={onDoubleClick}>
         <ReactFlow
           nodes={nodes}
           edges={displayEdges}
@@ -377,7 +402,7 @@ function Editor({ map }: { map: MindMap }) {
         </ReactFlow>
         <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-xs whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur lg:block">
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga ·
-          arraste as bolinhas para conectar · clique na linha para desvincular · ○ no canto marca o andamento
+          arraste as bolinhas para conectar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
     </MapCtx.Provider>
@@ -845,34 +870,113 @@ function LinkPicker({ kind, nodeId, label }: { kind: "task" | "lead"; nodeId: st
 
 const NODE_TYPES = { idea: IdeaNodeView }
 
+/** Legendas prontas (as mesmas das Conexões do resto do OS). */
+const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
+
 /**
- * Linha entre ideias. Área de clique larga (a linha é fina); selecionada, fica
- * destacada e mostra "Desvincular" no meio. Delete/Backspace também desvincula.
+ * Linha entre ideias. Sólida = hierarquia ("filho de"); tracejada com seta = relação
+ * livre, com legenda ("depende de", "gera"…). Área de clique larga; selecionada,
+ * mostra o tipo, a legenda e "Desvincular". Delete/Backspace também desvincula.
  */
-function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style }: EdgeProps) {
+function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, data }: EdgeProps) {
   const { deleteElements } = useReactFlow()
+  const map = useMap()
+  const link = (data ?? {}) as LinkData
+  const relation = link.kind === "relacao"
   const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  // zIndex: por cima dos balões (o rótulo fica numa camada abaixo dos nós por padrão).
+  const at = { transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: selected ? 1001 : undefined }
   return (
     <>
       <BaseEdge
         id={id}
         path={path}
+        markerEnd={markerEnd}
         interactionWidth={24}
-        style={{ ...style, stroke: selected ? "var(--brand)" : undefined, strokeWidth: selected ? 2.5 : 1.5 }}
+        style={{
+          ...style,
+          stroke: selected ? "var(--brand)" : relation ? "var(--muted-foreground)" : undefined,
+          strokeWidth: selected ? 2.5 : 1.5,
+          strokeDasharray: relation ? "6 4" : undefined,
+        }}
       />
-      {selected && (
-        <EdgeLabelRenderer>
-          <button
-            type="button"
-            onClick={() => deleteElements({ edges: [{ id }] })}
-            className="nodrag nopan pointer-events-auto absolute inline-flex animate-enter items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs font-medium text-foreground shadow-lift transition-colors hover:border-danger/50 hover:text-danger"
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+      <EdgeLabelRenderer>
+        {selected ? (
+          <div
+            className="nodrag nopan pointer-events-auto absolute flex animate-enter flex-col gap-1.5 rounded-lg border bg-card p-1.5 text-xs shadow-lift"
+            style={at}
+            onKeyDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
           >
-            <ScissorsIcon className="size-3.5" /> Desvincular
-          </button>
-        </EdgeLabelRenderer>
-      )}
+            <div className="flex gap-1">
+              <Chip active={!relation} onClick={() => map.setEdgeData(id, { kind: undefined })}>
+                Hierarquia
+              </Chip>
+              <Chip active={relation} onClick={() => map.setEdgeData(id, { kind: "relacao" })}>
+                Relação
+              </Chip>
+              <button
+                type="button"
+                onClick={() => deleteElements({ edges: [{ id }] })}
+                className="ml-1 inline-flex items-center gap-1 rounded-md px-1.5 font-medium text-muted-foreground transition-colors hover:text-danger"
+              >
+                <ScissorsIcon className="size-3.5" /> Desvincular
+              </button>
+            </div>
+            <EdgeLabelInput
+              key={id}
+              value={link.label ?? ""}
+              onSave={(label) => map.setEdgeData(id, { label: label || undefined, ...(label && !relation ? { kind: "relacao" as const } : {}) })}
+            />
+          </div>
+        ) : (
+          link.label && (
+            <span
+              className="nodrag nopan pointer-events-none absolute rounded-md border bg-background px-1.5 py-0.5 text-[11px] whitespace-nowrap text-muted-foreground"
+              style={at}
+            >
+              {link.label}
+            </span>
+          )
+        )}
+      </EdgeLabelRenderer>
     </>
+  )
+}
+
+/** Legenda da linha: digitar livre ou escolher uma pronta. Dar legenda vira relação. */
+function EdgeLabelInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [text, setText] = useState(value)
+  const save = (v: string) => v.trim() !== value && onSave(v.trim())
+  return (
+    <div className="grid gap-1">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => save(text)}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          if (e.key === "Enter") save(text)
+        }}
+        placeholder="Legenda (ex.: depende de)"
+        className="h-6 w-52 rounded-md border bg-background px-2 text-xs outline-none focus:border-brand"
+      />
+      <div className="flex max-w-52 flex-wrap gap-1">
+        {EDGE_LABELS.filter((l) => l !== value).map((l) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => {
+              setText(l)
+              onSave(l)
+            }}
+            className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground hover:text-foreground"
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -895,7 +999,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.status ?? null,
       n.kind ?? null,
     ]),
-    edges.map((e) => [e.id, e.source, e.target]),
+    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null]),
   ])
 }
 

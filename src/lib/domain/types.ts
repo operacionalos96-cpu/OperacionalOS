@@ -135,6 +135,10 @@ export interface MindMapEdge {
   id: string
   source: string
   target: string
+  /** Sem valor = hierarquia (linha sólida, "filho de"). "relacao" = linha tracejada com seta. */
+  kind?: "relacao"
+  /** Legenda no meio da linha ("depende de", "gera"…). */
+  label?: string
 }
 
 export interface MindMap {
