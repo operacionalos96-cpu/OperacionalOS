@@ -27,10 +27,12 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CheckIcon, CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CheckSquareIcon, MaximizeIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
-import { NODE_STATUS, nodeStatus, type NodeStatus } from "@/lib/domain/mindmap"
-import { toggleTaskWithFeedback } from "@/lib/actions"
+import { NODE_STATUS, nodeStatus, resolveLinkedTask } from "@/lib/domain/mindmap"
+import { setTaskStatus } from "@/lib/actions"
+import { StatusButton } from "@/components/shared/status-button"
+import { toast } from "sonner"
 import { LabelChip, labelHue } from "@/components/tasks/task-bits"
 import { Chip } from "@/components/shared/fields"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -273,22 +275,38 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
   const measured = !!useInternalNode(id)?.measured.width
   const editing = map.editingId === id
   const lead = useStore((s) => (data.leadId ? s.leads.find((l) => l.id === data.leadId) : undefined))
-  const task = useStore((s) => (data.taskId ? s.tasks.find((t) => t.id === data.taskId) : undefined))
+  const tasks = useStore((s) => s.tasks)
+  // Tarefa recorrente: acompanha a SÉRIE (a ocorrência atual), não só a primeira tarefa.
+  const linked = resolveLinkedTask(data.taskId, tasks, new Date())
+  const task = linked?.task
   // Cor: escolhida à mão > cor da etiqueta > neutro.
   const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
   const colored = hue !== undefined
   const sized = !!width
-  const status = nodeStatus({ status: data.status, taskId: task ? data.taskId : undefined }, task ? [task] : [])
+  const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
   const done = status === "feito"
+  // Texto cresce junto com o balão (ao aumentar pelos cantos ou P/M/G).
+  const titleSize = sized ? Math.round(Math.min(34, Math.max(14, width! / 15))) : undefined
 
-  // Um clique: a fazer → em andamento → feito → a fazer. Com tarefa vinculada, conclui/reabre a tarefa junto.
+  // Um clique: a fazer → em andamento → feito → a fazer. Com tarefa vinculada, a tarefa muda junto.
   function cycleStatus() {
     const next = NODE_STATUS[status].next
     map.setData(id, { status: next === "afazer" ? undefined : next })
-    if (task) {
-      if (next === "feito" && !task.done) toggleTaskWithFeedback(task.id)
-      if (next !== "feito" && task.done) useStore.getState().updateTask(task.id, { done: false, doneAt: undefined })
-    }
+    if (!linked) return
+    // Diária feita hoje e voltando para "a fazer": reabre a de hoje (e some com a de amanhã).
+    if (linked.recurring && linked.doneToday && linked.doneTodayTask && next === "afazer") setTaskStatus(linked.doneTodayTask.id, "afazer")
+    else setTaskStatus(linked.task.id, next)
+  }
+
+  // Desvincular não apaga nada e pode ser desfeito na hora.
+  function unlink(kind: "task" | "lead") {
+    const previous = kind === "task" ? data.taskId : data.leadId
+    if (kind === "task") map.linkTask(id, undefined)
+    else map.linkLead(id, undefined)
+    toast(kind === "task" ? "Tarefa desvinculada" : "Lead desvinculado", {
+      description: "Ela continua existindo. Para ligar de novo: Tarefa → Vincular existente.",
+      action: { label: "Desfazer", onClick: () => (kind === "task" ? map.linkTask(id, previous) : map.linkLead(id, previous)) },
+    })
   }
 
   return (
@@ -332,7 +350,7 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
         }
       >
         {colored && <span className="absolute inset-y-0 left-0 w-1" style={{ background: `oklch(0.68 0.13 ${hue})` }} />}
-        <StatusButton status={status} onClick={cycleStatus} />
+        <StatusButton status={status} onClick={cycleStatus} className="absolute top-2 right-2" />
         {data.tag && (
           <span
             className="w-fit rounded px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase"
@@ -352,24 +370,39 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
             }}
           />
         ) : (
-          <p className={cn("pr-5 font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground", done && "text-muted-foreground")}>
+          <p
+            className={cn("pr-6 leading-tight font-medium break-words whitespace-pre-wrap", !data.label && "text-muted-foreground", done && "text-muted-foreground")}
+            style={titleSize ? { fontSize: titleSize } : undefined}
+          >
             {data.label || "Sem texto"}
           </p>
         )}
         {data.description && !editing && (
-          <p className={cn("text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}>{data.description}</p>
+          <p
+            className={cn("text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground", !sized && "line-clamp-4")}
+            style={titleSize ? { fontSize: Math.round(titleSize * 0.62) } : undefined}
+          >
+            {data.description}
+          </p>
         )}
         {(lead || task) && (
           <div className="mt-auto flex flex-col gap-0.5 border-t pt-1">
             {task && (
-              <LinkedRow onUnlink={() => map.linkTask(id, undefined)} label="Desvincular tarefa">
+              <LinkedRow onUnlink={() => unlink("task")} label="Desvincular tarefa">
                 <button onClick={() => openTaskDetail(task.id)} className={cn("nodrag truncate text-left hover:underline", task.done && "line-through opacity-70")}>
                   ✓ {task.title}
                 </button>
               </LinkedRow>
             )}
+            {linked?.recurring && (
+              <p className="text-[10px] text-muted-foreground">
+                🔁 {task?.recurrence === "semanal" ? "Toda semana" : task?.recurrence === "mensal" ? "Todo mês" : "Todo dia"}
+                {linked.doneToday ? " · feito hoje" : ""}
+                {task && !task.done && task.dueDate ? ` · próxima: ${dueLabel(task.dueDate)}` : ""}
+              </p>
+            )}
             {lead && (
-              <LinkedRow onUnlink={() => map.linkLead(id, undefined)} label="Desvincular lead">
+              <LinkedRow onUnlink={() => unlink("lead")} label="Desvincular lead">
                 <Link href={`/pipeline/${lead.id}`} className="nodrag truncate hover:underline">
                   → Lead: {lead.name}
                 </Link>
@@ -382,32 +415,6 @@ function IdeaNodeView({ id, data, selected, width }: NodeProps<IdeaNode>) {
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
     </>
-  )
-}
-
-/** Círculo no canto do item: vazio (a fazer), meio cheio (em andamento), check verde (feito). */
-function StatusButton({ status, onClick }: { status: NodeStatus; onClick: () => void }) {
-  const label = `${NODE_STATUS[status].label} · clique para “${NODE_STATUS[NODE_STATUS[status].next].label}”`
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick()
-      }}
-      onDoubleClick={(e) => e.stopPropagation()}
-      title={label}
-      aria-label={label}
-      className={cn(
-        "nodrag absolute top-2 right-2 flex size-4 items-center justify-center rounded-full border-[1.5px] transition-colors",
-        status === "afazer" && "border-muted-foreground/50 hover:border-foreground",
-        status === "andamento" && "border-warning",
-        status === "feito" && "border-success bg-success text-brand-foreground",
-      )}
-    >
-      {status === "andamento" && <span className="size-2 rounded-full bg-warning" style={{ clipPath: "inset(0 50% 0 0)" }} />}
-      {status === "feito" && <CheckIcon className="size-3" strokeWidth={3} />}
-    </button>
   )
 }
 

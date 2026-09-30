@@ -60,6 +60,7 @@ export interface NewTaskInput {
   checklist?: ChecklistItem[]
   recurrence?: Recurrence
   collaborators?: string[]
+  seriesId?: string
 }
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
@@ -322,6 +323,7 @@ export const useStore = create<State>((set, get) => {
         description: input.description?.trim() || undefined,
         checklist: input.checklist?.length ? input.checklist : undefined,
         recurrence: input.recurrence,
+        seriesId: input.seriesId,
         collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
@@ -338,12 +340,14 @@ export const useStore = create<State>((set, get) => {
       const task = get().tasks.find((t) => t.id === id)
       if (!task) return
       const done = !task.done
-      saveTask({ ...task, done, doneAt: done ? nowIso() : undefined })
+      // Concluir tira o "em andamento"; reabrir volta para "a fazer".
+      saveTask({ ...task, done, doneAt: done ? nowIso() : undefined, status: undefined })
       if (done && task.leadId) addActivity(task.leadId, "acao_concluida", `Tarefa: ${task.title}`)
       if (!done || !task.recurrence) return
       // Recorrente: a próxima nasce com o checklist zerado e o mesmo resto.
       return get().createTask({
         ...task,
+        seriesId: task.seriesId ?? task.id,
         dueDate: nextOccurrence(task.dueDate, task.recurrence, new Date()),
         checklist: task.checklist?.map((i) => ({ ...i, id: uid(), done: false })),
       })

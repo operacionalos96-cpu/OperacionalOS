@@ -74,6 +74,10 @@ export interface Task {
   recurrence?: Recurrence
   /** Tarefa colaborativa: outras pessoas também responsáveis (além de ownerId). */
   collaborators?: string[]
+  /** Em andamento (sem valor = a fazer; concluída usa `done`). */
+  status?: "andamento"
+  /** Tarefas recorrentes: id da primeira da série (as próximas nascem com ele). */
+  seriesId?: string
 }
 
 export interface Note {

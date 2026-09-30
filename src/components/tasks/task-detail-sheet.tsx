@@ -6,7 +6,9 @@ import { CheckIcon, GripVerticalIcon, LinkIcon, ListChecksIcon, PlusIcon, Trash2
 import { getUser } from "@/config/team"
 import { assignPeople, checklistProgress, taskPeople } from "@/lib/domain/rules"
 import { dateTime, dueLabel, uid } from "@/lib/format"
-import { deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
+import { cycleTaskStatus, deleteTaskWithUndo, setTaskStatus } from "@/lib/actions"
+import { taskStatus } from "@/lib/domain/mindmap"
+import { StatusButton } from "@/components/shared/status-button"
 import { useStore } from "@/lib/store"
 import { useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -14,7 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { DueDateField, Field, LeadSelect } from "@/components/shared/fields"
+import { DueDateField, Field, LeadSelect, Segmented } from "@/components/shared/fields"
 import { LabelEditor, PeoplePicker, PriorityPicker, RecurrencePicker } from "./task-bits"
 
 /** Painel lateral: tudo que dá para personalizar em uma tarefa, salvo na hora. */
@@ -42,12 +44,7 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
   return (
     <>
       <div className="sticky top-0 z-10 flex items-start gap-3 border-b bg-popover/95 px-5 pt-5 pb-4 backdrop-blur">
-        <Checkbox
-          className={cn("mt-1.5 size-5 rounded-full", task.done && "check-burst")}
-          checked={task.done}
-          onCheckedChange={() => toggleTaskWithFeedback(task.id)}
-          aria-label="Concluir tarefa"
-        />
+        <StatusButton size="md" status={taskStatus(task)} onClick={() => cycleTaskStatus(task.id)} className="mt-1" />
         <div className="min-w-0 flex-1">
           <SheetTitle asChild>
             <textarea
@@ -69,6 +66,17 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
       </div>
 
       <div className="grid gap-5 px-5 py-5">
+        <Field label="Status">
+          <Segmented
+            value={taskStatus(task)}
+            onChange={(v) => setTaskStatus(task.id, v)}
+            options={[
+              { value: "afazer", label: "A fazer" },
+              { value: "andamento", label: <><span className="size-2 rounded-full bg-warning" /> Em andamento</> },
+              { value: "feito", label: <><span className="size-2 rounded-full bg-success" /> Feita</> },
+            ]}
+          />
+        </Field>
         <Field label="Prazo" hint={task.dueDate ? dueLabel(task.dueDate) : undefined}>
           <DueDateField allowEmpty value={task.dueDate} onChange={(dueDate) => set({ dueDate })} />
         </Field>

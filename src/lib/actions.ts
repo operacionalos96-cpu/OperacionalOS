@@ -3,6 +3,7 @@
 import { toast } from "sonner"
 import { dueLabel, money } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { NODE_STATUS, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
 
 /**
  * Ações com feedback + "Desfazer". Use estas na UI em vez de chamar a store
@@ -56,4 +57,31 @@ export function deleteTransactionWithUndo(id: string) {
   toast(`Lançamento de ${money(tx.amountCents)} excluído`, {
     action: { label: "Desfazer", onClick: () => useStore.getState().restoreTransaction(tx) },
   })
+}
+
+/**
+ * Define o status da tarefa (a fazer / em andamento / feita).
+ * Reabrir uma tarefa recorrente apaga a próxima ocorrência que tinha sido criada
+ * automaticamente ao concluir (senão ficariam duas em aberto).
+ */
+export function setTaskStatus(id: string, next: NodeStatus) {
+  const s = useStore.getState()
+  const task = s.tasks.find((t) => t.id === id)
+  if (!task) return
+  if (next === "feito") {
+    if (!task.done) toggleTaskWithFeedback(id)
+    return
+  }
+  if (task.done && task.recurrence && task.doneAt) {
+    const series = task.seriesId ?? task.id
+    const autoNext = s.tasks.find((t) => t.id !== id && !t.done && t.seriesId === series && t.createdAt >= task.doneAt!)
+    if (autoNext) s.deleteTask(autoNext.id)
+  }
+  s.updateTask(id, { done: false, doneAt: undefined, status: next === "andamento" ? "andamento" : undefined })
+}
+
+/** Um clique no círculo: a fazer → em andamento → feita → a fazer. */
+export function cycleTaskStatus(id: string) {
+  const task = useStore.getState().tasks.find((t) => t.id === id)
+  if (task) setTaskStatus(id, NODE_STATUS[taskStatus(task)].next)
 }

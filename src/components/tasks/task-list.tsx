@@ -35,12 +35,13 @@ import {
   taskBucket,
 } from "@/lib/domain/rules"
 import { dueLabel, dueShortcuts } from "@/lib/format"
-import { deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
+import { cycleTaskStatus, deleteTaskWithUndo } from "@/lib/actions"
+import { taskStatus } from "@/lib/domain/mindmap"
+import { StatusButton } from "@/components/shared/status-button"
 import { useStore } from "@/lib/store"
 import { openTaskDetail, openTaskForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -95,9 +96,9 @@ export function TaskList() {
         (!label || t.labels?.includes(label)) &&
         (!q || t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)),
     )
-    const map = new Map<TaskBucket, Task[]>()
+    const map = new Map<TaskBucket | "andamento", Task[]>()
     for (const t of visible) {
-      const b = taskBucket(t, n)
+      const b = !t.done && t.status === "andamento" ? "andamento" : taskBucket(t, n)
       map.set(b, [...(map.get(b) ?? []), t])
     }
     for (const list of map.values()) list.sort((a, b) => compareTasks(a, b, sort))
@@ -166,7 +167,7 @@ export function TaskList() {
           }
         />
       ) : (
-        TASK_BUCKETS.map((bucket) => {
+        [{ id: "andamento" as const, label: "Em andamento" }, ...TASK_BUCKETS].map((bucket) => {
           const list = grouped.get(bucket.id)
           if (!list?.length) return null
           if (bucket.id === "feitas") {
@@ -311,18 +312,16 @@ function TaskRow({ task, now, index }: { task: Task; now: Date; index: number })
       }}
     >
       {accent && !task.done && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full" style={{ background: accent }} />}
-      <Checkbox
-        className={cn("mt-0.5 size-[18px] rounded-full transition-transform hover:scale-110", task.done && "check-burst")}
-        checked={task.done}
-        onCheckedChange={() => toggleTaskWithFeedback(task.id)}
-        aria-label="Concluir tarefa"
-      />
+      <StatusButton status={taskStatus(task)} onClick={() => cycleTaskStatus(task.id)} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className={cn("text-sm leading-snug transition-colors", task.done && "text-muted-foreground line-through decoration-muted-foreground/50")}>
           {task.title}
         </p>
-        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority) && (
+        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+            {!task.done && task.status === "andamento" && (
+              <span className="rounded bg-warning-soft px-1.5 py-px text-[11px] font-medium text-warning">Em andamento</span>
+            )}
             <PriorityFlag priority={task.priority} withLabel />
             {task.labels?.map((l) => <LabelChip key={l} label={l} />)}
             {progress.total > 0 && (
