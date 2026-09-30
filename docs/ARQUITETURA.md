@@ -83,3 +83,16 @@ No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "
   pode representar uma tarefa (`taskId`), um lead (`leadId`) ou outra coisa (`ref`: produto, conteúdo, nota…).
 - Regras puras em `src/lib/domain/mindmap.ts`: tipos de balão, grupos (`membersOf`), ramos
   (`descendants`, `hiddenByCollapse`, `focusSet`) e a ordem da Lista/Apresentação (`outline`).
+
+## Eventos, automações e integrações (escala)
+
+- **Eventos** (`src/lib/events.ts`): `lead.ganho`, `lead.perdido`, `tarefa.concluida`, `entrada.lancada`,
+  `conteudo.etapa`. Saem da store/ações; qualquer módulo reage com `on(tipo, fn)`.
+- **Automações** (`src/lib/automations.ts`): "Meta batida" e "Virou cliente". Nova automação = item em
+  `AUTOMATIONS` + um `on(...)` em `startAutomations`.
+- **Vendas automáticas** (`src/lib/server/sales-webhooks.ts` + `POST /api/webhooks/<plataforma>`):
+  Hotmart e Kiwify viram **entrada** no financeiro (produto casado pelo nome, sem duplicar a mesma venda).
+  Na Vercel: `SUPABASE_SECRET_KEY`, `HOTMART_HOTTOK` e/ou `KIWIFY_TOKEN` (opcional `WEBHOOK_OWNER_ID`).
+  URL para colar na plataforma: `https://operacional-os.vercel.app/api/webhooks/hotmart` (ou `/kiwify`).
+  Plataforma nova = mais um item em `SALES_PROVIDERS`.
+- **Volume**: tudo carrega em páginas de 1000 (`src/lib/repositories/select-all.ts`); índices no SQL 0007.

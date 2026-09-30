@@ -101,6 +101,8 @@ export interface Transaction {
   /** Produto a que a entrada/saída pertence (rastreio financeiro por produto). */
   productId?: string
   createdById: string
+  /** Veio sozinho de uma integração ("hotmart", "kiwify"…). Sem valor = lançado à mão. */
+  source?: string
 }
 
 export interface FinanceSettings {

@@ -7,6 +7,7 @@ import { CONTENT_STAGES, type ContentItem, type ContentStage } from "@/lib/domai
 import { sameRef } from "@/lib/entities/types"
 import { useContentItems, useRelations } from "@/lib/modules"
 import { uid } from "@/lib/format"
+import { emit } from "@/lib/events"
 import { NODE_STATUS, nodeStatus, resolveLinkedTask, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
 
 /**
@@ -115,6 +116,7 @@ export function cycleMapNodeStatus(node: { status?: "andamento" | "feito"; taskI
 export function setContentStage(item: ContentItem, stage: ContentStage) {
   if (item.stage === stage) return
   useContentItems.getState().patch(item.id, { stage })
+  emit({ type: "conteudo.etapa", contentId: item.id, stage })
   const s = useStore.getState()
   const rels = useRelations.getState()
   const ref = { type: "content" as const, id: item.id }

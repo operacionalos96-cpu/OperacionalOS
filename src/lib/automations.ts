@@ -1,0 +1,58 @@
+"use client"
+
+import { toast } from "sonner"
+import { goalValue, linkedTaskIds } from "@/lib/domain/insights"
+import { on } from "@/lib/events"
+import { useGoals, useRelations } from "@/lib/modules"
+import { useStore } from "@/lib/store"
+
+/**
+ * Automações: reações aos eventos do negócio (src/lib/events.ts). Nova automação =
+ * uma entrada em AUTOMATIONS + um `on(...)` em startAutomations. Nada aqui apaga
+ * ou muda dados sem o usuário ver.
+ */
+export const AUTOMATIONS = [
+  { id: "meta-batida", label: "Meta batida", description: "Comemora quando uma meta chega a 100% (por qualquer um da equipe)." },
+  { id: "virou-cliente", label: "Virou cliente", description: "Lead ganho vira cliente, com atalho para a lista de clientes." },
+] as const
+
+let started = false
+
+export function startAutomations(navigate: (href: string) => void) {
+  if (started) return
+  started = true
+
+  // Virou cliente.
+  on("lead.ganho", ({ leadId }) => {
+    const lead = useStore.getState().leads.find((l) => l.id === leadId)
+    if (lead) toast.success(`${lead.name} virou cliente`, { action: { label: "Ver clientes", onClick: () => navigate("/clientes") } })
+  })
+
+  // Meta batida: olha os dados (vale também para o que o sócio fez em tempo real).
+  const celebrated = new Set<string>()
+  const check = (announce: boolean) => {
+    const { transactions, leads, tasks } = useStore.getState()
+    const relations = useRelations.getState().items
+    const today = new Date().toISOString().slice(0, 10)
+    for (const g of useGoals.getState().items) {
+      if (g.end < today || celebrated.has(g.id)) continue
+      const ids = linkedTaskIds(g.id, relations)
+      const v = goalValue(g, { transactions, leads, linkedTasks: tasks.filter((t) => ids.has(t.id)) })
+      if (v.target > 0 && v.pct >= 1) {
+        celebrated.add(g.id)
+        if (announce) toast.success(`Meta batida: ${g.title} 🎉`, { action: { label: "Ver", onClick: () => navigate(`/metas/${g.id}`) } })
+      }
+    }
+  }
+  check(false) // o que já estava batido não comemora de novo
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const later = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => check(true), 600)
+  }
+  useStore.subscribe((s, prev) => {
+    if (s.transactions !== prev.transactions || s.leads !== prev.leads || s.tasks !== prev.tasks) later()
+  })
+  useGoals.subscribe(later)
+  useRelations.subscribe(later)
+}

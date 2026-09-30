@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import {
@@ -42,6 +42,7 @@ import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dia
 import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/lead-flow-dialogs"
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
+import { startAutomations } from "@/lib/automations"
 import { NAV, NAV_SECTIONS, isActive } from "./nav"
 
 /** Telas sem barra lateral e sem dados (login, redefinir senha). */
@@ -61,6 +62,12 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     hydrate()
   }, [hydrate])
+
+  // Automações começam depois que os dados chegaram (senão tudo pareceria "novo").
+  const router = useRouter()
+  useEffect(() => {
+    if (hydrated) startAutomations((href) => router.push(href))
+  }, [hydrated, router])
 
   useGlobalShortcuts()
   const pathname = usePathname()

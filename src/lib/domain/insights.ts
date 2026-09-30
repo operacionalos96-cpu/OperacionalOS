@@ -58,6 +58,16 @@ export function goalValue(
   return { value, target, pct: target > 0 ? Math.min(value / target, 1) : 0 }
 }
 
+/** Tarefas ligadas à meta pelas Conexões (em qualquer sentido). */
+export function linkedTaskIds(goalId: string, relations: { from: { type: string; id: string }; to: { type: string; id: string } }[]) {
+  const ids = new Set<string>()
+  for (const r of relations) {
+    if (r.from.type === "goal" && r.from.id === goalId && r.to.type === "task") ids.add(r.to.id)
+    if (r.to.type === "goal" && r.to.id === goalId && r.from.type === "task") ids.add(r.from.id)
+  }
+  return ids
+}
+
 // ---------- movimento da equipe ----------
 
 export interface FeedEvent {

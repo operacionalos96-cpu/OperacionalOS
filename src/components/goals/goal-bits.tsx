@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { GOAL_SOURCES, goalValue, type Goal, type GoalSource } from "@/lib/domain/insights"
-import { sameRef } from "@/lib/entities/types"
+import { GOAL_SOURCES, goalValue, linkedTaskIds, type Goal, type GoalSource } from "@/lib/domain/insights"
 import { money, uid } from "@/lib/format"
 import { useGoals, useProducts, useRelations } from "@/lib/modules"
 import { useStore } from "@/lib/store"
@@ -19,10 +18,7 @@ export function useGoalValue(goal: Goal) {
   const tasks = useStore((s) => s.tasks)
   const relations = useRelations((s) => s.items)
   return useMemo(() => {
-    const ref = { type: "goal" as const, id: goal.id }
-    const ids = new Set(
-      relations.flatMap((r) => (sameRef(r.from, ref) && r.to.type === "task" ? [r.to.id] : sameRef(r.to, ref) && r.from.type === "task" ? [r.from.id] : [])),
-    )
+    const ids = linkedTaskIds(goal.id, relations)
     return goalValue(goal, { transactions, leads, linkedTasks: tasks.filter((t) => ids.has(t.id)) })
   }, [goal, transactions, leads, tasks, relations])
 }

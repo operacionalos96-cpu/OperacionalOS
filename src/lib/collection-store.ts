@@ -4,6 +4,7 @@ import { create, type StoreApi, type UseBoundStore } from "zustand"
 import { toast } from "sonner"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { queueWrite } from "@/lib/write-queue"
+import { selectAllData } from "@/lib/repositories/select-all"
 
 /**
  * Base de expansão: todo módulo novo (Produtos, Conteúdos, e os próximos) cria
@@ -50,9 +51,7 @@ export function createCollection<T extends { id: string; updatedAt?: string }>(t
     loaded: false,
 
     async load() {
-      const { data, error } = await db().select("data").order("updated_at", { ascending: true }).limit(5000)
-      if (error) throw error
-      set({ items: (data ?? []).map((r) => r.data as T), loaded: true })
+      set({ items: await selectAllData<T>(supabaseBrowser(), table), loaded: true })
     },
 
     save(input) {

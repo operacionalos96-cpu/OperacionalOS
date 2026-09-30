@@ -2,6 +2,7 @@
 
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 import type { FinanceSettings } from "@/lib/domain/types"
+import { selectAllData } from "./select-all"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { registeredCollections } from "@/lib/collection-store"
 import { queueWrite } from "@/lib/write-queue"
@@ -25,9 +26,7 @@ function collection<T extends { id: string }>(table: string): CollectionReposito
   const db = () => supabaseBrowser().from(table)
   return {
     async list() {
-      const { data, error } = await db().select("data").order("updated_at", { ascending: true }).limit(5000)
-      if (error) throw error
-      return (data ?? []).map((row) => row.data as T)
+      return selectAllData<T>(supabaseBrowser(), table)
     },
     async upsert(item) {
       const { error } = await queueWrite(`${table}:${item.id}`, () => db().upsert({ id: item.id, data: item }))

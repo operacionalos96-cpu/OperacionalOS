@@ -27,6 +27,7 @@ import { getRepositories } from "@/lib/repositories"
 import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { registeredCollections } from "@/lib/collection-store"
+import { emit } from "@/lib/events"
 import "@/lib/modules"
 
 /** Falhas de persistência não travam a UI, mas o usuário é avisado. */
@@ -275,6 +276,8 @@ export const useStore = create<State>((set, get) => {
       })
       const reason = stage === "perdido" && extra?.lostReason ? ` — ${extra.lostReason}` : ""
       addActivity(id, "estagio", `${stageLabel(lead.stage)} → ${stageLabel(stage)}${reason}`)
+      if (stage === "ganho") emit({ type: "lead.ganho", leadId: id })
+      if (stage === "perdido") emit({ type: "lead.perdido", leadId: id })
     },
 
     completeNextAction(id, next) {
@@ -343,6 +346,7 @@ export const useStore = create<State>((set, get) => {
       // Concluir tira o "em andamento"; reabrir volta para "a fazer".
       saveTask({ ...task, done, doneAt: done ? nowIso() : undefined, status: undefined })
       if (done && task.leadId) addActivity(task.leadId, "acao_concluida", `Tarefa: ${task.title}`)
+      if (done) emit({ type: "tarefa.concluida", taskId: id })
       if (!done || !task.recurrence) return
       // Recorrente: a próxima nasce com o checklist zerado e o mesmo resto.
       return get().createTask({
@@ -396,6 +400,7 @@ export const useStore = create<State>((set, get) => {
       const tx: Transaction = { ...input, id: uid(), createdById: get().meId }
       set((s) => ({ transactions: [...s.transactions, tx] }))
       persist(repos().transactions.upsert(tx))
+      if (tx.type === "entrada") emit({ type: "entrada.lancada", transactionId: tx.id, amountCents: tx.amountCents })
       return tx
     },
 

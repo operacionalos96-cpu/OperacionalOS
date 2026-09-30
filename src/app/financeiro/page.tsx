@@ -250,6 +250,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
                         <p className="truncate text-sm">{t.description}</p>
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t.category}
+                          {t.source && <span className="rounded bg-muted px-1 text-[10px] font-medium capitalize">via {t.source}</span>}
                           {lead && (
                             <Link href={`/pipeline/${lead.id}`} className="inline-flex items-center gap-0.5 hover:text-foreground hover:underline">
                               · <LinkIcon className="size-3" /> {lead.name}

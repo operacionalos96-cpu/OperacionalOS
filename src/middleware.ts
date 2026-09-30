@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   "/redefinir-senha",
   // Chamada pelo agendador da Vercel sem login: a própria rota exige o CRON_SECRET.
   "/api/integracoes/sincronizar",
+  // Vendas da Hotmart/Kiwify: a rota exige o segredo de cada plataforma.
+  "/api/webhooks",
 ]
 
 export async function middleware(request: NextRequest) {
