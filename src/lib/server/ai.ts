@@ -22,8 +22,8 @@ export function aiConfigured() {
 export async function generateJson(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new AiError("IA não configurada: coloque GEMINI_API_KEY na Vercel.", 503)
-  // Nome de modelo muda com o tempo: tenta o configurado e cai para o "Flash mais recente".
-  const models = [...new Set([process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[])]
+  // Nome de modelo muda e o gratuito às vezes fica sobrecarregado: tenta o próximo da lista.
+  const models = [...new Set([process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(Boolean) as string[])]
   let res: Response | undefined
   for (const model of models) {
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -37,7 +37,8 @@ export async function generateJson(prompt: string): Promise<string> {
     }).catch(() => {
       throw new AiError("A IA não respondeu a tempo. Tente de novo.", 504)
     })
-    if (res.status !== 404) break
+    // 404 = modelo não existe nesta conta; 500/503 = sobrecarga passageira → próximo modelo.
+    if (![404, 500, 503].includes(res.status)) break
   }
   if (!res) throw new AiError("IA indisponível.", 502)
   if (res.status === 429) throw new AiError("Limite do plano gratuito atingido. Espere um minuto e tente de novo.", 429)
@@ -49,6 +50,7 @@ export async function generateJson(prompt: string): Promise<string> {
     const hint =
       res.status === 400 && /API key/i.test(reason) ? "A chave do Gemini é inválida. Gere outra no AI Studio." :
       res.status === 403 ? "A chave não tem permissão para a API do Gemini." :
+      res.status === 503 || res.status === 500 ? "O Gemini está sobrecarregado agora (plano gratuito). Tente de novo em alguns minutos." :
       "A IA recusou o pedido."
     throw new AiError(`${hint} (${reason})`, 502)
   }
