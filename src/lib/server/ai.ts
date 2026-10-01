@@ -22,20 +22,36 @@ export function aiConfigured() {
 export async function generateJson(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new AiError("IA não configurada: coloque GEMINI_API_KEY na Vercel.", 503)
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 1024 },
-    }),
-    signal: AbortSignal.timeout(25_000),
-  }).catch(() => {
-    throw new AiError("A IA não respondeu a tempo. Tente de novo.", 504)
-  })
+  // Nome de modelo muda com o tempo: tenta o configurado e cai para o "Flash mais recente".
+  const models = [...new Set([process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[])]
+  let res: Response | undefined
+  for (const model of models) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 1024 },
+      }),
+      signal: AbortSignal.timeout(25_000),
+    }).catch(() => {
+      throw new AiError("A IA não respondeu a tempo. Tente de novo.", 504)
+    })
+    if (res.status !== 404) break
+  }
+  if (!res) throw new AiError("IA indisponível.", 502)
   if (res.status === 429) throw new AiError("Limite do plano gratuito atingido. Espere um minuto e tente de novo.", 429)
-  if (!res.ok) throw new AiError("A IA recusou o pedido. Tente de novo em instantes.", 502)
+  if (!res.ok) {
+    // Motivo do Google (nunca contém a chave): ajuda a saber se é chave inválida, permissão ou modelo.
+    const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; message?: string } }
+    const reason = `${res.status} ${err.error?.status ?? ""} ${err.error?.message ?? ""}`.trim().slice(0, 240)
+    console.error("[ia] Gemini recusou:", reason)
+    const hint =
+      res.status === 400 && /API key/i.test(reason) ? "A chave do Gemini é inválida. Gere outra no AI Studio." :
+      res.status === 403 ? "A chave não tem permissão para a API do Gemini." :
+      "A IA recusou o pedido."
+    throw new AiError(`${hint} (${reason})`, 502)
+  }
   const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? ""
   if (!text) throw new AiError("A IA não trouxe resposta. Tente reformular o balão.", 502)
