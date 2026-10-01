@@ -27,6 +27,8 @@ export interface EntitySummary {
   subtitle?: string
   /** Concluída / ganha / publicada — usada para bloqueios e riscados. */
   done: boolean
+  /** Texto extra só para a busca (ex.: WhatsApp do lead, com e sem formatação). */
+  search?: string
 }
 
 export const ENTITY_LABEL: Record<EntityType, { one: string; many: string }> = {
@@ -45,7 +47,7 @@ export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | nu
   switch (ref.type) {
     case "lead": {
       const l = s.leads.find((x) => x.id === ref.id)
-      return l ? { title: l.name, subtitle: l.company, done: l.stage === "ganho" } : null
+      return l ? { title: l.name, subtitle: l.company, done: l.stage === "ganho", search: l.contact ? `${l.contact} ${l.contact.replace(/\D/g, "")}` : undefined } : null
     }
     case "task": {
       const t = s.tasks.find((x) => x.id === ref.id)

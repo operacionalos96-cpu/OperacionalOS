@@ -6,6 +6,8 @@ import { toast } from "sonner"
 import type { Note } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { plainText } from "@/lib/domain/rich-text"
+import { RichTextEditor } from "@/components/shared/rich-text-editor"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/shared/layout"
@@ -56,7 +58,7 @@ export function Notes({ selectedId, onSelect }: { selectedId: string | null; onS
               >
                 <p className={cn("truncate text-sm font-medium", !n.title && "text-muted-foreground")}>{n.title || "Sem título"}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {relative(n.updatedAt)} · {n.body.split("\n")[0] || "vazia"}
+                  {relative(n.updatedAt)} · {plainText(n.body).split("\n")[0] || "vazia"}
                 </p>
               </button>
             </li>
@@ -77,14 +79,13 @@ export function Notes({ selectedId, onSelect }: { selectedId: string | null; onS
   )
 }
 
-/** Editor simples: título + texto. Salva sozinho enquanto digita. */
+/** Título + texto formatado. Salva sozinho enquanto digita. */
 function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
   const updateNote = useStore((s) => s.updateNote)
   const deleteNote = useStore((s) => s.deleteNote)
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body)
   const [status, setStatus] = useState<"salvo" | "salvando">("salvo")
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
   const pending = useRef<{ title: string; body: string } | null>(null)
 
   // Autosave com debounce; também salva ao sair da nota.
@@ -107,14 +108,6 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
     },
     [note.id],
   )
-
-  // Textarea cresce com o conteúdo.
-  useEffect(() => {
-    const el = bodyRef.current
-    if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${el.scrollHeight}px`
-  }, [body])
 
   function remove() {
     const snapshot = { ...note, title, body }
@@ -150,19 +143,12 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault()
-              bodyRef.current?.focus()
+              ;(document.querySelector(".rich-text") as HTMLElement | null)?.focus()
             }
           }}
           className="w-full bg-transparent text-2xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/60"
         />
-        <textarea
-          ref={bodyRef}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Escreva aqui… listas com - ou 1. funcionam bem."
-          className="mt-3 w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/60"
-          rows={8}
-        />
+        <RichTextEditor value={body} onChange={setBody} placeholder="Escreva aqui… use a barra acima ou atalhos: Ctrl+B, “- ” lista, “[] ” checklist, “## ” título." className="mt-3" />
       </div>
     </article>
   )

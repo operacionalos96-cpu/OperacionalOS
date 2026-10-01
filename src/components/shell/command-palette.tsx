@@ -77,7 +77,7 @@ export function CommandPalette() {
           return (
             <CommandGroup key={type} heading={ENTITY_LABEL[type].many}>
               {list.map((it) => (
-                <CommandItem key={refKey(it)} value={`${it.title} ${it.subtitle ?? ""} ${refKey(it)}`} onSelect={() => run(() => openEntity(it, router.push))}>
+                <CommandItem key={refKey(it)} value={`${it.title} ${it.subtitle ?? ""} ${it.search ?? ""} ${refKey(it)}`} onSelect={() => run(() => openEntity(it, router.push))}>
                   <Icon />
                   <span className={it.done ? "truncate text-muted-foreground line-through" : "truncate"}>{it.title}</span>
                   {it.subtitle && <span className="ml-auto max-w-40 shrink-0 truncate text-xs text-muted-foreground">{it.subtitle}</span>}

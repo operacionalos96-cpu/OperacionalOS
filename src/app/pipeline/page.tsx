@@ -2,6 +2,7 @@
 
 import { Suspense, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { leadMatches } from "@/lib/domain/contact"
 import { FileSpreadsheetIcon, KanbanIcon, PlusIcon, SearchIcon, UserPlusIcon } from "lucide-react"
 import { leadsNeedingAction } from "@/lib/domain/rules"
 import { useStore } from "@/lib/store"
@@ -48,12 +49,7 @@ function Pipeline() {
   }
 
   const leads = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return allLeads.filter(
-      (l) =>
-        (owner === "todos" || l.ownerId === meId) &&
-        (!q || l.name.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q)),
-    )
+    return allLeads.filter((l) => (owner === "todos" || l.ownerId === meId) && leadMatches(l, query))
   }, [allLeads, owner, meId, query])
 
   const needsCount = leadsNeedingAction(leads, new Date()).length
@@ -103,7 +99,7 @@ function Pipeline() {
           />
           <div className="relative ml-auto w-full sm:w-56">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Filtrar leads…" value={query} onChange={(e) => setQuery(e.target.value)} className="h-8 pl-8" />
+            <Input placeholder="Nome, empresa ou WhatsApp…" value={query} onChange={(e) => setQuery(e.target.value)} className="h-8 pl-8" />
           </div>
         </div>
       </PageHeader>
