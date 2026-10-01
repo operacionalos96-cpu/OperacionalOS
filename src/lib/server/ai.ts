@@ -23,8 +23,9 @@ export async function generateJson(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new AiError("IA não configurada: coloque GEMINI_API_KEY na Vercel.", 503)
   // Nome de modelo muda e o gratuito às vezes fica sobrecarregado: tenta o próximo da lista.
-  const models = [...new Set([process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(Boolean) as string[])]
+  const models = [...new Set([process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[])]
   let res: Response | undefined
+  let overloaded = false
   for (const model of models) {
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
@@ -38,10 +39,12 @@ export async function generateJson(prompt: string): Promise<string> {
       throw new AiError("A IA não respondeu a tempo. Tente de novo.", 504)
     })
     // 404 = modelo não existe nesta conta; 500/503 = sobrecarga passageira → próximo modelo.
+    if (res.status === 500 || res.status === 503) overloaded = true
     if (![404, 500, 503].includes(res.status)) break
   }
   if (!res) throw new AiError("IA indisponível.", 502)
   if (res.status === 429) throw new AiError("Limite do plano gratuito atingido. Espere um minuto e tente de novo.", 429)
+  if (!res.ok && overloaded) throw new AiError("O Gemini está sobrecarregado agora (plano gratuito). Tente de novo em alguns minutos.", 503)
   if (!res.ok) {
     // Motivo do Google (nunca contém a chave): ajuda a saber se é chave inválida, permissão ou modelo.
     const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; message?: string } }
