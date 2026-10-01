@@ -48,7 +48,6 @@ export async function generateJson(prompt: string): Promise<string> {
   }
   if (!res || (!res.ok && overloaded)) throw new AiError("O Gemini está sobrecarregado agora (plano gratuito). Tente de novo em alguns minutos.", 503)
   if (res.status === 429) throw new AiError("Limite do plano gratuito atingido. Espere um minuto e tente de novo.", 429)
-  if (!res.ok && overloaded) throw new AiError("O Gemini está sobrecarregado agora (plano gratuito). Tente de novo em alguns minutos.", 503)
   if (!res.ok) {
     // Motivo do Google (nunca contém a chave): ajuda a saber se é chave inválida, permissão ou modelo.
     const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; message?: string } }
