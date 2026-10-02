@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { TEAM } from "@/config/team"
 import { saleToTransaction, salesProvider } from "@/lib/server/sales-webhooks"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
+import { rateHit } from "@/lib/server/rate-limit"
 
 /**
  * POST /api/webhooks/hotmart  (ou /kiwify): venda aprovada → entrada no financeiro.
@@ -19,6 +20,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
   const rawBody = await req.text()
   if (rawBody.length > 200_000) return NextResponse.json({ erro: "corpo grande demais" }, { status: 413 })
   if (!provider.verify({ headers: req.headers, url: req.url, rawBody }, secret)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
+
+  // Mesmo com o segredo certo, no máximo 120 vendas por minuto por plataforma (segredo vazado não vira enxurrada).
+  if (!(await rateHit(`webhook:${provider.id}`, 120, 60))) return NextResponse.json({ erro: "muitas requisições" }, { status: 429 })
 
   let body: unknown
   try {

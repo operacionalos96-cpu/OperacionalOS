@@ -34,7 +34,7 @@ describe("cofre de senhas", async () => {
     expect(v.unlockRemaining(undefined, "u2", now)).toBe(0)
   })
 
-  it("limpa a entrada e limita tentativas", () => {
+  it("limpa a entrada", () => {
     expect(v.cleanItem({ name: "  " })).toBeNull()
     expect(v.cleanItem({ name: "Gmail", url: "gmail.com", id: "../x", secret: { password: "p", extra: 1 } })).toEqual({
       id: undefined,
@@ -42,8 +42,6 @@ describe("cofre de senhas", async () => {
       url: "https://gmail.com",
       secret: { username: undefined, password: "p", totp: undefined, recoveryKey: undefined, recovery: undefined, notes: undefined },
     })
-    for (let i = 0; i < 5; i++) expect(v.allowUnlockAttempt("x")).toBe(true)
-    expect(v.allowUnlockAttempt("x")).toBe(false)
   })
 
   it("senha do cofre: guarda só o hash, confere certo e recusa errada", () => {

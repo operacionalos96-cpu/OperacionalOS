@@ -145,8 +145,8 @@ function Attachments({ entity, ctx, update, meId }: { entity: EntityRef; ctx: En
     try {
       const path = await uploadAttachment(entity.type, entity.id, file)
       update((c) => ({ ...c, attachments: [...c.attachments, { id: uid(), name: file.name, storagePath: path, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meId }] }))
-    } catch {
-      toast.error("Não foi possível enviar o arquivo.")
+    } catch (e) {
+      toast.error(e instanceof Error && e.message.startsWith("Limite") ? e.message : "Não foi possível enviar o arquivo.")
     } finally {
       setBusy(false)
       if (fileRef.current) fileRef.current.value = ""

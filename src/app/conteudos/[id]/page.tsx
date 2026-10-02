@@ -250,8 +250,8 @@ function AssetSlot({ item, kind, label, hint, className }: { item: ContentItem; 
       const path = await uploadContentFile(item.id, kind, file)
       add({ id: uid(), kind, name: file.name, storagePath: path, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meId })
       toast.success(`${label} enviado`)
-    } catch {
-      toast.error("Não foi possível enviar. Confira se rodou o SQL 0002 (bucket de arquivos).")
+    } catch (e) {
+      toast.error(e instanceof Error && e.message.startsWith("Limite") ? e.message : "Não foi possível enviar o arquivo. Tente de novo.")
     } finally {
       setBusy(false)
       if (fileRef.current) fileRef.current.value = ""

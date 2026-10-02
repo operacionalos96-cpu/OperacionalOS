@@ -1,8 +1,9 @@
 import "server-only"
+import { rateHit } from "./rate-limit"
 
 /**
  * Modelo de IA — só no servidor, a chave nunca vai para o navegador.
- * Hoje: Gemini (GEMINI_API_KEY; modelo em GEMINI_MODEL, padrão gemini-2.5-flash).
+ * Hoje: Gemini (GEMINI_API_KEY; GEMINI_MODEL opcional, senão tenta os Flash atuais em ordem).
  * Trocar de modelo (ex.: Claude) = mais um provedor aqui; as telas não mudam.
  */
 export class AiError extends Error {
@@ -66,13 +67,7 @@ export async function generateJson(prompt: string): Promise<string> {
   return text
 }
 
-/** Limite simples por pessoa (por instância do servidor): evita gastar a cota por engano. */
-const hits = new Map<string, number[]>()
-export function allowRequest(userId: string, perMinute = 10) {
-  const now = Date.now()
-  const recent = (hits.get(userId) ?? []).filter((t) => now - t < 60_000)
-  if (recent.length >= perMinute) return false
-  recent.push(now)
-  hits.set(userId, recent)
-  return true
+/** Limite por pessoa (contador no banco, vale para todas as cópias do servidor): 10/min e 200/dia. */
+export async function allowRequest(userId: string) {
+  return (await rateHit(`ia:min:${userId}`, 10, 60)) && (await rateHit(`ia:dia:${userId}`, 200, 86_400))
 }

@@ -70,16 +70,8 @@ export function unlockRemaining(token: string | undefined, userId: string, now =
   return Math.max(0, exp - Math.floor(now / 1000))
 }
 
-/** Limite de tentativas de desbloqueio por pessoa (por instância do servidor). */
-const attempts = new Map<string, number[]>()
-export function allowUnlockAttempt(userId: string, max = 5, windowMs = 5 * 60_000) {
-  const now = Date.now()
-  const recent = (attempts.get(userId) ?? []).filter((t) => now - t < windowMs)
-  if (recent.length >= max) return false
-  recent.push(now)
-  attempts.set(userId, recent)
-  return true
-}
+/** Tentativas de abrir o cofre: 5 a cada 5 min por pessoa; 10 erros em 15 min trancam para todos. */
+export const UNLOCK_LIMITS = { perUser: 5, perUserWindow: 300, failures: 10, failuresWindow: 900 }
 
 // ---------- senha do cofre (separada do login) ----------
 

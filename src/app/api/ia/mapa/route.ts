@@ -7,7 +7,7 @@ import { requireMember } from "@/lib/server/auth"
 export async function POST(req: Request) {
   const member = await requireMember()
   if (!member) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
-  if (!allowRequest(member.userId)) return NextResponse.json({ erro: "Muitos pedidos seguidos. Espere um minuto." }, { status: 429 })
+  if (!(await allowRequest(member.userId))) return NextResponse.json({ erro: "Muitos pedidos de IA. Espere um pouco (limite: 10 por minuto, 200 por dia)." }, { status: 429 })
 
   const body = await req.json().catch(() => null)
   const request = validateAiRequest(body)

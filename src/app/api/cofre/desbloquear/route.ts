@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { requireMember } from "@/lib/server/auth"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
-import { MIN_VAULT_PASSWORD, UNLOCK_COOKIE, UNLOCK_SECONDS, allowUnlockAttempt, hashVaultPassword, unlockToken, verifyVaultPassword } from "@/lib/server/vault"
+import { MIN_VAULT_PASSWORD, UNLOCK_COOKIE, UNLOCK_LIMITS as L, UNLOCK_SECONDS, hashVaultPassword, unlockToken, verifyVaultPassword } from "@/lib/server/vault"
+import { rateCount, rateHit } from "@/lib/server/rate-limit"
 import { noStore } from "../shared"
 
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" as const, path: "/api/cofre" }
@@ -41,7 +42,11 @@ export async function GET() {
 export async function POST(req: Request) {
   const g = await gate()
   if (g.error) return g.error
-  if (!allowUnlockAttempt(g.member.userId)) return NextResponse.json({ erro: "Muitas tentativas. Espere 5 minutos." }, { status: 429, headers: noStore })
+  // Muitos erros (de qualquer pessoa) → cofre bloqueado para todos por 15 min.
+  if ((await rateCount("cofre:falhas", L.failuresWindow)) >= L.failures)
+    return NextResponse.json({ erro: "Cofre bloqueado por 15 minutos depois de várias senhas erradas." }, { status: 429, headers: noStore })
+  if (!(await rateHit(`cofre:${g.member.userId}`, L.perUser, L.perUserWindow)))
+    return NextResponse.json({ erro: "Muitas tentativas. Espere 5 minutos." }, { status: 429, headers: noStore })
 
   const body = (await req.json().catch(() => ({}))) as { senha?: unknown; nova?: unknown }
   const senha = typeof body.senha === "string" ? body.senha.slice(0, 200) : ""
@@ -52,6 +57,7 @@ export async function POST(req: Request) {
   if (!g.hash) {
     if (!nova) return NextResponse.json({ erro: "Crie a senha do cofre primeiro." }, { status: 400, headers: noStore })
   } else if (!senha || !verifyVaultPassword(senha, g.hash)) {
+    await rateHit("cofre:falhas", L.failures, L.failuresWindow)
     return NextResponse.json({ erro: "Senha do cofre incorreta." }, { status: 401, headers: noStore })
   }
 

@@ -16,11 +16,17 @@ export function uploadProblem(file: File): string | null {
   return null
 }
 
+/** Erro do Storage em linguagem de gente (a cota diária vem da regra do banco, SQL 0009). */
+function uploadError(error: { message?: string }) {
+  if (/row-level security|violates/i.test(error.message ?? "")) return new Error("Limite diário de envio atingido (2 GB ou 300 arquivos por pessoa). Tente amanhã ou use um link.")
+  return error
+}
+
 /** Sobe o arquivo e devolve o caminho no Storage. */
 export async function uploadContentFile(itemId: string, kind: AssetKind, file: File) {
   const path = `itens/${itemId}/${kind}/${uid()}-${safeFileName(file.name)}`
   const { error } = await supabaseBrowser().storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false })
-  if (error) throw error
+  if (error) throw uploadError(error)
   return path
 }
 
@@ -40,6 +46,6 @@ export async function deleteContentFile(path: string) {
 export async function uploadAttachment(entityType: string, entityId: string, file: File) {
   const path = `anexos/${entityType}/${entityId.replace(/[^A-Za-z0-9-]/g, "_")}/${uid()}-${safeFileName(file.name)}`
   const { error } = await supabaseBrowser().storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false })
-  if (error) throw error
+  if (error) throw uploadError(error)
   return path
 }
