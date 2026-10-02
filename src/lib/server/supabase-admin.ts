@@ -8,7 +8,7 @@ import { SUPABASE_URL } from "@/lib/supabase/env"
  * Use apenas depois de validar que quem chamou é membro (requireMember).
  */
 export function supabaseAdmin() {
-  const secret = process.env.SUPABASE_SECRET_KEY
+  const secret = process.env.SUPABASE_SECRET_KEY?.trim().replace(/^["']|["']$/g, "")
   if (!secret) throw new Error("SUPABASE_SECRET_KEY não configurada no servidor.")
   return createClient(SUPABASE_URL, secret, { auth: { persistSession: false, autoRefreshToken: false } })
 }
