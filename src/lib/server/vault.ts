@@ -1,5 +1,5 @@
 import "server-only"
-import { createHmac, timingSafeEqual } from "node:crypto"
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
 import { decrypt, encrypt, keyFrom } from "./crypto"
 
 /**
@@ -79,4 +79,23 @@ export function allowUnlockAttempt(userId: string, max = 5, windowMs = 5 * 60_00
   recent.push(now)
   attempts.set(userId, recent)
   return true
+}
+
+// ---------- senha do cofre (separada do login) ----------
+
+export const MIN_VAULT_PASSWORD = 10
+
+/** Hash scrypt com sal aleatório: "s1.<sal>.<hash>". Não dá para voltar à senha. */
+export function hashVaultPassword(password: string) {
+  const salt = randomBytes(16)
+  const hash = scryptSync(password.normalize("NFKC"), salt, 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 })
+  return ["s1", salt.toString("base64"), hash.toString("base64")].join(".")
+}
+
+export function verifyVaultPassword(password: string, stored: string) {
+  const [v, salt, hash] = stored.split(".")
+  if (v !== "s1" || !salt || !hash) return false
+  const got = scryptSync(password.normalize("NFKC"), Buffer.from(salt, "base64"), 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 })
+  const want = Buffer.from(hash, "base64")
+  return got.length === want.length && timingSafeEqual(got, want)
 }

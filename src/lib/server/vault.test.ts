@@ -45,4 +45,13 @@ describe("cofre de senhas", async () => {
     for (let i = 0; i < 5; i++) expect(v.allowUnlockAttempt("x")).toBe(true)
     expect(v.allowUnlockAttempt("x")).toBe(false)
   })
+
+  it("senha do cofre: guarda só o hash, confere certo e recusa errada", () => {
+    const stored = v.hashVaultPassword("cofre-forte-123")
+    expect(stored).not.toContain("cofre-forte-123")
+    expect(v.hashVaultPassword("cofre-forte-123")).not.toBe(stored) // sal diferente a cada vez
+    expect(v.verifyVaultPassword("cofre-forte-123", stored)).toBe(true)
+    expect(v.verifyVaultPassword("cofre-forte-124", stored)).toBe(false)
+    expect(v.verifyVaultPassword("x", "lixo")).toBe(false)
+  })
 })

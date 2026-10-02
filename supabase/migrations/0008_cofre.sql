@@ -28,3 +28,15 @@ create table if not exists public.vault_items (
 alter table public.vault_items enable row level security;
 revoke all on public.vault_items from anon, authenticated;
 -- Nenhuma política criada: acesso só pelo servidor.
+
+-- Senha do cofre (SEPARADA da senha de login): só o hash scrypt, irreversível.
+-- Mesma regra: nenhum acesso pelo navegador, só o servidor.
+create table if not exists public.vault_settings (
+  id            text primary key default 'default' check (id = 'default'),
+  password_hash text not null check (password_hash like 's1.%'),
+  updated_by    text,
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.vault_settings enable row level security;
+revoke all on public.vault_settings from anon, authenticated;

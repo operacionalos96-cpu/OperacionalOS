@@ -43,6 +43,7 @@ const FIELDS: { key: keyof Secret; label: string; secret?: boolean; multiline?: 
 ]
 
 const HIDE_AFTER = 30
+const MIN_LENGTH = 10 // igual a MIN_VAULT_PASSWORD no servidor
 
 const without = <T,>(o: Record<string, T>, key: string) => {
   const next = { ...o }
@@ -62,6 +63,7 @@ export default function VaultPage() {
   const [error, setError] = useState<string | null>(null)
   const [revealed, setRevealed] = useState<Record<string, Secret>>({})
   const [editing, setEditing] = useState<{ item?: Item; secret?: Secret } | null>(null)
+  const [changing, setChanging] = useState(false)
   const hideTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const lockLocal = useCallback(() => {
@@ -149,6 +151,9 @@ export default function VaultPage() {
           items && (
             <div className="flex items-center gap-2">
               <span className="tabular hidden text-xs text-muted-foreground sm:inline">tranca em {mm}</span>
+              <Button variant="ghost" onClick={() => setChanging(true)}>
+                Trocar senha do cofre
+              </Button>
               <Button variant="outline" onClick={lock}>
                 <LockIcon /> Trancar
               </Button>
@@ -213,38 +218,93 @@ export default function VaultPage() {
           Mostrar, some em {HIDE_AFTER} s e fica registrado quem viu.
         </p>
       </div>
+      {changing && <ChangePasswordDialog onClose={() => setChanging(false)} />}
       {editing && <ItemDialog item={editing.item} secret={editing.secret} onClose={() => setEditing(null)} onSaved={load} onLocked={lockLocal} />}
     </div>
   )
 }
 
+/** Abre o cofre com a SENHA DO COFRE. Na primeira vez, cria essa senha (vale para a equipe). */
 function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
+  const [configured, setConfigured] = useState<boolean | null>(null)
   const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api("/desbloquear").then((r) => (r.ok ? setConfigured(r.data.configurado) : setError(r.data.erro ?? "Cofre indisponível.")))
+  }, [])
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (configured === false && password !== confirm) return setError("As duas senhas não são iguais.")
     setBusy(true)
-    const r = await api("/desbloquear", { method: "POST", body: JSON.stringify({ senha: password }) })
+    const body = configured ? { senha: password } : { nova: password }
+    const r = await api("/desbloquear", { method: "POST", body: JSON.stringify(body) })
     setPassword("")
+    setConfirm("")
     setBusy(false)
     if (!r.ok) return setError(r.data.erro ?? "Não foi possível abrir.")
     setError(null)
     onUnlocked()
   }
+
+  if (configured === null) return error ? <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p> : null
+  const creating = !configured
   return (
-    <form onSubmit={submit} className="mx-auto grid w-full max-w-sm gap-3 rounded-xl border bg-card p-6 text-center">
+    <form onSubmit={submit} className="mx-auto grid w-full max-w-sm gap-3 rounded-xl border bg-card p-6 text-center" autoComplete="off">
       <LockIcon className="mx-auto size-8 text-muted-foreground" />
       <div>
-        <p className="font-semibold">Cofre trancado</p>
-        <p className="t-desc text-sm">Digite a senha da sua conta para abrir por 5 minutos.</p>
+        <p className="font-semibold">{creating ? "Crie a senha do cofre" : "Cofre trancado"}</p>
+        <p className="t-desc text-sm">
+          {creating
+            ? `Use uma senha só para o cofre, com pelo menos ${MIN_LENGTH} caracteres. Ela vale para a equipe e não tem como ser recuperada: guarde-a bem.`
+            : "Digite a senha do cofre. Ele fica aberto por 5 minutos."}
+        </p>
       </div>
-      <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha da conta" autoFocus />
+      <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha do cofre" autoFocus />
+      {creating && <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repita a senha do cofre" />}
       {error && <p className="text-sm text-danger">{error}</p>}
-      <Button type="submit" disabled={!password || busy}>
-        {busy ? "Conferindo…" : "Abrir cofre"}
+      <Button type="submit" disabled={!password || busy || (creating && password.length < MIN_LENGTH)}>
+        {busy ? "Conferindo…" : creating ? "Criar e abrir" : "Abrir cofre"}
       </Button>
     </form>
+  )
+}
+
+/** Trocar a senha do cofre (precisa da atual). */
+function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState("")
+  const [next, setNext] = useState("")
+  const [confirm, setConfirm] = useState("")
+  const [busy, setBusy] = useState(false)
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (next !== confirm) return toast.error("As duas senhas novas não são iguais.")
+    setBusy(true)
+    const r = await api("/desbloquear", { method: "POST", body: JSON.stringify({ senha: current, nova: next }) })
+    setBusy(false)
+    if (!r.ok) return toast.error(r.data.erro ?? "Não foi possível trocar.")
+    toast.success("Senha do cofre trocada", { description: "Avise o sócio da senha nova." })
+    onClose()
+  }
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Trocar senha do cofre</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="grid gap-2" autoComplete="off">
+          <Input type="password" autoComplete="new-password" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="Senha atual do cofre" autoFocus />
+          <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} placeholder={`Nova senha (mín. ${MIN_LENGTH})`} />
+          <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repita a nova senha" />
+          <Button type="submit" disabled={!current || next.length < MIN_LENGTH || busy}>
+            {busy ? "Trocando…" : "Trocar"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 
