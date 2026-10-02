@@ -30,7 +30,7 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
@@ -80,12 +80,36 @@ type IdeaNode = Node<IdeaData, "idea" | "area">
 
 const CHILD_DX = 240
 const ROW_DY = 64
+const COL_DX = 200
+const CHILD_DY = 120
+
+/** Para que lado o filho nasce. A linha sai exatamente desse lado (não escolhe sozinha). */
+type Dir = "direita" | "baixo" | "esquerda" | "cima"
+const DIRS: { id: Dir; label: string; arrow: string; out: string; in: string }[] = [
+  { id: "direita", label: "Direita", arrow: "→", out: "r", in: "l" },
+  { id: "baixo", label: "Baixo", arrow: "↓", out: "b", in: "t" },
+  { id: "esquerda", label: "Esquerda", arrow: "←", out: "l", in: "r" },
+  { id: "cima", label: "Cima", arrow: "↑", out: "t", in: "b" },
+]
+const DIR = Object.fromEntries(DIRS.map((d) => [d.id, d])) as Record<Dir, (typeof DIRS)[number]>
+/** Lado de uma linha já existente (pelo ponto de saída). */
+const dirOfHandle = (h?: string | null): Dir | undefined => DIRS.find((d) => d.out === h)?.id
+
+/** Posição do n-ésimo filho naquela direção (em fila: vertical para os lados, horizontal para cima/baixo). */
+function childPosition(parent: { x: number; y: number }, dir: Dir, index: number) {
+  if (dir === "direita") return { x: parent.x + CHILD_DX, y: parent.y + index * ROW_DY }
+  if (dir === "esquerda") return { x: parent.x - CHILD_DX, y: parent.y + index * ROW_DY }
+  if (dir === "baixo") return { x: parent.x + index * COL_DX, y: parent.y + CHILD_DY }
+  return { x: parent.x + index * COL_DX, y: parent.y - CHILD_DY }
+}
 
 interface MapActions {
   editingId: string | null
   setEditingId: (id: string | null) => void
   setLabel: (id: string, label: string) => void
-  addChild: (id: string) => void
+  addChild: (id: string, dir?: Dir) => void
+  /** Direção atual dos filhos (a última escolhida neste mapa). */
+  childDir: Dir
   addSibling: (id: string) => void
   remove: (id: string) => void
   toTask: (id: string, title?: string) => void
@@ -334,6 +358,7 @@ function Editor({ map }: { map: MindMap }) {
   const { screenToFlowPosition } = useReactFlow()
   useMapSync(map, nodes, edges, setNodes, setEdges)
   const [focusId, setFocus] = useState<string | null>(null)
+  const [childDir, setChildDir] = useState<Dir>("direita")
   const [panelOpen, setPanelOpen] = useState(true)
   const [presenting, setPresenting] = useState<number | null>(null)
 
@@ -348,13 +373,14 @@ function Editor({ map }: { map: MindMap }) {
   const focused = useMemo(() => (focusId ? focusSet(focusId, links) : null), [focusId, links])
 
   const createNode = useCallback(
-    (position: { x: number; y: number }, parentId?: string) => {
+    (position: { x: number; y: number }, parentId?: string, dir?: Dir) => {
       const id = uid()
       setNodes((ns) => [
         ...ns.map((n) => ({ ...n, selected: false })),
         { id, type: "idea", position, data: { label: "" }, selected: true },
       ])
-      if (parentId) setEdges((es) => [...es, { id: uid(), source: parentId, target: id }])
+      const handles = dir ? { sourceHandle: DIR[dir].out, targetHandle: DIR[dir].in } : {}
+      if (parentId) setEdges((es) => [...es, { id: uid(), source: parentId, target: id, ...handles }])
       setEditingId(id)
       return id
     },
@@ -367,17 +393,24 @@ function Editor({ map }: { map: MindMap }) {
       editingId,
       setEditingId,
       setLabel: (id, label) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n))),
-      addChild: (id) => {
+      childDir,
+      addChild: (id, dir) => {
         const parent = findNode(id)
         if (!parent) return
-        const children = edges.filter((e) => e.source === id && isHierarchy(e)).length
-        createNode({ x: parent.position.x + CHILD_DX, y: parent.position.y + children * ROW_DY }, id)
+        const d = dir ?? childDir
+        if (dir) setChildDir(dir)
+        // Conta só os filhos que já estão daquele lado, para enfileirar sem sobrepor.
+        const same = edges.filter((e) => e.source === id && isHierarchy(e) && (dirOfHandle(e.sourceHandle) ?? "direita") === d).length
+        createNode(childPosition(parent.position, d, same), id, d)
       },
       addSibling: (id) => {
         const node = findNode(id)
         if (!node) return
-        const parentId = edges.find((e) => e.target === id && isHierarchy(e))?.source
-        createNode({ x: node.position.x, y: node.position.y + ROW_DY }, parentId)
+        const link = edges.find((e) => e.target === id && isHierarchy(e))
+        const d = dirOfHandle(link?.sourceHandle) ?? "direita"
+        // Irmão fica ao lado, na fila da mesma direção do pai.
+        const pos = d === "baixo" || d === "cima" ? { x: node.position.x + COL_DX, y: node.position.y } : { x: node.position.x, y: node.position.y + ROW_DY }
+        createNode(pos, link?.source, link?.sourceHandle ? d : undefined)
       },
       remove: (id) => {
         setNodes((ns) => ns.filter((n) => n.id !== id))
@@ -422,15 +455,16 @@ function Editor({ map }: { map: MindMap }) {
       addChildren: (parentId, labels) => {
         const parent = findNode(parentId)
         if (!parent || !labels.length) return
-        const start = edges.filter((e) => e.source === parentId && isHierarchy(e)).length
+        const d = childDir
+        const start = edges.filter((e) => e.source === parentId && isHierarchy(e) && (dirOfHandle(e.sourceHandle) ?? "direita") === d).length
         const created = labels.map((label, i) => ({
           id: uid(),
           type: "idea" as const,
-          position: { x: parent.position.x + CHILD_DX, y: parent.position.y + (start + i) * ROW_DY },
+          position: childPosition(parent.position, d, start + i),
           data: { label },
         }))
         setNodes((ns) => [...ns, ...created])
-        setEdges((es) => [...es, ...created.map((c) => ({ id: uid(), source: parentId, target: c.id }))])
+        setEdges((es) => [...es, ...created.map((c) => ({ id: uid(), source: parentId, target: c.id, sourceHandle: DIR[d].out, targetHandle: DIR[d].in }))])
       },
       addSummary: (parentId, text) => {
         const parent = findNode(parentId)
@@ -449,7 +483,7 @@ function Editor({ map }: { map: MindMap }) {
       },
       areaLabel: (areaId) => nodes.find((n) => n.id === areaId && n.type === "area")?.data.label || (nodes.some((n) => n.id === areaId) ? "Grupo" : undefined),
     }
-  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId, links, map.title])
+  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId, links, map.title, childDir])
 
   const displayNodes = useMemo(
     () =>
@@ -709,7 +743,7 @@ function Editor({ map }: { map: MindMap }) {
           />
         )}
         <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
-          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco ·
+          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho (lado escolhido em Filho ▾) · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco ·
           arraste as bolinhas para conectar · clique na linha e arraste o ponto do meio para moldar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
@@ -778,9 +812,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
       />
       <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Top} className="flex gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
-        <ToolbarButton onClick={() => map.addChild(id)} label="Adicionar filho (Tab)">
-          <PlusIcon /> Filho
-        </ToolbarButton>
+        <ChildButton nodeId={id} />
         <ToolbarButton onClick={() => map.setFocus(map.focusId === id ? null : id)} label="Modo foco: destaca este ramo (F)">
           <CrosshairIcon />
         </ToolbarButton>
@@ -1072,6 +1104,37 @@ function AiMenu({ nodeId, label, description }: { nodeId: string; label: string;
         <p className="px-1 text-[10px] text-muted-foreground">Vai para a IA só o texto deste mapa.</p>
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** "+ Filho" com a direção escolhida por você (→ ↓ ← ↑). Tab usa a última escolhida. */
+function ChildButton({ nodeId }: { nodeId: string }) {
+  const map = useMap()
+  return (
+    <span className="flex items-center rounded-md">
+      <ToolbarButton onClick={() => map.addChild(nodeId)} label={`Adicionar filho para ${DIR[map.childDir].label.toLowerCase()} (Tab)`}>
+        <PlusIcon /> Filho {DIR[map.childDir].arrow}
+      </ToolbarButton>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button size="xs" variant="ghost" className="px-1" title="Escolher para que lado o filho nasce" aria-label="Direção do filho">
+            <ChevronDownIcon />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="grid w-40 grid-cols-2 gap-1 p-1.5" onKeyDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          {DIRS.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => map.addChild(nodeId, d.id)}
+              className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent", map.childDir === d.id && "bg-accent font-medium")}
+            >
+              <span className="w-4 text-center">{d.arrow}</span> {d.label}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+    </span>
   )
 }
 
