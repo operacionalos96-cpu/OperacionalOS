@@ -151,6 +151,11 @@ export interface MindMapEdge {
   kind?: "relacao"
   /** Legenda no meio da linha ("depende de", "gera"…). */
   label?: string
+  /** Sentido da seta: "fim" (→), "inicio" (←), "ambos" (↔, ida e volta) ou "nenhuma". Sem valor: relação → fim; hierarquia → nenhuma. */
+  arrow?: "fim" | "inicio" | "ambos" | "nenhuma"
+  /** Ponto escolhido em cada balão ("l", "r", "t", "b"). Sem valor = o lado mais perto. */
+  sourceHandle?: string
+  targetHandle?: string
 }
 
 export interface MindMap {

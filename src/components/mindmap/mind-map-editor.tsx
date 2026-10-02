@@ -18,6 +18,8 @@ import {
   ReactFlow,
   ReactFlowProvider,
   addEdge,
+  reconnectEdge,
+  SelectionMode,
   useEdgesState,
   useInternalNode,
   useNodesState,
@@ -28,11 +30,12 @@ import {
   type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
   NODE_KIND,
+  NODE_STATUS,
   areaAround,
   descendants,
   fitFontSize,
@@ -51,7 +54,7 @@ import { outlineText, type AiAction, type AiResult } from "@/lib/domain/ai-map"
 import { EntityChip } from "@/components/entities/entity-bits"
 import { getUser } from "@/config/team"
 import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
-import { cycleMapNodeStatus } from "@/lib/actions"
+import { cycleMapNodeStatus, setTaskStatus } from "@/lib/actions"
 import { StatusButton } from "@/components/shared/status-button"
 import { toast } from "sonner"
 import { LabelChip, labelHue } from "@/components/tasks/task-bits"
@@ -106,6 +109,8 @@ interface MapActions {
   setFocus: (id: string | null) => void
   /** Abre o painel lateral do balão selecionado. */
   openPanel: () => void
+  /** Vários selecionados: some a barra de cada balão (fica uma só, no topo). */
+  multi: boolean
   areaLabel: (id: string) => string | undefined
   /** IA: contexto do pedido (título, mapa/ramo em lista, textos que já existem). */
   aiContext: (id: string, action: AiAction) => { mapTitle: string; outline: string; existing: string[] }
@@ -130,13 +135,19 @@ function flowNode(n: MindMapNode): IdeaNode {
   }
 }
 
-type LinkData = { kind?: "relacao"; label?: string }
+type Arrow = NonNullable<MindMapEdge["arrow"]>
+type LinkData = { kind?: "relacao"; label?: string; arrow?: Arrow }
+
+/** Seta padrão: relação aponta para o destino; hierarquia sem seta. */
+const arrowOf = (d: LinkData | undefined): Arrow => d?.arrow ?? (d?.kind === "relacao" ? "fim" : "nenhuma")
 
 const flowEdge = (e: MindMapEdge): Edge<LinkData> => ({
   id: e.id,
   source: e.source,
   target: e.target,
-  ...(e.kind || e.label ? { data: { kind: e.kind, label: e.label } } : {}),
+  ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+  ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
+  ...(e.kind || e.label || e.arrow ? { data: { kind: e.kind, label: e.label, arrow: e.arrow } } : {}),
 })
 
 /** Linha de hierarquia (pai → filho). Relações livres não contam como filhos. */
@@ -172,7 +183,16 @@ function toMapNode(n: IdeaNode): MindMapNode {
 
 const toMapEdge = (e: Edge): MindMapEdge => {
   const d = e.data as LinkData | undefined
-  return { id: e.id, source: e.source, target: e.target, kind: d?.kind, label: d?.label?.trim() || undefined }
+  return {
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    kind: d?.kind,
+    label: d?.label?.trim() || undefined,
+    arrow: d?.arrow,
+    sourceHandle: e.sourceHandle ?? undefined,
+    targetHandle: e.targetHandle ?? undefined,
+  }
 }
 
 const signatures = <T extends MindMapNode | MindMapEdge>(items: T[]) => new Map(items.map((x) => [x.id, signature(x)]))
@@ -391,6 +411,7 @@ function Editor({ map }: { map: MindMap }) {
       focusId,
       setFocus,
       openPanel: () => setPanelOpen(true),
+      multi: nodes.filter((n) => n.selected).length > 1,
       aiContext: (nodeId, action) => {
         const all = outline(nodes.map(toMapNode), links)
         const branch = action === "resumir" ? new Set([nodeId, ...descendants(nodeId, links)]) : null
@@ -445,22 +466,28 @@ function Editor({ map }: { map: MindMap }) {
     const x = new Map(nodes.map((n) => [n.id, n.position.x]))
     return edges.map((e) => {
       const rightward = (x.get(e.target) ?? 0) >= (x.get(e.source) ?? 0)
-      const relation = !isHierarchy(e)
       const dim = !!focused && !(focused.has(e.source) && focused.has(e.target))
       return {
         ...e,
         hidden: hidden.has(e.source) || hidden.has(e.target),
         ...(dim ? { style: { opacity: 0.12 } } : {}),
         type: "unlink",
-        sourceHandle: rightward ? "r" : "l",
-        targetHandle: rightward ? "l" : "r",
-        ...(relation ? { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 } } : {}),
+        // Ponto escolhido ao ligar (ou ao arrastar a ponta da linha) vence; sem escolha, o lado mais perto.
+        sourceHandle: e.sourceHandle ?? (rightward ? "r" : "l"),
+        targetHandle: e.targetHandle ?? (rightward ? "l" : "r"),
+        ...(["fim", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 } } : {}),
+        ...(["inicio", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerStart: { type: MarkerType.ArrowClosed, width: 14, height: 14, orient: "auto-start-reverse" } } : {}),
       }
     })
   }, [nodes, edges, hidden, focused])
 
   const onConnect = useCallback(
     (c: Connection) => setEdges((es) => addEdge({ ...c, id: uid() }, es)),
+    [setEdges],
+  )
+  // Arrastar a ponta de uma linha para outra bolinha muda o ponto (mesma linha, mesmo id).
+  const onReconnect = useCallback(
+    (old: Edge, c: Connection) => setEdges((es) => reconnectEdge(old, c, es, { shouldReplaceId: false })),
     [setEdges],
   )
 
@@ -594,6 +621,12 @@ function Editor({ map }: { map: MindMap }) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onReconnect={onReconnect}
+          edgesReconnectable
+          selectionOnDrag
+          selectionMode={SelectionMode.Partial}
+          panOnDrag={[1, 2]}
+          onPaneContextMenu={(e) => e.preventDefault()}
           onNodeDragStart={onNodeDragStart}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
@@ -642,9 +675,20 @@ function Editor({ map }: { map: MindMap }) {
           )}
           {selectedIdeas.length >= 2 && !editingId && !focusId && presenting === null && (
             <Panel position="top-center">
-              <Button size="sm" variant="outline" className="animate-enter shadow-lift" onClick={groupSelected}>
-                <BoxSelectIcon /> Agrupar {selectedIdeas.length} itens
-              </Button>
+              <MultiToolbar
+                count={selectedIdeas.length}
+                onGroup={groupSelected}
+                onKind={(kind) => setNodes((ns) => ns.map((n) => (n.selected && n.type === "idea" ? { ...n, data: { ...n.data, kind } } : n)))}
+                onStatus={(st) => {
+                  for (const n of selectedIdeas) if (n.data.taskId) setTaskStatus(n.data.taskId, st)
+                  setNodes((ns) => ns.map((n) => (n.selected && n.type === "idea" ? { ...n, data: { ...n.data, status: st === "afazer" ? undefined : st } } : n)))
+                }}
+                onDelete={() => {
+                  const ids = new Set(nodes.filter((n) => n.selected).map((n) => n.id))
+                  setNodes((ns) => ns.filter((n) => !ids.has(n.id)))
+                  setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)))
+                }}
+              />
             </Panel>
           )}
         </ReactFlow>
@@ -664,8 +708,8 @@ function Editor({ map }: { map: MindMap }) {
           />
         )}
         <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
-          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Shift</Kbd>+arrastar seleciona vários · <Kbd>F</Kbd> foco ·
-          arraste as bolinhas para conectar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
+          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco ·
+          arraste as bolinhas para conectar (ou a ponta de uma linha para trocar o ponto) · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
     </MapCtx.Provider>
@@ -726,13 +770,13 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   return (
     <>
       <NodeResizer
-        isVisible={selected && !editing}
+        isVisible={selected && !editing && !map.multi}
         minWidth={120}
         minHeight={44}
         lineClassName="!border-brand/60"
         handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
       />
-      <NodeToolbar isVisible={selected && !editing} position={Position.Top} className="flex gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
+      <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Top} className="flex gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
         <ToolbarButton onClick={() => map.addChild(id)} label="Adicionar filho (Tab)">
           <PlusIcon /> Filho
         </ToolbarButton>
@@ -871,7 +915,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
           onDoubleClick={(e) => e.stopPropagation()}
           className={cn(
             // Embaixo do balão: as linhas saem pelos lados, aqui não há nada.
-            "nodrag absolute -bottom-2.5 left-1/2 flex h-5 min-w-6 -translate-x-1/2 items-center justify-center rounded-full border bg-card px-1.5 text-[11px] leading-none font-semibold text-muted-foreground shadow-xs transition-opacity hover:border-brand/60 hover:text-foreground",
+            "nodrag absolute -right-2.5 -bottom-2.5 flex h-5 min-w-6 items-center justify-center rounded-full border bg-card px-1.5 text-[11px] leading-none font-semibold text-muted-foreground shadow-xs transition-opacity hover:border-brand/60 hover:text-foreground",
             !data.collapsed && !selected && "opacity-0 group-hover/node:opacity-100",
             data.collapsed && "border-brand/50 text-foreground",
           )}
@@ -884,6 +928,8 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
       {/* Modo "Loose": qualquer bolinha conecta com qualquer outra. */}
       <Handle id="l" type="source" position={Position.Left} className="idea-handle" />
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
+      <Handle id="t" type="source" position={Position.Top} className="idea-handle" />
+      <Handle id="b" type="source" position={Position.Bottom} className="idea-handle" />
     </>
   )
 }
@@ -1025,6 +1071,68 @@ function AiMenu({ nodeId, label, description }: { nodeId: string; label: string;
         <p className="px-1 text-[10px] text-muted-foreground">Vai para a IA só o texto deste mapa.</p>
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** Uma barra só para vários balões selecionados: agrupar, tipo, andamento e apagar. */
+function MultiToolbar({
+  count,
+  onGroup,
+  onKind,
+  onStatus,
+  onDelete,
+}: {
+  count: number
+  onGroup: () => void
+  onKind: (k: NodeKind | undefined) => void
+  onStatus: (s: "afazer" | "andamento" | "feito") => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="flex animate-enter items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-lift" onDoubleClick={(e) => e.stopPropagation()}>
+      <span className="px-2 text-xs font-semibold">{count} selecionados</span>
+      <ToolbarButton onClick={onGroup} label="Agrupar numa área">
+        <BoxSelectIcon /> Agrupar
+      </ToolbarButton>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button size="xs" variant="ghost" title="Tipo de todos">
+            <SquareStackIcon /> Tipo
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="grid w-56 gap-0.5 p-1">
+          {NODE_KINDS.map((k) => {
+            const KIcon = NODE_KIND_ICON[k.id]
+            return (
+              <button key={k.id} type="button" onClick={() => onKind(k.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+                <KIcon className="size-4 text-muted-foreground" /> {k.label}
+              </button>
+            )
+          })}
+          <button type="button" onClick={() => onKind(undefined)} className="rounded-md border-t px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent">
+            Automático (pelo vínculo)
+          </button>
+        </PopoverContent>
+      </Popover>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button size="xs" variant="ghost" title="Andamento de todos">
+            <CircleDotIcon /> Status
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="grid w-44 gap-0.5 p-1">
+          {(["afazer", "andamento", "feito"] as const).map((st) => (
+            <button key={st} type="button" onClick={() => onStatus(st)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+              <StatusButton status={st} onClick={() => onStatus(st)} className="pointer-events-none" /> {NODE_STATUS[st].label}
+            </button>
+          ))}
+          <p className="px-2 pt-1 text-[11px] text-muted-foreground">Tarefas ligadas mudam junto.</p>
+        </PopoverContent>
+      </Popover>
+      <ToolbarButton onClick={onDelete} label="Apagar selecionados (Del)">
+        <Trash2Icon />
+      </ToolbarButton>
+    </div>
   )
 }
 
@@ -1354,7 +1462,7 @@ function AreaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
       />
       {/* zIndex: a área fica atrás de tudo; título e barra ficam na frente das linhas. */}
-      <NodeToolbar isVisible={selected && !editing} position={Position.Bottom} style={{ zIndex: 1001 }} className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-md">
+      <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Bottom} style={{ zIndex: 1001 }} className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-md">
         <button
           type="button"
           onClick={() => map.setData(id, { hue: undefined })}
@@ -1419,6 +1527,13 @@ function AreaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
 
 const NODE_TYPES = { idea: IdeaNodeView, area: AreaNodeView }
 
+const ARROWS: { id: Arrow; label: string; hint: string }[] = [
+  { id: "nenhuma", label: "—", hint: "Sem seta" },
+  { id: "fim", label: "→", hint: "Vai para o destino" },
+  { id: "inicio", label: "←", hint: "Volta para a origem" },
+  { id: "ambos", label: "↔", hint: "Ida e volta (loop)" },
+]
+
 /** Legendas prontas (as mesmas das Conexões do resto do OS). */
 const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
 
@@ -1427,7 +1542,7 @@ const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
  * livre, com legenda ("depende de", "gera"…). Área de clique larga; selecionada,
  * mostra o tipo, a legenda e "Desvincular". Delete/Backspace também desvincula.
  */
-function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, data }: EdgeProps) {
+function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, markerStart, data }: EdgeProps) {
   const { deleteElements } = useReactFlow()
   const map = useMap()
   const link = (data ?? {}) as LinkData
@@ -1441,6 +1556,7 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
         id={id}
         path={path}
         markerEnd={markerEnd}
+        markerStart={markerStart}
         interactionWidth={24}
         style={{
           ...style,
@@ -1471,6 +1587,14 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
               >
                 <ScissorsIcon className="size-3.5" /> Desvincular
               </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">Sentido</span>
+              {ARROWS.map((a) => (
+                <Chip key={a.id} active={arrowOf(link) === a.id} onClick={() => map.setEdgeData(id, { arrow: a.id })} title={a.hint}>
+                  {a.label}
+                </Chip>
+              ))}
             </div>
             <EdgeLabelInput
               key={id}
@@ -1553,7 +1677,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.decision ? JSON.stringify(n.decision) : null,
       n.summaryOf ?? null,
     ]),
-    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null]),
+    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null]),
   ])
 }
 
