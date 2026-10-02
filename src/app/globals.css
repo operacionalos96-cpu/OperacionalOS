@@ -293,6 +293,15 @@
   opacity: 1;
 }
 
+/* Desenho à mão: só o traço recebe clique (o retângulo em volta é transparente). */
+.react-flow__node.map-drawing {
+  pointer-events: none !important;
+}
+.react-flow__node.map-drawing .drawing-hit {
+  pointer-events: stroke;
+  cursor: move;
+}
+
 /* Números alinhados em valores monetários e contagens. */
 .tabular {
   font-variant-numeric: tabular-nums;

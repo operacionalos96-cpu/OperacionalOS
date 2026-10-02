@@ -28,4 +28,12 @@ describe("IA no mapa", () => {
     expect(parseAiResult("resumir", { summary: "  Tudo certo.  " })).toEqual({ summary: "Tudo certo." })
     expect(parseAiResult("resumir", { items: [] })).toBeNull()
   })
+
+  it("hierarquia: aceita só números da lista e níveis válidos", () => {
+    expect(validateAiRequest({ action: "hierarquia", focus: { label: "Raiz" }, outline: "1 Raiz" })?.action).toBe("hierarquia")
+    expect(buildPrompt({ action: "hierarquia", mapTitle: "M", focus: { label: "Raiz" }, outline: "1 Raiz" })).toContain('{"levels"')
+    const r = parseAiResult("hierarquia", { levels: { "1": 1, "1.1": 2.4, "1.2": 99, "x": 2, "1.3": "3", "1.4": 0 } })
+    expect(r).toEqual({ levels: { "1": 1, "1.1": 2, "1.2": 12, "1.4": 1 } })
+    expect(parseAiResult("hierarquia", { levels: {} })).toBeNull()
+  })
 })

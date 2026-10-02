@@ -131,8 +131,24 @@ export interface MindMapNode {
   status?: "andamento" | "feito"
   /** Tipo do balão (Ideia, Projeto, Decisão…). Sem valor: deduzido do vínculo. */
   kind?: "ideia" | "projeto" | "tarefa" | "venda" | "cliente" | "produto" | "meta" | "decisao" | "resumo"
-  /** "group" = área/grupo (retângulo com título). Sem valor = balão comum. */
-  type?: "group"
+  /**
+   * "group" = área/grupo (retângulo com título). "text" = texto solto no fundo do quadro.
+   * "drawing" = traço feito à mão (`path`). Sem valor = balão comum.
+   */
+  type?: "group" | "text" | "drawing"
+  /**
+   * Ampliação do item (zoom infinito): 0.1 = dez vezes menor que o normal. Sem valor = 1.
+   * Balão criado com a tela aproximada nasce pequeno, para a ideia continuar "lá dentro".
+   */
+  scale?: number
+  /** Camada (como no Canva): maior fica na frente. Sem valor: balões 0, textos e desenhos atrás (-1). */
+  z?: number
+  /** Desenho: pontos x,y,x,y… em unidades locais (multiplicar por `scale`), a partir do canto do item. */
+  path?: number[]
+  /** Desenho e texto: espessura do traço / tamanho da letra em unidades locais. */
+  stroke?: number
+  /** Anotações que não poluem o mapa: comentário, observação, citação de app/plataforma… */
+  notes?: NodeNote[]
   /** Ramo recolhido: filhos escondidos (mostra [n] no balão). */
   collapsed?: boolean
   /** Ligação com outra coisa do OS (produto, conteúdo, nota…). Tarefa e lead usam taskId/leadId. */
@@ -141,6 +157,22 @@ export interface MindMapNode {
   decision?: { decidedAt?: string; ownerId?: string; reason?: string; alternatives?: string }
   /** Balão "Resumo": id do grupo (área) que ele resume. */
   summaryOf?: string
+}
+
+/**
+ * Anotação de um balão. `kind` vem de NOTE_KINDS (src/lib/domain/node-notes.ts): para
+ * um tipo novo no futuro (link, número, arquivo…), basta acrescentar lá. Tipo
+ * desconhecido continua aparecendo como comentário.
+ */
+export interface NodeNote {
+  id: string
+  kind: string
+  text: string
+  /** Citação: app ou plataforma citada (Instagram, Hotmart, Canva…). */
+  app?: string
+  url?: string
+  authorId: string
+  createdAt: ISODate
 }
 
 export interface MindMapEdge {

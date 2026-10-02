@@ -7,6 +7,7 @@ import type { ContentItem } from "@/lib/domain/content"
 import type { Product } from "@/lib/domain/products"
 import type { Lead, MindMap, Note, Task, Transaction } from "@/lib/domain/types"
 import type { Goal } from "../domain/insights"
+import { ideaNodes } from "../domain/mindmap"
 import { money } from "../format"
 import type { EntityRef, EntityType, Relation } from "./types"
 
@@ -71,7 +72,7 @@ export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | nu
     }
     case "map": {
       const m = s.mindMaps.find((x) => x.id === ref.id)
-      return m ? { title: m.title, subtitle: `${m.nodes.filter((n) => n.type !== "group").length} itens`, done: false } : null
+      return m ? { title: m.title, subtitle: `${ideaNodes(m.nodes).length} itens`, done: false } : null
     }
     case "mapNode": {
       // id = "<mapa>/<balão>"

@@ -28,9 +28,10 @@ import {
   type Edge,
   type Node,
   type NodeProps,
+  useStore as useFlowStore,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
+import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon, MousePointer2Icon, TypeIcon, PencilIcon, LayersIcon, MessageSquareIcon, MessageSquarePlusIcon, NetworkIcon, ZoomInIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
@@ -41,7 +42,6 @@ import {
   fitFontSize,
   focusSet,
   hiddenByCollapse,
-  isArea,
   membersOf,
   nodeKind,
   nodeStatus,
@@ -49,6 +49,10 @@ import {
   resolveLinkedTask,
   type NodeKind,
 } from "@/lib/domain/mindmap"
+import { DRAW_LIMITS, LAYER_MOVES, ZOOM_LIMITS, drawingFromStroke, gridGap, moveLayer, pathBox, pathD, resizeByHierarchy, roundScale, scaleForZoom, scaleOf, scaleSet, zOf, type LayerMove, type ScalePatch, type SizedItem } from "@/lib/domain/canvas"
+import { NoteBranches } from "@/components/mindmap/node-notes"
+import { autocorrected, spellProps } from "@/lib/use-autocorrect"
+import { correctText } from "@/lib/domain/autocorrect"
 import { NodePanel } from "@/components/mindmap/node-panel"
 import { outlineText, type AiAction, type AiResult } from "@/lib/domain/ai-map"
 import { EntityChip } from "@/components/entities/entity-bits"
@@ -74,9 +78,35 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean } & Pick<MindMapNode, "ref" | "decision" | "summaryOf">
-/** "idea" = balão; "area" = grupo (retângulo com título que leva junto o que está dentro). */
-type IdeaNode = Node<IdeaData, "idea" | "area">
+type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean } & Pick<
+  MindMapNode,
+  "ref" | "decision" | "summaryOf" | "scale" | "z" | "path" | "stroke" | "notes"
+> & {
+  /** Tipo gravado que esta versão não conhece (de uma versão mais nova): volta igual ao gravar. */
+  storedType?: string
+}
+/**
+ * "idea" = balão; "area" = grupo (retângulo com título que leva junto o que está dentro);
+ * "text" = texto solto no fundo do quadro; "drawing" = traço à mão.
+ */
+type FlowKind = "idea" | "area" | "text" | "drawing"
+type IdeaNode = Node<IdeaData, FlowKind>
+
+const FLOW_KIND: Record<NonNullable<MindMapNode["type"]> | "none", FlowKind> = { none: "idea", group: "area", text: "text", drawing: "drawing" }
+const STORED_TYPE: Record<FlowKind, MindMapNode["type"]> = { idea: undefined, area: "group", text: "text", drawing: "drawing" }
+
+/** Ferramenta do quadro: selecionar/mover, escrever texto solto, desenhar. */
+type Tool = "selecionar" | "texto" | "desenhar"
+/** Tamanho padrão da letra do texto solto (px na tela, antes da ampliação). */
+const TEXT_SIZE = 24
+const PEN_SIZES = [
+  { id: 2, label: "Fino" },
+  { id: 4, label: "Médio" },
+  { id: 8, label: "Grosso" },
+]
+/** Cor de texto/desenho: matiz ou sem valor = cor do texto do tema. */
+const INK_HUES = [25, 75, 150, 250, 310]
+const inkColor = (hue?: number) => (hue === undefined ? "var(--foreground)" : `oklch(0.62 0.17 ${hue})`)
 
 const CHILD_DX = 240
 const ROW_DY = 64
@@ -96,11 +126,12 @@ const DIR = Object.fromEntries(DIRS.map((d) => [d.id, d])) as Record<Dir, (typeo
 const dirOfHandle = (h?: string | null): Dir | undefined => DIRS.find((d) => d.out === h)?.id
 
 /** Posição do n-ésimo filho naquela direção (em fila: vertical para os lados, horizontal para cima/baixo). */
-function childPosition(parent: { x: number; y: number }, dir: Dir, index: number) {
-  if (dir === "direita") return { x: parent.x + CHILD_DX, y: parent.y + index * ROW_DY }
-  if (dir === "esquerda") return { x: parent.x - CHILD_DX, y: parent.y + index * ROW_DY }
-  if (dir === "baixo") return { x: parent.x + index * COL_DX, y: parent.y + CHILD_DY }
-  return { x: parent.x + index * COL_DX, y: parent.y - CHILD_DY }
+/** `s` = ampliação do pai: num balão pequeno (zoom infinito) os filhos ficam perto, na mesma escala. */
+function childPosition(parent: { x: number; y: number }, dir: Dir, index: number, s = 1) {
+  if (dir === "direita") return { x: parent.x + CHILD_DX * s, y: parent.y + index * ROW_DY * s }
+  if (dir === "esquerda") return { x: parent.x - CHILD_DX * s, y: parent.y + index * ROW_DY * s }
+  if (dir === "baixo") return { x: parent.x + index * COL_DX * s, y: parent.y + CHILD_DY * s }
+  return { x: parent.x + index * COL_DX * s, y: parent.y - CHILD_DY * s }
 }
 
 interface MapActions {
@@ -142,20 +173,35 @@ interface MapActions {
   addChildren: (id: string, labels: string[]) => void
   /** Aceitar resumo: vira um balão "Resumo" filho do balão. */
   addSummary: (id: string, text: string) => void
+  /** Amplia/reduz itens (fator) em volta do centro do conjunto. */
+  scaleItems: (ids: string[], factor: number) => void
+  /** Camada (frente/trás) dos itens. */
+  moveLayers: (ids: string[], move: LayerMove) => void
+  /** Item sendo anotado (cartão de anotações aberto mesmo sem nenhuma). */
+  notesFor: string | null
+  setNotesFor: (id: string | null) => void
 }
 
 const MapCtx = createContext<MapActions | null>(null)
 const useMap = () => useContext(MapCtx)!
 
+/**
+ * Balão gravado -> nó do React Flow. TODOS os campos do balão vão para `data`
+ * (inclusive os que esta versão não conhece): assim uma versão mais antiga/nova do
+ * app aberta no outro computador nunca apaga o que não entende ao gravar de volta.
+ */
 function flowNode(n: MindMapNode): IdeaNode {
+  const z = zOf(n)
+  const { id, x, y, width, height, type, ...rest } = n
+  const known = FLOW_KIND[type ?? "none"]
   return {
-    id: n.id,
-    type: isArea(n) ? "area" : "idea",
-    ...(isArea(n) ? { zIndex: -1 } : {}),
-    position: { x: n.x, y: n.y },
-    ...(n.width ? { width: n.width } : {}),
-    ...(n.height ? { height: n.height } : {}),
-    data: { label: n.label, taskId: n.taskId, leadId: n.leadId, tag: n.tag, hue: n.hue, description: n.description, status: n.status, kind: n.kind, collapsed: n.collapsed, ref: n.ref, decision: n.decision, summaryOf: n.summaryOf },
+    id,
+    type: known ?? "idea",
+    ...(z ? { zIndex: z } : {}),
+    position: { x, y },
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {}),
+    data: { ...rest, ...(known ? {} : { storedType: type }) } as IdeaData,
   }
 }
 
@@ -183,25 +229,21 @@ function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
 
 /** Nó do React Flow -> balão como é gravado. */
 function toMapNode(n: IdeaNode): MindMapNode {
+  // Balão normal: números inteiros, como sempre. Minúsculo (zoom infinito): precisão suficiente para não "pular".
+  const r = scaleOf(n.data) >= 0.5 ? Math.round : (v: number) => Number(v.toPrecision(6))
+  const { storedType, ...data } = n.data
   return {
+    // Campos que esta versão não conhece seguem como vieram (ver flowNode).
+    ...data,
     id: n.id,
-    label: n.data.label,
-    x: Math.round(n.position.x),
-    y: Math.round(n.position.y),
-    taskId: n.data.taskId,
-    leadId: n.data.leadId,
-    tag: n.data.tag,
-    hue: n.data.hue,
-    description: n.data.description,
-    status: n.data.status,
-    kind: n.data.kind,
-    type: n.type === "area" ? "group" : undefined,
-    collapsed: n.data.collapsed || undefined,
-    ref: n.data.ref,
-    decision: n.data.decision && Object.keys(n.data.decision).length ? n.data.decision : undefined,
-    summaryOf: n.data.summaryOf,
-    width: n.width ? Math.round(n.width) : undefined,
-    height: n.height ? Math.round(n.height) : undefined,
+    x: r(n.position.x),
+    y: r(n.position.y),
+    type: (storedType as MindMapNode["type"]) ?? STORED_TYPE[n.type ?? "idea"],
+    collapsed: data.collapsed || undefined,
+    decision: data.decision && Object.keys(data.decision).length ? data.decision : undefined,
+    width: n.width ? r(n.width) : undefined,
+    height: n.height ? r(n.height) : undefined,
+    notes: data.notes?.length ? data.notes : undefined,
   }
 }
 
@@ -355,9 +397,13 @@ function Editor({ map }: { map: MindMap }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<IdeaNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, flowToScreenPosition, getZoom, setCenter, fitView } = useReactFlow()
   useMapSync(map, nodes, edges, setNodes, setEdges)
   const [focusId, setFocus] = useState<string | null>(null)
+  const [tool, setTool] = useState<Tool>("selecionar")
+  const [pen, setPen] = useState<{ hue?: number; size: number }>({ size: 4 })
+  const [notesFor, setNotesFor] = useState<string | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [childDir, setChildDir] = useState<Dir>("direita")
   const [panelOpen, setPanelOpen] = useState(true)
   const [presenting, setPresenting] = useState<number | null>(null)
@@ -372,19 +418,66 @@ function Editor({ map }: { map: MindMap }) {
   )
   const focused = useMemo(() => (focusId ? focusSet(focusId, links) : null), [focusId, links])
 
+  /**
+   * Zoom infinito: "acompanha" o item novo. Se ele ficou pequeno/grande demais na
+   * tela ou fora dela, a tela vai até ele (no zoom em que ele aparece no tamanho normal).
+   */
+  const follow = useCallback(
+    (position: { x: number; y: number }, scale = 1) => {
+      const zoom = getZoom()
+      const onScreen = scale * zoom
+      const target = { x: position.x + 70 * scale, y: position.y + 20 * scale }
+      const p = flowToScreenPosition(target)
+      const r = wrapRef.current?.getBoundingClientRect()
+      const outside = !!r && (p.x < r.left + 40 || p.x > r.right - 40 || p.y < r.top + 40 || p.y > r.bottom - 40)
+      if (onScreen < 0.45 || onScreen > 2.5) setCenter(target.x, target.y, { zoom: Math.min(ZOOM_LIMITS.max, Math.max(ZOOM_LIMITS.min, 1 / scale)), duration: 450 })
+      else if (outside) setCenter(target.x, target.y, { zoom, duration: 300 })
+    },
+    [getZoom, setCenter, flowToScreenPosition],
+  )
+
+  /**
+   * Cria um balão (ou texto solto). Sem pai, nasce do tamanho da tela (zoom infinito:
+   * aproximou, nasce pequeno). Com pai, na mesma escala do pai.
+   */
   const createNode = useCallback(
-    (position: { x: number; y: number }, parentId?: string, dir?: Dir) => {
+    (position: { x: number; y: number }, parentId?: string, dir?: Dir, scale: number | undefined | "zoom" = "zoom", type: "idea" | "text" = "idea") => {
       const id = uid()
+      const s = scale === "zoom" ? scaleForZoom(getZoom()) : roundScale(scale ?? 1)
+      const data: IdeaData = { label: "", ...(s ? { scale: s } : {}) }
       setNodes((ns) => [
         ...ns.map((n) => ({ ...n, selected: false })),
-        { id, type: "idea", position, data: { label: "" }, selected: true },
+        { id, type, position, data, selected: true, ...(type === "text" ? { zIndex: -1 } : {}) },
       ])
       const handles = dir ? { sourceHandle: DIR[dir].out, targetHandle: DIR[dir].in } : {}
       if (parentId) setEdges((es) => [...es, { id: uid(), source: parentId, target: id, ...handles }])
       setEditingId(id)
+      follow(position, s ?? 1)
       return id
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges, getZoom, follow],
+  )
+
+  /** Aplica ampliação/posição calculadas (conjunto, hierarquia, desfazer). */
+  const applyScale = useCallback(
+    (patches: ScalePatch[]) => {
+      const byId = new Map(patches.map((p) => [p.id, p]))
+      setNodes((ns) =>
+        ns.map((n) => {
+          const p = byId.get(n.id)
+          if (!p) return n
+          return {
+            ...n,
+            position: { x: p.x, y: p.y },
+            ...(n.width ? { width: p.width } : {}),
+            ...(n.height ? { height: p.height } : {}),
+            // Área (grupo) só muda de tamanho; o resto ganha a ampliação.
+            data: n.type === "area" ? n.data : { ...n.data, scale: p.scale },
+          }
+        }),
+      )
+    },
+    [setNodes],
   )
 
   const actions: MapActions = useMemo(() => {
@@ -401,16 +494,17 @@ function Editor({ map }: { map: MindMap }) {
         if (dir) setChildDir(dir)
         // Conta só os filhos que já estão daquele lado, para enfileirar sem sobrepor.
         const same = edges.filter((e) => e.source === id && isHierarchy(e) && (dirOfHandle(e.sourceHandle) ?? "direita") === d).length
-        createNode(childPosition(parent.position, d, same), id, d)
+        createNode(childPosition(parent.position, d, same, scaleOf(parent.data)), id, d, parent.data.scale)
       },
       addSibling: (id) => {
         const node = findNode(id)
         if (!node) return
         const link = edges.find((e) => e.target === id && isHierarchy(e))
         const d = dirOfHandle(link?.sourceHandle) ?? "direita"
-        // Irmão fica ao lado, na fila da mesma direção do pai.
-        const pos = d === "baixo" || d === "cima" ? { x: node.position.x + COL_DX, y: node.position.y } : { x: node.position.x, y: node.position.y + ROW_DY }
-        createNode(pos, link?.source, link?.sourceHandle ? d : undefined)
+        // Irmão fica ao lado, na fila da mesma direção do pai, na mesma escala.
+        const s = scaleOf(node.data)
+        const pos = d === "baixo" || d === "cima" ? { x: node.position.x + COL_DX * s, y: node.position.y } : { x: node.position.x, y: node.position.y + ROW_DY * s }
+        createNode(pos, link?.source, link?.sourceHandle ? d : undefined, node.data.scale)
       },
       remove: (id) => {
         setNodes((ns) => ns.filter((n) => n.id !== id))
@@ -450,7 +544,7 @@ function Editor({ map }: { map: MindMap }) {
         const all = outline(nodes.map(toMapNode), links)
         const branch = action === "resumir" ? new Set([nodeId, ...descendants(nodeId, links)]) : null
         const rows = branch ? all.filter((r) => branch.has(r.node.id)) : all
-        return { mapTitle: map.title, outline: outlineText(rows), existing: nodes.map((n) => n.data.label).filter(Boolean) }
+        return { mapTitle: map.title, outline: outlineText(rows), existing: nodes.filter((n) => n.type === "idea").map((n) => n.data.label).filter(Boolean) }
       },
       addChildren: (parentId, labels) => {
         const parent = findNode(parentId)
@@ -460,8 +554,8 @@ function Editor({ map }: { map: MindMap }) {
         const created = labels.map((label, i) => ({
           id: uid(),
           type: "idea" as const,
-          position: childPosition(parent.position, d, start + i),
-          data: { label },
+          position: childPosition(parent.position, d, start + i, scaleOf(parent.data)),
+          data: { label, scale: parent.data.scale },
         }))
         setNodes((ns) => [...ns, ...created])
         setEdges((es) => [...es, ...created.map((c) => ({ id: uid(), source: parentId, target: c.id, sourceHandle: DIR[d].out, targetHandle: DIR[d].in }))])
@@ -475,25 +569,38 @@ function Editor({ map }: { map: MindMap }) {
           {
             id,
             type: "idea",
-            position: { x: parent.position.x + CHILD_DX, y: parent.position.y - ROW_DY },
-            data: { label: `Resumo: ${parent.data.label}`, description: text, kind: "resumo" },
+            position: { x: parent.position.x + CHILD_DX * scaleOf(parent.data), y: parent.position.y - ROW_DY * scaleOf(parent.data) },
+            data: { label: `Resumo: ${parent.data.label}`, description: text, kind: "resumo", scale: parent.data.scale },
           },
         ])
         setEdges((es) => [...es, { id: uid(), source: parentId, target: id }])
       },
       areaLabel: (areaId) => nodes.find((n) => n.id === areaId && n.type === "area")?.data.label || (nodes.some((n) => n.id === areaId) ? "Grupo" : undefined),
+      scaleItems: (ids, factor) => {
+        const set = new Set(ids)
+        applyScale(scaleSet(nodes.filter((n) => set.has(n.id)).map(sized), factor))
+      },
+      moveLayers: (ids, move) => {
+        const next = moveLayer(nodes.map((n) => ({ id: n.id, z: n.data.z, type: STORED_TYPE[n.type ?? "idea"] })), new Set(ids), move)
+        setNodes((ns) => ns.map((n) => (next.has(n.id) ? { ...n, zIndex: next.get(n.id), data: { ...n.data, z: next.get(n.id) } } : n)))
+      },
+      notesFor,
+      setNotesFor,
     }
-  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId, links, map.title, childDir])
+  }, [nodes, edges, editingId, setNodes, setEdges, createNode, branch, focusId, links, map.title, childDir, applyScale, notesFor])
 
   const displayNodes = useMemo(
     () =>
       nodes.map((n) => {
         const isHidden = hidden.has(n.id)
         const dim = !!focused && !focused.has(n.id) && n.type !== "area"
-        if (!isHidden && !dim && !n.hidden && !n.className) return n
-        return { ...n, hidden: isHidden, className: dim ? "opacity-15 transition-opacity" : undefined }
+        const className = cn(n.type === "drawing" && "map-drawing", dim && "opacity-15 transition-opacity") || undefined
+        // Balão selecionado com anotações abertas fica por cima: os balões ramificados não somem atrás dos vizinhos.
+        const lifted = n.selected && n.type === "idea" && (!!n.data.notes?.length || notesFor === n.id)
+        if (!isHidden && !n.hidden && className === n.className && !lifted) return n
+        return { ...n, hidden: isHidden, className, ...(lifted ? { zIndex: 1000 } : {}) }
       }),
-    [nodes, hidden, focused],
+    [nodes, hidden, focused, notesFor],
   )
 
   // Cada conexão sai pelo lado voltado para o outro nó (evita curvas dando a volta).
@@ -534,28 +641,97 @@ function Editor({ map }: { map: MindMap }) {
       return
     }
     const target = e.target as HTMLElement
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return
     const selected = nodes.find((n) => n.selected)
     if (!selected) return
-    if (selected.type === "area" && (e.key === "Tab" || e.key === "Enter")) return
+    if (selected.type !== "idea" && (e.key === "Tab" || e.key === "Enter")) return
     if (e.key === "Tab") {
       e.preventDefault()
       actions.addChild(selected.id)
     } else if (e.key === "Enter") {
       e.preventDefault()
       actions.addSibling(selected.id)
-    } else if ((e.key === "f" || e.key === "F") && selected.type !== "area") {
+    } else if ((e.key === "f" || e.key === "F") && selected.type === "idea") {
       e.preventDefault()
       setFocus(focusId === selected.id ? null : selected.id)
-    } else if (e.key === "F2" || e.key === " ") {
+    } else if ((e.key === "F2" || e.key === " ") && selected.type !== "drawing") {
       e.preventDefault()
       setEditingId(selected.id)
     }
   }
 
+  // Ferramentas do quadro (V, T, D) e Z: valem mesmo com o foco fora do mapa (depois de clicar no fundo).
+  // Sem Ctrl/Cmd, para não brigar com copiar/colar/desfazer; nunca enquanto digita.
+  const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id).join()
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || editingId || presenting !== null) return
+      const t = e.target as HTMLElement
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return
+      if (t !== document.body && !wrapRef.current?.contains(t)) return
+      const k = e.key.toLowerCase()
+      if (k === "v" || (k === "escape" && tool !== "selecionar")) setTool("selecionar")
+      else if (k === "t") setTool("texto")
+      else if (k === "d") setTool("desenhar")
+      else if (k === "z") {
+        // Zoom infinito: entra no que está selecionado (ou enquadra tudo).
+        const ids = selectedIds ? selectedIds.split(",") : []
+        // Para quando o menor item selecionado aparece no tamanho normal (zoom = 1 / ampliação dele).
+        const smallest = Math.min(...nodes.filter((n) => ids.includes(n.id)).map((n) => scaleOf(n.data)))
+        if (ids.length) fitView({ nodes: ids.map((id) => ({ id })), padding: 0.5, maxZoom: Math.min(ZOOM_LIMITS.max, 1 / smallest), duration: 450 })
+        else fitView({ padding: 0.3, maxZoom: 1, duration: 400 })
+      } else return
+      e.preventDefault()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [tool, editingId, presenting, selectedIds, fitView, nodes])
+
   function onDoubleClick(e: React.MouseEvent) {
-    if (!(e.target as HTMLElement).classList.contains("react-flow__pane")) return
+    if (tool !== "selecionar" || !(e.target as HTMLElement).classList.contains("react-flow__pane")) return
     createNode(screenToFlowPosition({ x: e.clientX, y: e.clientY }))
+  }
+
+  // Ferramenta Texto: um clique no fundo do quadro escreve ali (e volta para selecionar).
+  function onPaneClick(e: React.MouseEvent) {
+    if (tool !== "texto") return
+    createNode(screenToFlowPosition({ x: e.clientX, y: e.clientY - 16 }), undefined, undefined, "zoom", "text")
+    setTool("selecionar")
+  }
+
+  // Ferramenta Desenhar: arrastar no fundo faz um traço. A rodinha continua dando zoom.
+  const [stroke, setStroke] = useState<{ x: number; y: number }[] | null>(null)
+  const strokeRef = useRef<{ screen: { x: number; y: number }[]; flow: { x: number; y: number }[] } | null>(null)
+  function onDrawStart(e: React.PointerEvent) {
+    if (tool !== "desenhar" || e.button !== 0) return
+    if ((e.target as HTMLElement).closest(".react-flow__panel, .react-flow__node-toolbar")) return
+    e.preventDefault()
+    e.stopPropagation()
+    const r = wrapRef.current!.getBoundingClientRect()
+    strokeRef.current = { screen: [{ x: e.clientX - r.left, y: e.clientY - r.top }], flow: [screenToFlowPosition({ x: e.clientX, y: e.clientY })] }
+    setStroke(strokeRef.current.screen)
+    const move = (ev: PointerEvent) => {
+      const cur = strokeRef.current
+      if (!cur || cur.flow.length > DRAW_LIMITS.points * 4) return
+      cur.screen.push({ x: ev.clientX - r.left, y: ev.clientY - r.top })
+      cur.flow.push(screenToFlowPosition({ x: ev.clientX, y: ev.clientY }))
+      setStroke([...cur.screen])
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      const cur = strokeRef.current
+      strokeRef.current = null
+      setStroke(null)
+      const d = cur && drawingFromStroke(cur.flow, getZoom(), pen.size)
+      if (!d) return
+      setNodes((ns) => [
+        ...ns,
+        { id: uid(), type: "drawing", zIndex: -1, position: { x: d.x, y: d.y }, data: { label: "", path: d.path, stroke: d.stroke, scale: d.scale, hue: pen.hue } },
+      ])
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
   }
 
   // Grupo: ao arrastar a área, o que tem o centro dentro dela vai junto.
@@ -591,7 +767,6 @@ function Editor({ map }: { map: MindMap }) {
   }, [])
 
   // Apresentação: percorre a árvore (mesma ordem da Lista), centralizando cada balão.
-  const { fitView } = useReactFlow()
   const slides = useMemo(
     () => (presenting === null ? [] : outline(nodes.map(toMapNode), links).map((r) => r.node.id).filter((id) => !hidden.has(id))),
     [presenting !== null, links, hidden], // eslint-disable-line react-hooks/exhaustive-deps
@@ -640,15 +815,63 @@ function Editor({ map }: { map: MindMap }) {
     const a = areaAround(selectedIdeas.map(box))
     const id = uid()
     setNodes((ns) => [
-      { id, type: "area", zIndex: -1, position: { x: a.x, y: a.y }, width: a.width, height: a.height, data: { label: "Grupo" }, selected: true },
+      { id, type: "area", zIndex: -2, position: { x: a.x, y: a.y }, width: a.width, height: a.height, data: { label: "Grupo" }, selected: true },
       ...ns.map((n) => ({ ...n, selected: false })),
     ])
     setEditingId(id)
   }
 
+  const [sizing, setSizing] = useState(false)
+
+  /**
+   * IA: tamanhos pela hierarquia das linhas. A IA sugere o peso de cada balão;
+   * a regra garante que filho nunca fica do tamanho do pai ou maior. Sem IA
+   * (fora do ar, limite), usa só a hierarquia. Dá para desfazer.
+   */
+  async function sizeByHierarchy() {
+    const items = selectedAll.filter((n) => n.type === "idea")
+    if (items.length < 2) return
+    const ids = new Set(items.map((n) => n.id))
+    if (!links.some((l) => l.kind !== "relacao" && ids.has(l.source) && ids.has(l.target)))
+      return toast("Nenhuma linha de hierarquia entre os selecionados", { description: "Ligue os balões (pai → filho) e tente de novo." })
+    setSizing(true)
+    const rows = outline(items.map(toMapNode), links)
+    let suggested: Map<string, number> | undefined
+    let usedAi = false
+    try {
+      const res = await fetch("/api/ia/mapa", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "hierarquia", mapTitle: map.title, outline: outlineText(rows), focus: { label: rows[0]?.node.label || "Mapa" } }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.levels) {
+        suggested = new Map(rows.filter((r) => data.levels[r.number] !== undefined).map((r) => [r.node.id, data.levels[r.number] as number]))
+        usedAi = true
+      }
+    } catch {
+      // Sem IA: segue só pela hierarquia.
+    }
+    setSizing(false)
+    const before = items.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, scale: n.data.scale, width: n.width, height: n.height }))
+    applyScale(resizeByHierarchy(items.map(sized), links, suggested))
+    toast.success(usedAi ? "Tamanhos ajustados pela hierarquia (IA)" : "Tamanhos ajustados pela hierarquia", {
+      description: usedAi ? "Filho sempre menor que o pai; a IA decidiu o que é detalhe." : "A IA não respondeu agora; usei só as linhas pai → filho.",
+      action: { label: "Desfazer", onClick: () => applyScale(before) },
+    })
+  }
+
+  const drawing = tool === "desenhar"
+
   return (
     <MapCtx.Provider value={actions}>
-      <div className="relative h-full w-full overflow-hidden" onKeyDown={onKeyDown} onDoubleClick={onDoubleClick}>
+      <div
+        ref={wrapRef}
+        className={cn("relative h-full w-full overflow-hidden", tool === "texto" && "[&_.react-flow__pane]:!cursor-text", drawing && "[&_.react-flow__pane]:!cursor-crosshair [&_.react-flow__node]:!cursor-crosshair")}
+        onKeyDown={onKeyDown}
+        onDoubleClick={onDoubleClick}
+        onPointerDownCapture={onDrawStart}
+      >
         <ReactFlow
           nodes={displayNodes}
           edges={displayEdges}
@@ -658,10 +881,12 @@ function Editor({ map }: { map: MindMap }) {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onReconnect={onReconnect}
+          onPaneClick={onPaneClick}
           edgesReconnectable
-          selectionOnDrag
+          selectionOnDrag={!drawing}
           selectionMode={SelectionMode.Partial}
           panOnDrag={[1, 2]}
+          nodesDraggable={!drawing}
           onPaneContextMenu={(e) => e.preventDefault()}
           onNodeDragStart={onNodeDragStart}
           onNodeDrag={onNodeDrag}
@@ -673,11 +898,13 @@ function Editor({ map }: { map: MindMap }) {
           defaultEdgeOptions={{ type: "default", style: { strokeWidth: 1.5 } }}
           fitView
           fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
-          minZoom={0.2}
+          minZoom={ZOOM_LIMITS.min}
+          maxZoom={ZOOM_LIMITS.max}
           proOptions={{ hideAttribution: true }}
         >
-          <Background gap={20} size={1} />
+          <InfiniteBackground />
           <MapControls onPresent={() => setPresenting(0)} />
+          {presenting === null && <ToolPanel tool={tool} setTool={setTool} pen={pen} setPen={setPen} />}
           {presenting !== null && (
             <Panel position="bottom-center" className="!mb-6">
               <div className="flex animate-enter items-center gap-1 rounded-xl border bg-card p-1 shadow-lift">
@@ -712,8 +939,13 @@ function Editor({ map }: { map: MindMap }) {
           {selectedIdeas.length + selectedLinks.length >= 2 && !editingId && !focusId && presenting === null && (
             <Panel position="top-center">
               <MultiToolbar
-                nodeCount={selectedIdeas.length}
+                nodeCount={selectedIdeas.filter((n) => n.type === "idea").length}
+                decorCount={selectedIdeas.filter((n) => n.type !== "idea").length}
                 edgeCount={selectedLinks.length}
+                sizing={sizing}
+                onScale={(factor) => actions.scaleItems(selectedAll.map((n) => n.id), factor)}
+                onHierarchy={sizeByHierarchy}
+                onLayer={(move) => actions.moveLayers(selectedAll.map((n) => n.id), move)}
                 onEdges={(patch) => setEdges((es) => es.map((e) => (e.selected ? { ...e, data: { ...(e.data as LinkData | undefined), ...patch } } : e)))}
                 onGroup={groupSelected}
                 onKind={(kind) => setNodes((ns) => ns.map((n) => (n.selected && n.type === "idea" ? { ...n, data: { ...n.data, kind } } : n)))}
@@ -730,6 +962,18 @@ function Editor({ map }: { map: MindMap }) {
             </Panel>
           )}
         </ReactFlow>
+        {stroke && stroke.length > 1 && (
+          <svg className="pointer-events-none absolute inset-0 z-10 size-full">
+            <polyline
+              points={stroke.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={inkColor(pen.hue)}
+              strokeWidth={pen.size}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
         {panelNode && (
           <NodePanel
             mapId={map.id}
@@ -746,7 +990,7 @@ function Editor({ map }: { map: MindMap }) {
           />
         )}
         <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
-          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho (lado escolhido em Filho ▾) · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco ·
+          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho (lado escolhido em Filho ▾) · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco · <Kbd>Rodinha</Kbd> zoom infinito · <Kbd>Z</Kbd> entra no selecionado · <Kbd>T</Kbd> texto · <Kbd>D</Kbd> desenhar ·
           arraste as bolinhas para conectar · clique na linha e arraste o ponto do meio para moldar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
@@ -760,7 +1004,10 @@ function Kbd({ children }: { children: React.ReactNode }) {
 
 function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>) {
   const map = useMap()
-  const measured = !!useInternalNode(id)?.measured.width
+  const internal = useInternalNode(id)
+  const measured = !!internal?.measured.width
+  // Tamanho escolhido pelo usuário (cantos ou P/M/G); "width" das props é o medido.
+  const fixed = internal?.width ? { width: internal.width / scaleOf(data), ...(internal.height ? { height: internal.height / scaleOf(data) } : {}) } : undefined
   const editing = map.editingId === id
   const lead = useStore((s) => (data.leadId ? s.leads.find((l) => l.id === data.leadId) : undefined))
   const tasks = useStore((s) => s.tasks)
@@ -773,6 +1020,11 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
   const colored = hue !== undefined
   const sized = !!width
+  // Zoom infinito: o balão inteiro (texto, bolinhas, ícones) é desenhado em escala.
+  const s = scaleOf(data)
+  const localW = sized ? width! / s : undefined
+  const localH = sized ? (height ?? width! * 0.4) / s : undefined
+  const notesOpen = selected && !editing && !map.multi && (!!data.notes?.length || map.notesFor === id)
   const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
   const kind = nodeKind({ kind: data.kind, taskId: linked ? data.taskId : undefined, leadId: lead ? data.leadId : undefined, ref: data.ref }, lead?.stage)
   const summaryArea = data.summaryOf ? map.areaLabel(data.summaryOf) : undefined
@@ -784,7 +1036,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   // Texto preenche o balão: maior fonte em que título + descrição cabem na caixa.
   const titleSize = sized
     ? fitFontSize(
-        { width: width!, height: height ?? width! * 0.4 },
+        { width: localW!, height: localH! },
         { title: data.label, description: data.description, extraTop: data.tag ? 22 : 0, extraBottom: data.taskId || data.leadId ? 28 : 0 },
       )
     : undefined
@@ -807,13 +1059,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
 
   return (
     <>
-      <NodeResizer
-        isVisible={selected && !editing && !map.multi}
-        minWidth={120}
-        minHeight={44}
-        lineClassName="!border-brand/60"
-        handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
-      />
+      {selected && !editing && !map.multi && <ScreenResizer minWidth={120 * s} minHeight={44 * s} />}
       <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Top} className="flex gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
         <ChildButton nodeId={id} />
         <ToolbarButton onClick={() => map.setFocus(map.focusId === id ? null : id)} label="Modo foco: destaca este ramo (F)">
@@ -832,10 +1078,16 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         </span>
         {(!data.taskId || taskMissing) && <LinkPicker kind="task" nodeId={id} label={data.label} />}
         {!data.leadId && <LinkPicker kind="lead" nodeId={id} label={data.label} />}
+        {!data.notes?.length && (
+          <ToolbarButton onClick={() => map.setNotesFor(map.notesFor === id ? null : id)} label="Anotar: comentário, observação ou citação de app (fica escondido no balão)">
+            <MessageSquarePlusIcon />
+          </ToolbarButton>
+        )}
         <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
           <Trash2Icon />
         </ToolbarButton>
       </NodeToolbar>
+      <div className={cn("group/node relative", !fixed && sized && s === 1 && "h-full w-full")} style={{ ...(s !== 1 ? { zoom: s } : {}), ...fixed }}>
       <div
         onDoubleClick={(e) => {
           e.stopPropagation()
@@ -843,7 +1095,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         }}
         className={cn(
           // Conteúdo sempre centralizado (horizontal e, no balão redimensionado, vertical).
-          "group/node relative flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-card px-7 py-2 text-center text-sm shadow-xs transition-shadow",
+          "relative flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-card px-7 py-2 text-center text-sm shadow-xs transition-shadow",
           sized ? "h-full w-full justify-center" : "max-w-72 min-w-28",
           selected && "ring-2 ring-foreground/15",
           done && "outline outline-1 outline-success/60",
@@ -905,6 +1157,14 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
           </p>
         )}
         {kind === "resumo" && summaryArea && !editing && <p className="text-[11px] text-muted-foreground">Resume: {summaryArea}</p>}
+        {!!data.notes?.length && !editing && (
+          <span
+            className={cn("absolute bottom-1.5 left-2 flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground", notesOpen && "text-brand")}
+            title={`${data.notes.length} anotação(ões) — clique no balão para ver`}
+          >
+            <MessageSquareIcon className="size-3" /> {data.notes.length}
+          </span>
+        )}
         {(lead || task || taskMissing || data.ref) && (
           <div className="mt-1 flex w-full flex-col gap-0.5 border-t pt-1 text-left">
             {data.ref && (
@@ -966,6 +1226,10 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
       <Handle id="r" type="source" position={Position.Right} className="idea-handle" />
       <Handle id="t" type="source" position={Position.Top} className="idea-handle" />
       <Handle id="b" type="source" position={Position.Bottom} className="idea-handle" />
+      {notesOpen && (
+        <NoteBranches notes={data.notes} adding={map.notesFor === id} onChange={(notes) => map.setData(id, { notes })} onDoneAdding={() => map.setNotesFor(null)} />
+      )}
+      </div>
     </>
   )
 }
@@ -1148,7 +1412,12 @@ function ChildButton({ nodeId }: { nodeId: string }) {
  */
 function MultiToolbar({
   nodeCount,
+  decorCount,
   edgeCount,
+  sizing,
+  onScale,
+  onHierarchy,
+  onLayer,
   onGroup,
   onKind,
   onStatus,
@@ -1156,7 +1425,14 @@ function MultiToolbar({
   onDelete,
 }: {
   nodeCount: number
+  /** Textos soltos e desenhos selecionados. */
+  decorCount: number
   edgeCount: number
+  /** IA pensando nos tamanhos. */
+  sizing: boolean
+  onScale: (factor: number) => void
+  onHierarchy: () => void
+  onLayer: (move: LayerMove) => void
   onGroup: () => void
   onKind: (k: NodeKind | undefined) => void
   onStatus: (s: "afazer" | "andamento" | "feito") => void
@@ -1167,11 +1443,31 @@ function MultiToolbar({
   return (
     <div className="flex max-w-[calc(100vw-2rem)] animate-enter flex-wrap items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-lift" onDoubleClick={(e) => e.stopPropagation()}>
       <span className="px-2 text-xs font-semibold">
-        {[nodeCount && plural(nodeCount, "balão", "balões"), edgeCount && plural(edgeCount, "linha", "linhas")].filter(Boolean).join(" · ")}
+        {[nodeCount && plural(nodeCount, "balão", "balões"), decorCount && plural(decorCount, "texto/desenho", "textos/desenhos"), edgeCount && plural(edgeCount, "linha", "linhas")]
+          .filter(Boolean)
+          .join(" · ")}
       </span>
+      {nodeCount + decorCount > 0 && (
+        <span className="flex items-center gap-0.5 border-r pr-1">
+          <ToolbarButton onClick={() => onScale(0.8)} label="Diminuir o conjunto (tudo junto, mantendo o desenho)">
+            <MinusIcon />
+          </ToolbarButton>
+          <ZoomInIcon className="size-3.5 text-muted-foreground" aria-hidden />
+          <ToolbarButton onClick={() => onScale(1.25)} label="Ampliar o conjunto (tudo junto, mantendo o desenho)">
+            <PlusIcon />
+          </ToolbarButton>
+          {nodeCount >= 2 && (
+            <Button size="xs" variant="ghost" disabled={sizing} onClick={onHierarchy} title="IA: redimensiona os balões seguindo a hierarquia das linhas (pai maior, filhos menores)">
+              {sizing ? <Loader2Icon className="animate-spin" /> : <NetworkIcon />} {sizing ? "Pensando…" : "Hierarquia"}
+              {!sizing && <SparklesIcon className="text-brand" />}
+            </Button>
+          )}
+          <LayerPicker onMove={onLayer} />
+        </span>
+      )}
       {nodeCount > 0 && (
         <>
-          {nodeCount >= 2 && (
+          {nodeCount + decorCount >= 2 && (
             <ToolbarButton onClick={onGroup} label="Agrupar os balões numa área">
               <BoxSelectIcon /> Agrupar
             </ToolbarButton>
@@ -1232,6 +1528,27 @@ function MultiToolbar({
         <Trash2Icon />
       </ToolbarButton>
     </div>
+  )
+}
+
+/** Camada de vários itens (barra de seleção múltipla). */
+function LayerPicker({ onMove }: { onMove: (move: LayerMove) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="Camada: frente ou fundo do quadro">
+          <LayersIcon /> Camada
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="center" className="grid w-56 gap-0.5 p-1">
+        {LAYER_MOVES.map((m) => (
+          <button key={m.id} type="button" onClick={() => onMove(m.id)} className="grid rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+            <span className="font-medium">{m.label}</span>
+            <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -1389,10 +1706,29 @@ function StyleFields({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
         </div>
 
         <div className="grid gap-1.5">
+          <p className="t-label">Ampliação · zoom infinito</p>
+          <div className="flex items-center gap-1.5">
+            <Chip onClick={() => map.scaleItems([nodeId], 0.8)} title="Diminuir este balão">
+              −
+            </Chip>
+            <span className="tabular w-14 text-center text-xs font-semibold">{Math.round(scaleOf(data) * 1000) / 10}%</span>
+            <Chip onClick={() => map.scaleItems([nodeId], 1.25)} title="Ampliar este balão">
+              +
+            </Chip>
+            {scaleOf(data) !== 1 && (
+              <Chip onClick={() => map.scaleItems([nodeId], 1 / scaleOf(data))} title="Voltar ao tamanho normal">
+                100%
+              </Chip>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
           <p className="t-label">Descrição</p>
           <textarea
             defaultValue={data.description ?? ""}
-            onBlur={(e) => map.setData(nodeId, { description: e.target.value.trim() || undefined })}
+            {...spellProps}
+            onBlur={(e) => map.setData(nodeId, { description: correctText(e.target.value.trim()) || undefined })}
             placeholder="O que é esta fase, objetivo, critério de pronto…"
             rows={3}
             className="rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-brand"
@@ -1419,12 +1755,13 @@ function NodeInput({ initial, ready, onDone, placeholder = "Digite a ideia…", 
     <input
       ref={ref}
       value={value}
-      onChange={(e) => setValue(e.target.value)}
+      {...spellProps}
+      onChange={(e) => setValue(autocorrected(value, e.currentTarget))}
       onFocus={(e) => e.currentTarget.select()}
-      onBlur={() => finish(value)}
+      onBlur={() => finish(correctText(value))}
       onKeyDown={(e) => {
         e.stopPropagation()
-        if (e.key === "Enter") finish(value)
+        if (e.key === "Enter") finish(correctText(value))
         if (e.key === "Escape") finish(initial)
       }}
       placeholder={placeholder}
@@ -1539,6 +1876,12 @@ function box(n: IdeaNode) {
   }
 }
 
+/** Item com tamanho medido e ampliação: para ampliar conjuntos e tamanhos pela hierarquia. */
+function sized(n: IdeaNode): SizedItem {
+  const b = box(n)
+  return { id: n.id, x: n.position.x, y: n.position.y, w: b.width, h: b.height, scale: n.data.scale, width: n.width, height: n.height }
+}
+
 const AREA_HUES = [150, 210, 260, 320, 30, 80]
 
 /**
@@ -1553,13 +1896,7 @@ function AreaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
   const tint = hue !== undefined ? `oklch(0.7 0.1 ${hue})` : "var(--muted-foreground)"
   return (
     <>
-      <NodeResizer
-        isVisible={selected && !editing}
-        minWidth={180}
-        minHeight={120}
-        lineClassName="!border-brand/60"
-        handleClassName="!size-2.5 !rounded-sm !border-brand !bg-card"
-      />
+      {selected && !editing && <ScreenResizer minWidth={180} minHeight={120} />}
       {/* zIndex: a área fica atrás de tudo; título e barra ficam na frente das linhas. */}
       <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Bottom} style={{ zIndex: 1001 }} className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-md">
         <button
@@ -1624,7 +1961,239 @@ function AreaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
   )
 }
 
-const NODE_TYPES = { idea: IdeaNodeView, area: AreaNodeView }
+/**
+ * Texto solto no fundo do quadro (como no Canva): sem balão, com camada (frente/trás),
+ * cor e tamanho. Duplo clique edita; Enter quebra linha; Esc ou clicar fora termina.
+ */
+function TextNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
+  const map = useMap()
+  const editing = map.editingId === id
+  const s = scaleOf(data)
+  const size = data.stroke ?? TEXT_SIZE
+  const [text, setText] = useState(data.label)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  // Item novo fica invisível até o React Flow medi-lo; só então o foco "pega".
+  const measured = !!useInternalNode(id)?.measured.width
+  useEffect(() => {
+    if (editing) setText(data.label)
+  }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (editing && measured) ref.current?.focus()
+  }, [editing, measured])
+  function finish() {
+    const v = correctText(text.trim())
+    if (!v && !data.label) map.remove(id)
+    else if (v) map.setLabel(id, v)
+    map.setEditingId(null)
+  }
+  return (
+    <>
+      <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Top} className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
+        <ToolbarButton onClick={() => map.setData(id, { stroke: Math.max(8, Math.round(size / 1.25)) })} label="Letra menor">
+          <span className="text-[11px] font-semibold">A−</span>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => map.setData(id, { stroke: Math.min(160, Math.round(size * 1.25)) })} label="Letra maior">
+          <span className="text-sm font-semibold">A+</span>
+        </ToolbarButton>
+        <InkPicker hue={data.hue} onPick={(hue) => map.setData(id, { hue })} />
+        <LayerMenu ids={[id]} />
+        <ToolbarButton onClick={() => map.setEditingId(id)} label="Editar texto (duplo clique)">
+          <TypeIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
+          <Trash2Icon />
+        </ToolbarButton>
+      </NodeToolbar>
+      <div
+        style={{ ...(s !== 1 ? { zoom: s } : {}), fontSize: size, color: inkColor(data.hue) }}
+        className={cn(
+          "rounded-md px-1 leading-tight font-semibold whitespace-pre-wrap",
+          selected && !editing && "outline-2 outline-brand/50 outline-solid",
+          !data.label && !editing && "text-muted-foreground",
+        )}
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          map.setEditingId(id)
+        }}
+      >
+        {editing ? (
+          <textarea
+            ref={ref}
+            value={text}
+            rows={1}
+            {...spellProps}
+            onChange={(e) => setText(autocorrected(text, e.currentTarget))}
+            onBlur={finish}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === "Escape") e.currentTarget.blur()
+            }}
+            placeholder="Escreva…"
+            className="nodrag block field-sizing-content min-w-24 resize-none bg-transparent outline-none placeholder:text-muted-foreground"
+            style={{ fontSize: "inherit", color: "inherit", fontWeight: "inherit", lineHeight: "inherit" }}
+          />
+        ) : (
+          data.label || "Texto"
+        )}
+      </div>
+    </>
+  )
+}
+
+/** Traço feito à mão. Só a linha recebe clique (o fundo em volta é "vazado"). */
+function DrawingNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
+  const map = useMap()
+  const s = scaleOf(data)
+  const path = data.path ?? []
+  const stroke = data.stroke ?? 4
+  const b = pathBox(path, stroke)
+  const d = pathD(path)
+  return (
+    <>
+      <NodeToolbar isVisible={selected && !map.multi} position={Position.Top} className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
+        <InkPicker hue={data.hue} onPick={(hue) => map.setData(id, { hue })} />
+        <LayerMenu ids={[id]} />
+        <ToolbarButton onClick={() => map.scaleItems([id], 0.8)} label="Diminuir">
+          <MinusIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => map.scaleItems([id], 1.25)} label="Aumentar">
+          <PlusIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => map.remove(id)} label="Apagar (Del)">
+          <Trash2Icon />
+        </ToolbarButton>
+      </NodeToolbar>
+      <svg width={b.width} height={b.height} style={s !== 1 ? { zoom: s } : undefined} className={cn("block overflow-visible", selected && "drop-shadow-[0_0_3px_var(--brand)]")}>
+        <path d={d} fill="none" stroke={inkColor(data.hue)} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
+        {/* Área de clique mais larga que o traço. */}
+        <path d={d} fill="none" stroke="transparent" strokeWidth={Math.max(14, stroke + 10)} strokeLinecap="round" className="drawing-hit" />
+      </svg>
+    </>
+  )
+}
+
+/** Cor da tinta (texto e desenho). */
+function InkPicker({ hue, onPick }: { hue?: number; onPick: (hue: number | undefined) => void }) {
+  return (
+    <span className="flex items-center gap-1 px-1">
+      {[undefined, ...INK_HUES].map((h) => (
+        <button
+          key={h ?? "auto"}
+          type="button"
+          onClick={() => onPick(h)}
+          className={cn("size-4 rounded-full border", hue === h && "ring-2 ring-foreground/50 ring-offset-1 ring-offset-background")}
+          style={{ background: inkColor(h) }}
+          aria-label={h === undefined ? "Cor do texto" : `Cor ${h}`}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Camada como no Canva: frente, avançar, recuar, trás. */
+function LayerMenu({ ids }: { ids: string[] }) {
+  const map = useMap()
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="ghost" title="Camada: frente ou fundo do quadro">
+          <LayersIcon /> Camada
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="center" className="grid w-56 gap-0.5 p-1" onDoubleClick={(e) => e.stopPropagation()}>
+        {LAYER_MOVES.map((m) => (
+          <button key={m.id} type="button" onClick={() => map.moveLayers(ids, m.id)} className="grid rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+            <span className="font-medium">{m.label}</span>
+            <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * Ferramentas do quadro: selecionar (V), texto (T) e desenhar (D).
+ * Desenhando: cor e espessura da caneta.
+ */
+function ToolPanel({ tool, setTool, pen, setPen }: { tool: Tool; setTool: (t: Tool) => void; pen: { hue?: number; size: number }; setPen: (p: { hue?: number; size: number }) => void }) {
+  const tools: { id: Tool; label: string; icon: React.ComponentType<{ className?: string }>; key: string }[] = [
+    { id: "selecionar", label: "Selecionar e mover", icon: MousePointer2Icon, key: "V" },
+    { id: "texto", label: "Texto no quadro: clique onde quer escrever", icon: TypeIcon, key: "T" },
+    { id: "desenhar", label: "Desenhar à mão livre", icon: PencilIcon, key: "D" },
+  ]
+  return (
+    <Panel position="top-left" className="flex items-start gap-2">
+      <div className="flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
+        {tools.map((t, i) => (
+          <Tooltip key={t.id}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setTool(t.id)}
+                aria-label={t.label}
+                aria-pressed={tool === t.id}
+                className={cn(
+                  "flex size-9 items-center justify-center text-foreground/80 transition-colors hover:bg-accent hover:text-foreground",
+                  i > 0 && "border-t",
+                  tool === t.id && "bg-brand/15 text-brand",
+                )}
+              >
+                <t.icon className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {t.label} ({t.key})
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+      {tool === "desenhar" && (
+        <div className="flex animate-enter items-center gap-2 rounded-lg border bg-card p-1.5 shadow-lift">
+          <InkPicker hue={pen.hue} onPick={(hue) => setPen({ ...pen, hue })} />
+          <span className="flex gap-0.5 border-l pl-1.5">
+            {PEN_SIZES.map((p) => (
+              <Chip key={p.id} active={pen.size === p.id} onClick={() => setPen({ ...pen, size: p.id })}>
+                {p.label}
+              </Chip>
+            ))}
+          </span>
+          <span className="hidden text-[11px] text-muted-foreground sm:inline">Arraste para desenhar · V volta</span>
+        </div>
+      )}
+      {tool === "texto" && <div className="animate-enter rounded-lg border bg-card px-2.5 py-1.5 text-xs text-muted-foreground shadow-lift">Clique no quadro onde quer escrever</div>}
+    </Panel>
+  )
+}
+
+/** Grade de pontos do quadro infinito: o espaço se adapta ao zoom e o ponto tem sempre 1px na tela. */
+function InfiniteBackground() {
+  const zoom = useFlowStore((st) => st.transform[2])
+  return <Background gap={gridGap(zoom)} size={1 / zoom} />
+}
+
+/**
+ * Cantos de redimensionar sempre do mesmo tamanho na tela, em qualquer zoom
+ * (os da biblioteca crescem junto quando a tela está muito aproximada).
+ */
+function ScreenResizer({ minWidth, minHeight }: { minWidth: number; minHeight: number }) {
+  const zoom = useFlowStore((st) => st.transform[2])
+  const px = (v: number) => v / zoom
+  return (
+    <NodeResizer
+      isVisible
+      autoScale={false}
+      minWidth={minWidth}
+      minHeight={minHeight}
+      // Borda nunca fica abaixo de 1px no navegador (vira faixa grossa com zoom alto): linhas invisíveis
+      // (o contorno de seleção do balão já mostra), cantos sem borda.
+      lineStyle={{ borderColor: "transparent" }}
+      handleStyle={{ width: px(9), height: px(9), border: "none", borderRadius: px(2), background: "var(--brand)" }}
+    />
+  )
+}
+
+const NODE_TYPES = { idea: IdeaNodeView, area: AreaNodeView, text: TextNodeView, drawing: DrawingNodeView }
 
 const ARROWS: { id: Arrow; label: string; hint: string }[] = [
   { id: "nenhuma", label: "—", hint: "Sem seta" },
@@ -1641,9 +2210,13 @@ const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
  * livre, com legenda ("depende de", "gera"…). Área de clique larga; selecionada,
  * mostra o tipo, a legenda e "Desvincular". Delete/Backspace também desvincula.
  */
-function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, markerStart, data }: EdgeProps) {
+function UnlinkEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, markerStart, data }: EdgeProps) {
   const { deleteElements, screenToFlowPosition } = useReactFlow()
   const map = useMap()
+  // Zoom infinito: linha entre balões pequenos fica fina na mesma proporção (a seta acompanha).
+  const sourceScale = (useInternalNode(source)?.data as IdeaData | undefined)?.scale ?? 1
+  const targetScale = (useInternalNode(target)?.data as IdeaData | undefined)?.scale ?? 1
+  const k = Math.min(sourceScale, targetScale)
   const link = (data ?? {}) as LinkData
   const relation = link.kind === "relacao"
   const midX = (sourceX + targetX) / 2
@@ -1681,12 +2254,12 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
         path={path}
         markerEnd={markerEnd}
         markerStart={markerStart}
-        interactionWidth={24}
+        interactionWidth={24 * k}
         style={{
           ...style,
           stroke: selected ? "var(--brand)" : relation ? "var(--muted-foreground)" : undefined,
-          strokeWidth: selected ? 2.5 : 1.5,
-          strokeDasharray: relation ? "6 4" : undefined,
+          strokeWidth: (selected ? 2.5 : 1.5) * k,
+          strokeDasharray: relation ? `${6 * k} ${4 * k}` : undefined,
         }}
       />
       <EdgeLabelRenderer>
@@ -1770,6 +2343,7 @@ function EdgeLabelInput({ value, onSave }: { value: string; onSave: (v: string) 
           if (e.key === "Enter") save(text)
         }}
         placeholder="Legenda (ex.: depende de)"
+        {...spellProps}
         className="h-6 w-52 rounded-md border bg-background px-2 text-xs outline-none focus:border-brand"
       />
       <div className="flex max-w-52 flex-wrap gap-1">
@@ -1814,6 +2388,11 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.ref ? `${n.ref.type}:${n.ref.id}` : null,
       n.decision ? JSON.stringify(n.decision) : null,
       n.summaryOf ?? null,
+      n.scale ?? null,
+      n.z ?? null,
+      n.stroke ?? null,
+      n.path ? n.path.join(",") : null,
+      n.notes ? JSON.stringify(n.notes) : null,
     ]),
     edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null, e.bend ? `${e.bend.dx},${e.bend.dy}` : null]),
   ])
@@ -1824,7 +2403,8 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
  * claro-sobre-claro no tema escuro). Nome de cada botão aparece ao passar o mouse.
  */
 function MapControls({ onPresent }: { onPresent: () => void }) {
-  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  const { zoomIn, zoomOut, fitView, zoomTo } = useReactFlow()
+  const zoom = useFlowStore((st) => st.transform[2])
   const buttons = [
     { label: "Aproximar", icon: PlusIcon, onClick: () => zoomIn({ duration: 200 }) },
     { label: "Afastar", icon: MinusIcon, onClick: () => zoomOut({ duration: 200 }) },
@@ -1833,6 +2413,14 @@ function MapControls({ onPresent }: { onPresent: () => void }) {
   ]
   return (
     <Panel position="bottom-right" className="!mb-16 flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" onClick={() => zoomTo(1, { duration: 300 })} className="tabular h-7 border-b px-1 text-[10px] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground">
+            {zoomLabel(zoom)}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Zoom atual · clique volta para 100%</TooltipContent>
+      </Tooltip>
       {buttons.map((b, i) => (
         <Tooltip key={b.label}>
           <TooltipTrigger asChild>
@@ -1853,4 +2441,10 @@ function MapControls({ onPresent }: { onPresent: () => void }) {
       ))}
     </Panel>
   )
+}
+
+/** "100%", "2.500%", "0,4%" — zoom infinito em número legível. */
+function zoomLabel(zoom: number) {
+  const pct = zoom * 100
+  return `${pct >= 10 ? Math.round(pct).toLocaleString("pt-BR") : pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
 }

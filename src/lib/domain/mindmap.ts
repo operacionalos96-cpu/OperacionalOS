@@ -120,8 +120,11 @@ export function kindCounts(nodes: Pick<MindMapNode, "kind" | "taskId" | "leadId"
 /** Grupo = área visual com título (um registro a mais no mapa, `type: "group"`). */
 export const isArea = (n: Pick<MindMapNode, "type">) => n.type === "group"
 
-/** Só os balões (sem as áreas) — para contar, progresso, prévia. */
-export const ideaNodes = <T extends Pick<MindMapNode, "type">>(nodes: T[]) => nodes.filter((n) => !isArea(n))
+/** Texto solto ou desenho no fundo do quadro: decoração, não é ideia (não conta, não vai para a IA). */
+export const isDecor = (n: Pick<MindMapNode, "type">) => n.type === "text" || n.type === "drawing"
+
+/** Só os balões (sem áreas, textos soltos e desenhos) — para contar, progresso, prévia. */
+export const ideaNodes = <T extends Pick<MindMapNode, "type">>(nodes: T[]) => nodes.filter((n) => !isArea(n) && !isDecor(n))
 
 type Box = { id: string; x: number; y: number; width: number; height: number }
 
