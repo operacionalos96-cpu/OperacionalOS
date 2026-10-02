@@ -445,7 +445,7 @@ function Editor({ map }: { map: MindMap }) {
       focusId,
       setFocus,
       openPanel: () => setPanelOpen(true),
-      multi: nodes.filter((n) => n.selected).length > 1,
+      multi: nodes.filter((n) => n.selected).length + edges.filter((e) => e.selected).length > 1,
       aiContext: (nodeId, action) => {
         const all = outline(nodes.map(toMapNode), links)
         const branch = action === "resumir" ? new Set([nodeId, ...descendants(nodeId, links)]) : null
@@ -623,7 +623,7 @@ function Editor({ map }: { map: MindMap }) {
 
   // Painel lateral: um único balão selecionado (fora da apresentação).
   const selectedAll = nodes.filter((n) => n.selected)
-  const panelNode = presenting === null && panelOpen && selectedAll.length === 1 && selectedAll[0].type === "idea" ? selectedAll[0] : undefined
+  const panelNode = presenting === null && panelOpen && selectedAll.length === 1 && selectedAll[0].type === "idea" && !edges.some((e) => e.selected) ? selectedAll[0] : undefined
   const leads = useStore((s) => s.leads)
   const areas = nodes.filter((n) => n.type === "area").map((n) => ({ id: n.id, label: n.data.label }))
   const membersLabels = (areaId: string) => {
@@ -634,6 +634,7 @@ function Editor({ map }: { map: MindMap }) {
   }
 
   const selectedIdeas = nodes.filter((n) => n.selected && n.type !== "area")
+  const selectedLinks = edges.filter((e) => e.selected)
   function groupSelected() {
     if (selectedIdeas.length < 2) return
     const a = areaAround(selectedIdeas.map(box))
@@ -708,10 +709,12 @@ function Editor({ map }: { map: MindMap }) {
               </div>
             </Panel>
           )}
-          {selectedIdeas.length >= 2 && !editingId && !focusId && presenting === null && (
+          {selectedIdeas.length + selectedLinks.length >= 2 && !editingId && !focusId && presenting === null && (
             <Panel position="top-center">
               <MultiToolbar
-                count={selectedIdeas.length}
+                nodeCount={selectedIdeas.length}
+                edgeCount={selectedLinks.length}
+                onEdges={(patch) => setEdges((es) => es.map((e) => (e.selected ? { ...e, data: { ...(e.data as LinkData | undefined), ...patch } } : e)))}
                 onGroup={groupSelected}
                 onKind={(kind) => setNodes((ns) => ns.map((n) => (n.selected && n.type === "idea" ? { ...n, data: { ...n.data, kind } } : n)))}
                 onStatus={(st) => {
@@ -721,7 +724,7 @@ function Editor({ map }: { map: MindMap }) {
                 onDelete={() => {
                   const ids = new Set(nodes.filter((n) => n.selected).map((n) => n.id))
                   setNodes((ns) => ns.filter((n) => !ids.has(n.id)))
-                  setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)))
+                  setEdges((es) => es.filter((e) => !e.selected && !ids.has(e.source) && !ids.has(e.target)))
                 }}
               />
             </Panel>
@@ -1138,62 +1141,94 @@ function ChildButton({ nodeId }: { nodeId: string }) {
   )
 }
 
-/** Uma barra só para vários balões selecionados: agrupar, tipo, andamento e apagar. */
+/**
+ * Uma barra só quando há VÁRIOS itens selecionados (balões e/ou linhas): nenhum painel
+ * individual abre. Ajustes valem para todos: balões (agrupar, tipo, andamento) e
+ * linhas (hierarquia/relação, sentido). Apagar leva tudo que está selecionado.
+ */
 function MultiToolbar({
-  count,
+  nodeCount,
+  edgeCount,
   onGroup,
   onKind,
   onStatus,
+  onEdges,
   onDelete,
 }: {
-  count: number
+  nodeCount: number
+  edgeCount: number
   onGroup: () => void
   onKind: (k: NodeKind | undefined) => void
   onStatus: (s: "afazer" | "andamento" | "feito") => void
+  onEdges: (patch: LinkData) => void
   onDelete: () => void
 }) {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   return (
-    <div className="flex animate-enter items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-lift" onDoubleClick={(e) => e.stopPropagation()}>
-      <span className="px-2 text-xs font-semibold">{count} selecionados</span>
-      <ToolbarButton onClick={onGroup} label="Agrupar numa área">
-        <BoxSelectIcon /> Agrupar
-      </ToolbarButton>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button size="xs" variant="ghost" title="Tipo de todos">
-            <SquareStackIcon /> Tipo
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="center" className="grid w-56 gap-0.5 p-1">
-          {NODE_KINDS.map((k) => {
-            const KIcon = NODE_KIND_ICON[k.id]
-            return (
-              <button key={k.id} type="button" onClick={() => onKind(k.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
-                <KIcon className="size-4 text-muted-foreground" /> {k.label}
+    <div className="flex max-w-[calc(100vw-2rem)] animate-enter flex-wrap items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-lift" onDoubleClick={(e) => e.stopPropagation()}>
+      <span className="px-2 text-xs font-semibold">
+        {[nodeCount && plural(nodeCount, "balão", "balões"), edgeCount && plural(edgeCount, "linha", "linhas")].filter(Boolean).join(" · ")}
+      </span>
+      {nodeCount > 0 && (
+        <>
+          {nodeCount >= 2 && (
+            <ToolbarButton onClick={onGroup} label="Agrupar os balões numa área">
+              <BoxSelectIcon /> Agrupar
+            </ToolbarButton>
+          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="xs" variant="ghost" title="Tipo de todos os balões">
+                <SquareStackIcon /> Tipo
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="center" className="grid w-56 gap-0.5 p-1">
+              {NODE_KINDS.map((k) => {
+                const KIcon = NODE_KIND_ICON[k.id]
+                return (
+                  <button key={k.id} type="button" onClick={() => onKind(k.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+                    <KIcon className="size-4 text-muted-foreground" /> {k.label}
+                  </button>
+                )
+              })}
+              <button type="button" onClick={() => onKind(undefined)} className="rounded-md border-t px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent">
+                Automático (pelo vínculo)
               </button>
-            )
-          })}
-          <button type="button" onClick={() => onKind(undefined)} className="rounded-md border-t px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent">
-            Automático (pelo vínculo)
-          </button>
-        </PopoverContent>
-      </Popover>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button size="xs" variant="ghost" title="Andamento de todos">
-            <CircleDotIcon /> Status
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="xs" variant="ghost" title="Andamento de todos os balões">
+                <CircleDotIcon /> Status
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="center" className="grid w-44 gap-0.5 p-1">
+              {(["afazer", "andamento", "feito"] as const).map((st) => (
+                <button key={st} type="button" onClick={() => onStatus(st)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+                  <StatusButton status={st} onClick={() => onStatus(st)} className="pointer-events-none" /> {NODE_STATUS[st].label}
+                </button>
+              ))}
+              <p className="px-2 pt-1 text-[11px] text-muted-foreground">Tarefas ligadas mudam junto.</p>
+            </PopoverContent>
+          </Popover>
+        </>
+      )}
+      {edgeCount > 0 && (
+        <div className={cn("flex items-center gap-0.5", nodeCount > 0 && "ml-0.5 border-l pl-1")}>
+          <Button size="xs" variant="ghost" onClick={() => onEdges({ kind: undefined })} title="Todas as linhas como hierarquia (sólida)">
+            Hierarquia
           </Button>
-        </PopoverTrigger>
-        <PopoverContent align="center" className="grid w-44 gap-0.5 p-1">
-          {(["afazer", "andamento", "feito"] as const).map((st) => (
-            <button key={st} type="button" onClick={() => onStatus(st)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
-              <StatusButton status={st} onClick={() => onStatus(st)} className="pointer-events-none" /> {NODE_STATUS[st].label}
-            </button>
+          <Button size="xs" variant="ghost" onClick={() => onEdges({ kind: "relacao" })} title="Todas as linhas como relação (tracejada)">
+            Relação
+          </Button>
+          {ARROWS.map((a) => (
+            <Button key={a.id} size="xs" variant="ghost" className="px-1.5" onClick={() => onEdges({ arrow: a.id })} title={`Sentido de todas: ${a.hint}`}>
+              {a.label}
+            </Button>
           ))}
-          <p className="px-2 pt-1 text-[11px] text-muted-foreground">Tarefas ligadas mudam junto.</p>
-        </PopoverContent>
-      </Popover>
-      <ToolbarButton onClick={onDelete} label="Apagar selecionados (Del)">
+        </div>
+      )}
+      <ToolbarButton onClick={onDelete} label="Apagar tudo que está selecionado (Del)">
         <Trash2Icon />
       </ToolbarButton>
     </div>
@@ -1637,6 +1672,7 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   }
   // zIndex: por cima dos balões (o rótulo fica numa camada abaixo dos nós por padrão).
   const at = { transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: selected ? 1001 : undefined }
+  const solo = selected && !map.multi
   const below = { transform: `translate(-50%, 14px) translate(${labelX}px, ${labelY}px)`, zIndex: 1001 }
   return (
     <>
@@ -1654,7 +1690,7 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
         }}
       />
       <EdgeLabelRenderer>
-        {selected && (
+        {solo && (
           <button
             type="button"
             onPointerDown={dragBend}
@@ -1668,7 +1704,7 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
             aria-label="Moldar a linha"
           />
         )}
-        {selected ? (
+        {solo ? (
           <div
             className="nodrag nopan pointer-events-auto absolute flex animate-enter flex-col gap-1.5 rounded-lg border bg-card p-1.5 text-xs shadow-lift"
             style={below}
