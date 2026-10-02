@@ -19,7 +19,7 @@ async function gate() {
   if (error)
     return {
       error: NextResponse.json(
-        { erro: error.code === "PGRST205" || error.code === "42P01" ? "As tabelas do cofre não existem: rode o SQL 0008 no Supabase." : `Erro no banco (${error.code}).` },
+        { erro: error.code === "PGRST205" || error.code === "42P01" ? "As tabelas do cofre não existem: rode o SQL 0008 no Supabase." : `Erro no banco (${error.code ?? "sem código"}: ${String(error.message ?? "").slice(0, 160)})` },
         { status: 500, headers: noStore },
       ),
     }
