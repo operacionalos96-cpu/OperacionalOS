@@ -26,7 +26,8 @@ export async function POST(req: Request) {
     // Senha errada → mensagem simples. Qualquer outra falha → código do Supabase (nunca a senha), para dar para corrigir.
     const wrong = error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message)
     if (!wrong) console.error("[cofre] conferência da senha falhou:", error.status, error.code, error.message)
-    return NextResponse.json({ erro: wrong ? "Senha incorreta." : `Não foi possível conferir a senha (${error.code ?? error.status ?? "erro"}: ${error.message.slice(0, 120)})` }, { status: 401, headers: noStore })
+    const masked = member.email.replace(/^(.{2}).*(@.*)$/, "$1***$2")
+    return NextResponse.json({ erro: wrong ? `Senha incorreta para ${masked}.` :`Não foi possível conferir a senha (${error.code ?? error.status ?? "erro"}: ${error.message.slice(0, 120)})` }, { status: 401, headers: noStore })
   }
   if (data.user?.id !== member.userId) return NextResponse.json({ erro: "Esta senha é de outra conta." }, { status: 401, headers: noStore })
   await check.auth.signOut({ scope: "local" }).catch(() => {}) // descarta a sessão de conferência
