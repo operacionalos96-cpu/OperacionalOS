@@ -358,10 +358,10 @@ function AgendaPanel({ items, className }: { items: AgendaItem[]; className?: st
       className={cn("stagger", className)}
       style={{ "--i": 4 } as React.CSSProperties}
       title="Minhas responsabilidades"
-      description="Tarefas e próximas ações suas, até domingo."
+      description="Suas tarefas até domingo."
     >
       {items.length === 0 ? (
-        <EmptyState icon={UserIcon} title="Nada com você esta semana" description="Tarefas e próximas ações de leads em que você é o responsável aparecem aqui." />
+        <EmptyState icon={UserIcon} title="Nada com você esta semana" description="Tarefas suas (ou em que você colabora) aparecem aqui." />
       ) : (
         <div className="flex flex-col divide-y">
           {buckets

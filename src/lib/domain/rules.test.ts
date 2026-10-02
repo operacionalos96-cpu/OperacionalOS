@@ -120,7 +120,7 @@ describe("tarefas e agenda", () => {
     expect(dueBucket(undefined, NOW)).toBe("sem_prazo")
   })
 
-  it("agenda inclui só itens meus até o fim da semana", () => {
+  it("agenda: só minhas tarefas até o fim da semana (próxima ação de lead não entra)", () => {
     const tasks: Task[] = [
       { id: "t1", title: "Minha", ownerId: "u1", dueDate: "2025-10-16", done: false, createdAt: "" },
       { id: "t2", title: "Dele", ownerId: "u2", dueDate: "2025-10-16", done: false, createdAt: "" },
@@ -128,8 +128,7 @@ describe("tarefas e agenda", () => {
     ]
     const leads = [lead({ nextAction: { text: "Ligar", dueDate: "2025-10-14" } }), lead({ id: "l2", ownerId: "u2" })]
     const agenda = myAgenda("u1", leads, tasks, NOW)
-    expect(agenda.map((i) => i.id)).toEqual(["l1", "t1"])
-    expect(agenda[0].bucket).toBe("atrasadas")
+    expect(agenda.map((i) => i.id)).toEqual(["t1"])
   })
 
   it("itens de atenção limitados e ordenados por gravidade", () => {

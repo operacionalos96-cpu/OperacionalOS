@@ -318,13 +318,7 @@ export function myAgenda(userId: string, leads: Lead[], tasks: Task[], now: Date
       items.push({ kind: "task", id: t.id, title: t.title, context: lead?.name, dueDate: t.dueDate, bucket, priority: t.priority })
     }
   }
-  for (const l of leads) {
-    if (l.ownerId !== userId || !isOpenStage(l.stage)) continue
-    const bucket = dueBucket(l.nextAction.dueDate, now)
-    if (bucket === "atrasadas" || bucket === "hoje" || bucket === "semana") {
-      items.push({ kind: "lead", id: l.id, title: l.nextAction.text, context: l.name, dueDate: l.nextAction.dueDate, bucket })
-    }
-  }
+  // Só tarefas criadas. A "próxima ação" de cada lead (ex.: primeiro contato) fica no Pipeline, não aqui.
   return items.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
 
