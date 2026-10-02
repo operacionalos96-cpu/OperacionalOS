@@ -12,7 +12,13 @@ export async function GET() {
     .from("vault_items")
     .select("id, name, url, created_by, updated_by, updated_at, last_revealed_by, last_revealed_at")
     .order("name")
-  if (error) return NextResponse.json({ erro: "Não foi possível abrir o cofre. Rodou o SQL 0008?" }, { status: 500, headers: noStore })
+  if (error) {
+    const missing = error.code === "PGRST205" || error.code === "42P01"
+    return NextResponse.json(
+      { erro: missing ? "A tabela do cofre não existe: rode o SQL 0008 no Supabase." : `Não foi possível abrir o cofre (${error.code}: ${error.message.slice(0, 120)})` },
+      { status: 500, headers: noStore },
+    )
+  }
   return NextResponse.json({ itens: data, segundos: gate.remaining }, { headers: noStore })
 }
 
