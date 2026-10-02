@@ -153,6 +153,8 @@ export interface MindMapEdge {
   label?: string
   /** Sentido da seta: "fim" (→), "inicio" (←), "ambos" (↔, ida e volta) ou "nenhuma". Sem valor: relação → fim; hierarquia → nenhuma. */
   arrow?: "fim" | "inicio" | "ambos" | "nenhuma"
+  /** Curva feita à mão: deslocamento (px) a partir do meio da linha. Sem valor = curva automática. */
+  bend?: { dx: number; dy: number }
   /** Ponto escolhido em cada balão ("l", "r", "t", "b"). Sem valor = o lado mais perto. */
   sourceHandle?: string
   targetHandle?: string

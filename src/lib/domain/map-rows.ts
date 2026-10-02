@@ -62,7 +62,19 @@ export function resolveMaps(maps: MindMap[], nodes: MapNodeRow[], edges: MapEdge
 }
 
 /** Assinatura estável de um balão/linha (para saber o que mudou). */
-export const signature = (x: MindMapNode | MindMapEdge) => JSON.stringify(clean(x), Object.keys(clean(x)).sort())
+export const signature = (x: MindMapNode | MindMapEdge) => stable(x)
+
+/** JSON com as chaves em ordem em TODOS os níveis (campos dentro de campos também contam: decisão, curva da linha…). */
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`
+  if (v && typeof v === "object")
+    return `{${Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => x !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, x]) => `${JSON.stringify(k)}:${stable(x)}`)
+      .join(",")}}`
+  return JSON.stringify(v)
+}
 
 /**
  * O que gravar: itens novos ou alterados desde a última gravação e ids que sumiram.

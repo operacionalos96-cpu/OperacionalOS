@@ -76,3 +76,15 @@ describe("gravar só o que mudou", () => {
     expect(d.remove).toEqual(["b"])
   })
 })
+
+describe("assinatura (o que mudou) vê campos dentro de campos", () => {
+  it("editar a decisão ou a curva da linha conta como mudança", () => {
+    const a = { id: "n", label: "x", x: 0, y: 0, decision: { reason: "barato" } }
+    expect(signature(a)).not.toBe(signature({ ...a, decision: { reason: "rápido" } }))
+    const e = { id: "e", source: "a", target: "b", bend: { dx: 10, dy: 0 } }
+    expect(signature(e)).not.toBe(signature({ ...e, bend: { dx: 10, dy: 40 } }))
+  })
+  it("ordem das chaves e campos vazios não contam", () => {
+    expect(signature({ id: "n", label: "x", x: 0, y: 0, hue: undefined })).toBe(signature({ y: 0, x: 0, label: "x", id: "n" } as never))
+  })
+})

@@ -136,7 +136,7 @@ function flowNode(n: MindMapNode): IdeaNode {
 }
 
 type Arrow = NonNullable<MindMapEdge["arrow"]>
-type LinkData = { kind?: "relacao"; label?: string; arrow?: Arrow }
+type LinkData = { kind?: "relacao"; label?: string; arrow?: Arrow; bend?: { dx: number; dy: number } }
 
 /** Seta padrão: relação aponta para o destino; hierarquia sem seta. */
 const arrowOf = (d: LinkData | undefined): Arrow => d?.arrow ?? (d?.kind === "relacao" ? "fim" : "nenhuma")
@@ -147,7 +147,7 @@ const flowEdge = (e: MindMapEdge): Edge<LinkData> => ({
   target: e.target,
   ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
   ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
-  ...(e.kind || e.label || e.arrow ? { data: { kind: e.kind, label: e.label, arrow: e.arrow } } : {}),
+  ...(e.kind || e.label || e.arrow || e.bend ? { data: { kind: e.kind, label: e.label, arrow: e.arrow, bend: e.bend } } : {}),
 })
 
 /** Linha de hierarquia (pai → filho). Relações livres não contam como filhos. */
@@ -190,6 +190,7 @@ const toMapEdge = (e: Edge): MindMapEdge => {
     kind: d?.kind,
     label: d?.label?.trim() || undefined,
     arrow: d?.arrow,
+    bend: d?.bend ? { dx: Math.round(d.bend.dx), dy: Math.round(d.bend.dy) } : undefined,
     sourceHandle: e.sourceHandle ?? undefined,
     targetHandle: e.targetHandle ?? undefined,
   }
@@ -709,7 +710,7 @@ function Editor({ map }: { map: MindMap }) {
         )}
         <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
           <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco ·
-          arraste as bolinhas para conectar (ou a ponta de uma linha para trocar o ponto) · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
+          arraste as bolinhas para conectar · clique na linha e arraste o ponto do meio para moldar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
         </div>
       </div>
     </MapCtx.Provider>
@@ -1543,13 +1544,37 @@ const EDGE_LABELS = RELATION_KINDS.map((k) => k.label)
  * mostra o tipo, a legenda e "Desvincular". Delete/Backspace também desvincula.
  */
 function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, style, markerEnd, markerStart, data }: EdgeProps) {
-  const { deleteElements } = useReactFlow()
+  const { deleteElements, screenToFlowPosition } = useReactFlow()
   const map = useMap()
   const link = (data ?? {}) as LinkData
   const relation = link.kind === "relacao"
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  const midX = (sourceX + targetX) / 2
+  const midY = (sourceY + targetY) / 2
+  const [autoPath, autoX, autoY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  // Linha moldada à mão: curva que PASSA pelo ponto arrastado (guardado como deslocamento do meio).
+  const bx = link.bend ? midX + link.bend.dx : autoX
+  const by = link.bend ? midY + link.bend.dy : autoY
+  const path = link.bend ? `M ${sourceX},${sourceY} Q ${2 * bx - midX},${2 * by - midY} ${targetX},${targetY}` : autoPath
+  const labelX = bx
+  const labelY = by
+
+  function dragBend(e: React.PointerEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const move = (ev: PointerEvent) => {
+      const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
+      map.setEdgeData(id, { bend: { dx: p.x - midX, dy: p.y - midY } })
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
   // zIndex: por cima dos balões (o rótulo fica numa camada abaixo dos nós por padrão).
   const at = { transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: selected ? 1001 : undefined }
+  const below = { transform: `translate(-50%, 14px) translate(${labelX}px, ${labelY}px)`, zIndex: 1001 }
   return (
     <>
       <BaseEdge
@@ -1566,10 +1591,24 @@ function UnlinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
         }}
       />
       <EdgeLabelRenderer>
+        {selected && (
+          <button
+            type="button"
+            onPointerDown={dragBend}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              map.setEdgeData(id, { bend: undefined })
+            }}
+            className="nodrag nopan pointer-events-auto absolute size-3.5 cursor-grab rounded-full border-2 border-brand bg-card shadow-sm active:cursor-grabbing"
+            style={{ ...at, zIndex: 1002 }}
+            title="Arraste para moldar a linha · duplo clique volta ao normal"
+            aria-label="Moldar a linha"
+          />
+        )}
         {selected ? (
           <div
             className="nodrag nopan pointer-events-auto absolute flex animate-enter flex-col gap-1.5 rounded-lg border bg-card p-1.5 text-xs shadow-lift"
-            style={at}
+            style={below}
             onKeyDown={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
           >
@@ -1677,7 +1716,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.decision ? JSON.stringify(n.decision) : null,
       n.summaryOf ?? null,
     ]),
-    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null]),
+    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null, e.bend ? `${e.bend.dx},${e.bend.dy}` : null]),
   ])
 }
 
