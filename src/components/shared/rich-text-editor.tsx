@@ -17,8 +17,10 @@ import {
   QuoteIcon,
   StrikethroughIcon,
   UnderlineIcon,
+  WandSparklesIcon,
 } from "lucide-react"
-import { toNoteHtml } from "@/lib/domain/rich-text"
+import { useRef } from "react"
+import { convertMarkdownInHtml, looksLikeMarkdown, markdownToHtml, toNoteHtml } from "@/lib/domain/rich-text"
 import { cn } from "@/lib/utils"
 
 const httpOnly = (url: string) => /^https?:\/\//i.test(url)
@@ -29,6 +31,7 @@ const httpOnly = (url: string) => /^https?:\/\//i.test(url)
  * Atalhos: Ctrl+B, Ctrl+I, Ctrl+U, "## " título, "- " lista, "[] " checklist, "> " citação.
  */
 export function RichTextEditor({ value, onChange, placeholder, className }: { value: string; onChange: (html: string) => void; placeholder?: string; className?: string }) {
+  const ref = useRef<Editor | null>(null)
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -47,7 +50,20 @@ export function RichTextEditor({ value, onChange, placeholder, className }: { va
       Placeholder.configure({ placeholder: placeholder ?? "Escreva aqui…" }),
     ],
     content: toNoteHtml(value),
-    editorProps: { attributes: { class: "rich-text min-h-48 outline-none", "aria-label": "Texto da nota" } },
+    editorProps: {
+      attributes: { class: "rich-text min-h-48 outline-none", "aria-label": "Texto da nota" },
+      // Markdown colado (ChatGPT, Notion…) já entra formatado. Se o que veio já é texto formatado, deixa o editor cuidar.
+      handlePaste: (_view, event) => {
+        const text = event.clipboardData?.getData("text/plain") ?? ""
+        const html = event.clipboardData?.getData("text/html") ?? ""
+        if (/<(strong|b|em|h[1-6]|ul|ol|li|blockquote)\b/i.test(html) || !looksLikeMarkdown(text)) return false
+        ref.current?.commands.insertContent(markdownToHtml(text))
+        return true
+      },
+    },
+    onCreate: ({ editor }) => {
+      ref.current = editor
+    },
     onUpdate: ({ editor }) => onChange(editor.isEmpty ? "" : editor.getHTML()),
   })
 
@@ -75,6 +91,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       quote: e.isActive("blockquote"),
       code: e.isActive("codeBlock"),
       link: e.isActive("link"),
+      markdown: looksLikeMarkdown(e.getText({ blockSeparator: "\n" })),
     }),
   })
   const c = () => editor.chain().focus()
@@ -110,6 +127,8 @@ function Toolbar({ editor }: { editor: Editor }) {
     ],
   ]
 
+  const convert = () => editor.commands.setContent(convertMarkdownInHtml(editor.getHTML()), { emitUpdate: true })
+
   return (
     <div className="sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-0.5 rounded-lg border bg-card/95 p-1 backdrop-blur" role="toolbar" aria-label="Formatação">
       {groups.map((g, i) => (
@@ -130,6 +149,16 @@ function Toolbar({ editor }: { editor: Editor }) {
           ))}
         </div>
       ))}
+      {s.markdown && (
+        <button
+          type="button"
+          onClick={convert}
+          title="Transforma ##, **negrito**, --- etc. em formatação"
+          className="ml-auto flex h-7 items-center gap-1.5 rounded-md border border-brand/40 px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          <WandSparklesIcon className="size-3.5 text-brand" /> Converter Markdown
+        </button>
+      )}
     </div>
   )
 }
