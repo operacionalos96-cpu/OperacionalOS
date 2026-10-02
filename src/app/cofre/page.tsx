@@ -28,6 +28,7 @@ interface Secret {
   username?: string
   password?: string
   totp?: string
+  recoveryKey?: string
   recovery?: string
   notes?: string
 }
@@ -36,6 +37,7 @@ const FIELDS: { key: keyof Secret; label: string; secret?: boolean; multiline?: 
   { key: "username", label: "Usuário / e-mail" },
   { key: "password", label: "Senha", secret: true },
   { key: "totp", label: "2FA (chave ou onde está)", secret: true },
+  { key: "recoveryKey", label: "Chave de recuperação", secret: true },
   { key: "recovery", label: "Códigos de recuperação", secret: true, multiline: true },
   { key: "notes", label: "Observações", multiline: true },
 ]

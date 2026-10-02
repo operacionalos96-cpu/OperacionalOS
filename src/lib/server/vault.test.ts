@@ -40,7 +40,7 @@ describe("cofre de senhas", async () => {
       id: undefined,
       name: "Gmail",
       url: "https://gmail.com",
-      secret: { username: undefined, password: "p", totp: undefined, recovery: undefined, notes: undefined },
+      secret: { username: undefined, password: "p", totp: undefined, recoveryKey: undefined, recovery: undefined, notes: undefined },
     })
     for (let i = 0; i < 5; i++) expect(v.allowUnlockAttempt("x")).toBe(true)
     expect(v.allowUnlockAttempt("x")).toBe(false)

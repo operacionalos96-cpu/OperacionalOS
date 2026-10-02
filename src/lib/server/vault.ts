@@ -15,6 +15,8 @@ export interface VaultSecret {
   username?: string
   password?: string
   totp?: string
+  /** Chave/frase de recuperação única (ex.: Apple, cripto, Bitwarden). */
+  recoveryKey?: string
   recovery?: string
   notes?: string
 }
@@ -38,6 +40,7 @@ export function cleanItem(body: unknown): { id?: string; name: string; url?: str
       username: str(s.username, LIMITS.field),
       password: str(s.password, LIMITS.field),
       totp: str(s.totp, LIMITS.field),
+      recoveryKey: str(s.recoveryKey, LIMITS.field),
       recovery: str(s.recovery, LIMITS.field),
       notes: str(s.notes, LIMITS.field),
     },
