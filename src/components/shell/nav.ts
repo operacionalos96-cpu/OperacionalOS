@@ -1,4 +1,4 @@
-import { CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
+import { CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, KeyRoundIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
 
 export interface NavItem {
   href: string
@@ -36,6 +36,7 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
       { href: "/tarefas", label: "Tarefas & Notas", short: "Tarefas", icon: CheckSquareIcon },
       { href: "/mapas", label: "Mapas", icon: NetworkIcon },
       { href: "/metas", label: "Metas", icon: TargetIcon },
+      { href: "/cofre", label: "Cofre", icon: KeyRoundIcon },
     ],
   },
 

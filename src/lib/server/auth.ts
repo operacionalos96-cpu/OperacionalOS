@@ -11,7 +11,7 @@ export async function requireMember() {
   if (!data.user) return null
   const { data: member } = await supabase.from("members").select("team_id").maybeSingle()
   if (!member) return null
-  return { userId: data.user.id, teamId: member.team_id as string }
+  return { userId: data.user.id, teamId: member.team_id as string, email: data.user.email ?? "" }
 }
 
 /** Endereço público do app (fixo na configuração; não confia no cabeçalho Host). */
