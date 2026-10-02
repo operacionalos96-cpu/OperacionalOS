@@ -22,7 +22,13 @@ export async function POST(req: Request) {
   // Confere a senha com um cliente descartável (não mexe na sessão atual do navegador).
   const check = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data, error } = await check.auth.signInWithPassword({ email: member.email, password })
-  if (error || data.user?.id !== member.userId) return NextResponse.json({ erro: "Senha incorreta." }, { status: 401, headers: noStore })
+  if (error) {
+    // Senha errada → mensagem simples. Qualquer outra falha → código do Supabase (nunca a senha), para dar para corrigir.
+    const wrong = error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message)
+    if (!wrong) console.error("[cofre] conferência da senha falhou:", error.status, error.code, error.message)
+    return NextResponse.json({ erro: wrong ? "Senha incorreta." : `Não foi possível conferir a senha (${error.code ?? error.status ?? "erro"}: ${error.message.slice(0, 120)})` }, { status: 401, headers: noStore })
+  }
+  if (data.user?.id !== member.userId) return NextResponse.json({ erro: "Esta senha é de outra conta." }, { status: 401, headers: noStore })
   await check.auth.signOut({ scope: "local" }).catch(() => {}) // descarta a sessão de conferência
 
   const res = NextResponse.json({ ok: true, segundos: UNLOCK_SECONDS }, { headers: noStore })
