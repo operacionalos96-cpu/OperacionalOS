@@ -138,8 +138,8 @@ describe("tarefas e agenda", () => {
     ]
     const tasks: Task[] = [{ id: "t", title: "Atrasada", ownerId: "u1", dueDate: "2025-10-14", done: false, createdAt: "" }]
     const { items, total } = attentionItems({ leads, tasks, txs: [], settings }, NOW, 2)
-    expect(total).toBe(4) // 2 leads + 1 tarefa + meta (0% com ~48% esperado)
-    expect(items.map((i) => i.kind)).toEqual(["acao_vencida", "tarefa_atrasada"])
+    expect(total).toBe(3) // lead parado + tarefa + meta; ação vencida de lead não entra
+    expect(items.map((i) => i.kind)).toEqual(["tarefa_atrasada", "meta"])
   })
 })
 

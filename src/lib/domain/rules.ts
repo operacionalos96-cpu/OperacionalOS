@@ -343,20 +343,9 @@ export function attentionItems(
   const items: (AttentionItem & { sortDays: number })[] = []
 
   for (const l of input.leads) {
+    // A "próxima ação" vencida de cada lead (ex.: primeiro contato) fica no Pipeline, não aqui.
     const urgency = leadUrgency(l, now)
-    if (urgency === "vencida") {
-      const d = daysSince(l.nextAction.dueDate, now)
-      items.push({
-        id: `lead-${l.id}`,
-        severity: 3,
-        kind: "acao_vencida",
-        title: l.name,
-        detail: `${l.nextAction.text} · venceu há ${d} ${d === 1 ? "dia" : "dias"}`,
-        ownerId: l.ownerId,
-        leadId: l.id,
-        sortDays: d,
-      })
-    } else if (urgency === "parado") {
+    if (urgency === "parado") {
       const d = daysSince(l.lastActivityAt, now)
       items.push({
         id: `lead-${l.id}`,
