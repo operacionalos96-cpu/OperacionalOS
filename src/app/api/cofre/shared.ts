@@ -10,6 +10,8 @@ export const noStore = { "Cache-Control": "no-store" }
 export async function requireUnlocked() {
   const member = await requireMember()
   if (!member) return { error: NextResponse.json({ erro: "não autorizado" }, { status: 401, headers: noStore }) }
+  if (!process.env.SUPABASE_SECRET_KEY)
+    return { error: NextResponse.json({ erro: "Cofre sem acesso ao banco: coloque SUPABASE_SECRET_KEY na Vercel e faça Redeploy." }, { status: 503, headers: noStore }) }
   if (!process.env.VAULT_ENCRYPTION_KEY)
     return { error: NextResponse.json({ erro: "Cofre não configurado: coloque VAULT_ENCRYPTION_KEY na Vercel." }, { status: 503, headers: noStore }) }
   const remaining = unlockRemaining((await cookies()).get(UNLOCK_COOKIE)?.value, member.userId)
