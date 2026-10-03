@@ -72,3 +72,18 @@ describe("idempotência", () => {
     expect(idempotencyKey("analyze_website", "lead_123", 2)).not.toBe(idempotencyKey("analyze_website", "lead_123"))
   })
 })
+
+describe("saúde do worker e texto dos eventos de job", async () => {
+  const { workerHealth, describeJobEvent } = await import("./jobs")
+  it("online/idle/offline só pelo heartbeat", () => {
+    const now = Date.parse("2026-10-03T12:00:00Z")
+    expect(workerHealth("2026-10-03T11:59:00Z", now)).toBe("online")
+    expect(workerHealth("2026-10-03T11:40:00Z", now)).toBe("idle")
+    expect(workerHealth("2026-10-03T10:00:00Z", now)).toBe("offline")
+    expect(workerHealth(null, now)).toBe("offline")
+  })
+  it("frases da timeline", () => {
+    expect(describeJobEvent("job.completed", { job_type: "analyze_website" })).toBe("Job Analisar site concluído")
+    expect(describeJobEvent("job.progress", { job_type: "analyze_website", message: "abrindo o site" })).toBe("Job Analisar site progresso: abrindo o site")
+  })
+})

@@ -218,3 +218,34 @@ export function pollAdvice(compatibleQueued: number, idleSeconds: number, cfg = 
 // ---------- idempotência: chaves determinísticas ----------
 
 export const idempotencyKey = (jobType: string, entityId: string, version: string | number = 1) => `${jobType}:${entityId}:v${version}`
+
+// ---------- saúde do worker (só o que temos evidência: heartbeat/atividade) ----------
+
+export type WorkerHealth = "online" | "idle" | "offline"
+/** online = heartbeat há < 2 min; idle = < 30 min; offline = mais que isso (ou nunca). Não diz se o app está aberto. */
+export function workerHealth(lastSeenAt: string | null | undefined, now = Date.now()): WorkerHealth {
+  if (!lastSeenAt) return "offline"
+  const s = (now - new Date(lastSeenAt).getTime()) / 1000
+  return s < 120 ? "online" : s < 1800 ? "idle" : "offline"
+}
+
+const JOB_VERB: Record<string, string> = {
+  "job.created": "criado",
+  "job.claimed": "assumido",
+  "job.started": "iniciado",
+  "job.progress": "progresso",
+  "job.completed": "concluído",
+  "job.failed": "falhou",
+  "job.lease_expired": "lease expirou",
+  "job.dead_lettered": "foi para a dead letter",
+  "job.released": "devolvido à fila",
+  "job.retried": "reenfileirado por humano",
+  "job.cancelled": "cancelado",
+}
+
+/** "Job Analisar site concluído", "Job … progresso: abrindo o site". */
+export function describeJobEvent(type: string, metadata: Record<string, unknown>) {
+  const label = JOB_TYPES[String(metadata.job_type)]?.label ?? String(metadata.job_type ?? "job")
+  const extra = typeof metadata.message === "string" && metadata.message ? `: ${metadata.message}` : typeof metadata.error === "string" ? ` — ${metadata.error}` : ""
+  return `Job ${label} ${JOB_VERB[type] ?? type.replace("job.", "")}${extra}`
+}

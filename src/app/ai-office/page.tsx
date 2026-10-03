@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 import { ActivityIcon, BotIcon, FlaskConicalIcon, LightbulbIcon, PlusIcon } from "lucide-react"
-import { AGENT_STATUS, HYPOTHESIS_NEXT, HYPOTHESIS_STATUS, describeEvent, type Agent, type HypothesisStatus } from "@/lib/domain/ai-office"
+import { AGENT_STATUS, HYPOTHESIS_NEXT, HYPOTHESIS_STATUS, describeEvent, type Agent, type BusinessEvent, type HypothesisStatus } from "@/lib/domain/ai-office"
+import { JOB_TYPES, describeJobEvent } from "@/lib/domain/jobs"
+import { startOps, useOps, type JobRow, type WorkerRow } from "@/components/ai-office/ops-store"
+import { JobsMonitor, STATUS_LABEL } from "@/components/ai-office/jobs-monitor"
+import { WebhooksPanel } from "@/components/ai-office/webhooks-panel"
+import { WorkerHealthLine, WorkersPanel } from "@/components/ai-office/workers-panel"
 import { conversionData, rejectionLabel } from "@/lib/domain/prospecting"
 import { useEventFeed } from "@/lib/event-service"
 import { relative } from "@/lib/format"
@@ -29,10 +34,15 @@ export default function AiOfficePage() {
   const events = useEventFeed((s) => s.events)
   const feedLoaded = useEventFeed((s) => s.loaded)
   const leads = useStore((s) => s.leads)
+  const jobs = useOps((s) => s.jobs)
+  const workers = useOps((s) => s.workers)
+  const opsMissing = useOps((s) => s.missing)
+  const [tab, setTab] = useState<"workforce" | "jobs" | "webhooks" | "workers">("workforce")
 
   useEffect(() => {
     if (agentsLoaded) ensureDefaultAgents()
   }, [agentsLoaded])
+  useEffect(() => startOps(), [])
 
   const ordered = useMemo(() => {
     const order = ["prospector", "web-analyst", "intelligence", "knowledge-manager"]
@@ -46,12 +56,32 @@ export default function AiOfficePage() {
     <div className="flex flex-col">
       <PageHeader title="AI Office" description="Os funcionários IA, o que está acontecendo e o que estamos aprendendo. Mudança de regra só com aprovação humana." />
       <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6">
+        <div className="flex gap-1 border-b text-sm">
+          {(
+            [
+              ["workforce", "AI Workforce"],
+              ["jobs", `Jobs${jobs.some((j) => j.status === "dead_letter") ? " ⚠" : ""}`],
+              ["webhooks", "Webhooks"],
+              ["workers", "Workers"],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className={cn("-mb-px border-b-2 px-3 py-2", tab === id ? "border-brand font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {opsMissing && tab !== "workforce" && <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0011 no Supabase para ativar a fila, os workers e os webhooks.</p>}
+        {tab === "jobs" && <JobsMonitor />}
+        {tab === "webhooks" && <WebhooksPanel />}
+        {tab === "workers" && <WorkersPanel />}
+        {tab === "workforce" && (
+        <>
         {!agentsLoaded ? null : agents.length === 0 ? (
           <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0010 no Supabase para criar os agentes.</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {ordered.map((a) => (
-              <AgentCard key={a.id} agent={a} />
+              <AgentCard key={a.id} agent={a} jobs={jobs.filter((j) => j.agent_id === a.id)} workers={workers.filter((w) => w.agent_id === a.id)} />
             ))}
           </div>
         )}
@@ -73,7 +103,7 @@ export default function AiOfficePage() {
                   <li key={e.id} className="flex gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40">
                     <span className="tabular w-11 shrink-0 text-xs text-muted-foreground">{format(new Date(e.created_at), "HH:mm")}</span>
                     <span className="min-w-0 flex-1">
-                      {describeEvent(e, e.event_type.startsWith("agent.") ? agentName(e.entity_id) : leads.find((l) => l.id === e.entity_id)?.name)}
+                      {feedText(e, e.event_type.startsWith("agent.") ? agentName(e.entity_id) : leads.find((l) => l.id === e.entity_id)?.name)}
                     </span>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{e.actor_type === "human" ? "" : e.actor_type === "agent" ? agentName(e.actor_id) ?? "agente" : "sistema"}</span>
                   </li>
@@ -135,13 +165,25 @@ export default function AiOfficePage() {
           <LearningsPanel />
           <HypothesesPanel />
         </div>
+        </>
+        )}
       </div>
     </div>
   )
 }
 
-function AgentCard({ agent }: { agent: Agent }) {
-  const st = AGENT_STATUS[agent.status]
+/** Frase do feed para qualquer evento (de negócio ou de job). */
+function feedText(e: BusinessEvent, name?: string) {
+  return e.event_type.startsWith("job.") ? describeJobEvent(e.event_type, e.metadata) : describeEvent(e, name)
+}
+
+function AgentCard({ agent, jobs, workers }: { agent: Agent; jobs: JobRow[]; workers: WorkerRow[] }) {
+  // Status real vem da fila: há job em execução → trabalhando; senão o cadastro.
+  const current = jobs.find((j) => j.status === "running" || j.status === "claimed")
+  const queued = jobs.filter((j) => j.status === "queued" || j.status === "retry_scheduled").length
+  const dead = jobs.filter((j) => j.status === "dead_letter").length
+  const lastDone = jobs.filter((j) => j.completed_at).sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? ""))[0]
+  const st = AGENT_STATUS[agent.status === "disabled" ? "disabled" : current ? "working" : dead ? "error" : queued ? "waiting" : agent.status]
   return (
     <article className="grid gap-3 rounded-xl border bg-card p-4">
       <header className="flex items-start gap-3">
@@ -166,12 +208,18 @@ function AgentCard({ agent }: { agent: Agent }) {
       </header>
       <dl className="grid gap-1 text-xs">
         <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Tarefa atual</dt>
-          <dd className="truncate">{agent.currentTask || "—"}</dd>
+          <dt className="text-muted-foreground">Job atual</dt>
+          <dd className="truncate">{current ? `${JOB_TYPES[current.job_type]?.label ?? current.job_type} · ${STATUS_LABEL[current.status]}` : agent.currentTask || "—"}</dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Última atividade</dt>
-          <dd>{agent.lastActivity ? relative(agent.lastActivity) : "—"}</dd>
+          <dt className="text-muted-foreground">Fila</dt>
+          <dd className="tabular">
+            {queued} esperando{dead ? <span className="text-danger"> · {dead} dead letter</span> : null}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-muted-foreground">Última execução</dt>
+          <dd>{lastDone?.completed_at ? relative(lastDone.completed_at) : agent.lastActivity ? relative(agent.lastActivity) : "—"}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">Modelo preferencial</dt>
@@ -186,6 +234,18 @@ function AgentCard({ agent }: { agent: Agent }) {
         </div>
       </dl>
       <p className="text-xs text-muted-foreground">{agent.description}</p>
+      {workers.length > 0 ? (
+        <ul className="grid gap-0.5 border-t pt-2">
+          {workers.map((w) => (
+            <li key={w.id} className="flex flex-col">
+              <span className="text-xs font-medium">{w.name}</span>
+              <WorkerHealthLine w={w} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="border-t pt-2 text-[11px] text-muted-foreground">Nenhum worker conectado (aba Workers).</p>
+      )}
       <div className="flex flex-wrap gap-1">
         {agent.permissions.map((p) => (
           <code key={p} className="rounded bg-muted px-1 py-px text-[10px] text-muted-foreground">
