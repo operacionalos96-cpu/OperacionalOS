@@ -10,8 +10,10 @@ import { deliverDue } from "@/lib/server/webhooks"
 export const maxDuration = 60
 
 function authorized(req: Request) {
-  const secret = process.env.CRON_SECRET ?? ""
-  const got = Buffer.from(req.headers.get("authorization") ?? "")
+  // Espaços/quebras de linha colados junto com o segredo (na Vercel ou no cofre do Supabase) não contam.
+  const secret = (process.env.CRON_SECRET ?? "").trim()
+  const sent = (req.headers.get("authorization") ?? "").trim().replace(/^Bearer\s+/i, "").trim()
+  const got = Buffer.from(`Bearer ${sent}`)
   const want = Buffer.from(`Bearer ${secret}`)
   return secret.length >= 16 && got.length === want.length && timingSafeEqual(got, want)
 }
