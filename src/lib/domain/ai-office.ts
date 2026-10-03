@@ -113,6 +113,10 @@ export interface BusinessEvent {
   actor_id: string
   metadata: Record<string, unknown>
   created_at: string
+  /** Mesma história (ex.: "lead:<id>" do cadastro à venda). */
+  correlation_id?: string | null
+  /** Qual evento/job causou este. */
+  causation_id?: string | null
 }
 
 export interface EventInput {
@@ -120,7 +124,12 @@ export interface EventInput {
   entity: { type: string; id: string }
   actor: { type: ActorType; id: string }
   metadata?: Record<string, unknown>
+  correlationId?: string
+  causationId?: string
 }
+
+/** Correlação padrão: toda a história de um lead compartilha "lead:<id>". */
+export const correlationFor = (entity: { type: string; id: string }) => (entity.type === "lead" ? `lead:${entity.id}` : undefined)
 
 export function makeEvent(input: EventInput, id: string, now: string): BusinessEvent {
   return {
@@ -132,6 +141,8 @@ export function makeEvent(input: EventInput, id: string, now: string): BusinessE
     actor_id: input.actor.id,
     metadata: input.metadata ?? {},
     created_at: now,
+    correlation_id: input.correlationId ?? correlationFor(input.entity) ?? null,
+    causation_id: input.causationId ?? null,
   }
 }
 

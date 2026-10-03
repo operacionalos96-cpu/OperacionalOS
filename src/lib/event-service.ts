@@ -2,7 +2,7 @@
 
 import { create } from "zustand"
 import { makeEvent, type BusinessEvent, type BusinessEventType, type EventInput } from "@/lib/domain/ai-office"
-import { uid } from "@/lib/format"
+import { publicId } from "@/lib/domain/jobs"
 import { supabaseBrowser } from "@/lib/supabase/client"
 
 /**
@@ -37,7 +37,7 @@ function notify(e: BusinessEvent) {
 }
 
 export function recordEvent(input: EventInput): BusinessEvent {
-  const e = makeEvent(input, uid(), new Date().toISOString())
+  const e = makeEvent(input, publicId("evt"), new Date().toISOString())
   useEventFeed.getState().add(e)
   notify(e)
   void supabaseBrowser()

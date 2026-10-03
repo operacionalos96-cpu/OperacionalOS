@@ -260,7 +260,7 @@ export const useStore = create<State>((set, get) => {
       persist(repos().leads.upsert(lead))
       addActivity(lead.id, "criado", "Lead criado")
       const actor = { type: "human" as const, id: get().meId }
-      recordEvent({ type: "lead.created", entity: { type: "lead", id: lead.id }, actor, metadata: { name: lead.name, source: lead.source, segment: lead.segment, city: lead.city } })
+      recordEvent({ type: "lead.created", entity: { type: "lead", id: lead.id }, actor, metadata: { name: lead.name, source: lead.source, segment: lead.segment, city: lead.city, website: lead.website, hasAnalysis: !!lead.analysis } })
       if (lead.analysis)
         recordEvent({ type: "lead.analyzed", entity: { type: "lead", id: lead.id }, actor: { type: lead.analysis.analyzedBy === "planilha" ? "system" : "agent", id: lead.analysis.analyzedBy ?? "planilha" }, metadata: { name: lead.name, ...lead.analysis } })
       return lead

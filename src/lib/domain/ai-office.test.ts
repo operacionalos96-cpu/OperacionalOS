@@ -14,7 +14,7 @@ describe("AI Office", () => {
 
   it("evento no formato da tabela e frase do feed", () => {
     const e = makeEvent({ type: "lead.rejected", entity: { type: "lead", id: "abc123456" }, actor: { type: "human", id: "u2" }, metadata: { name: "Costa Lion", reasonLabel: "Site já é bom" } }, "id-1", "t")
-    expect(e).toEqual({ id: "id-1", event_type: "lead.rejected", entity_type: "lead", entity_id: "abc123456", actor_type: "human", actor_id: "u2", metadata: { name: "Costa Lion", reasonLabel: "Site já é bom" }, created_at: "t" })
+    expect(e).toEqual({ id: "id-1", event_type: "lead.rejected", entity_type: "lead", entity_id: "abc123456", actor_type: "human", actor_id: "u2", metadata: { name: "Costa Lion", reasonLabel: "Site já é bom" }, created_at: "t", correlation_id: "lead:abc123456", causation_id: null })
     expect(describeEvent(e)).toBe("Lead Costa Lion descartado · Site já é bom")
     expect(describeEvent({ event_type: "lead.approved", entity_id: "xyz7890", metadata: {} })).toBe("Lead #xyz789 aprovado")
     expect(describeEvent({ event_type: "agent.completed", entity_id: "web-analyst", metadata: { task: "análise" } }, "Web Analyst")).toBe("Web Analyst concluiu análise")
