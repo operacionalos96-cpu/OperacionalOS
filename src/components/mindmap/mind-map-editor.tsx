@@ -51,10 +51,12 @@ import {
 } from "@/lib/domain/mindmap"
 import { DRAW_LIMITS, LAYER_MOVES, ZOOM_LIMITS, drawingFromStroke, gridGap, moveLayer, organize, pathBox, pathD, roundScale, scaleForZoom, scaleOf, scaleSet, zOf, type LayerMove, type ScalePatch, type SizedItem } from "@/lib/domain/canvas"
 import { NoteBranches } from "@/components/mindmap/node-notes"
+import { AiCommand, type AiScope, type ScopeRow } from "@/components/mindmap/ai-command"
+import { addNote, makeNote } from "@/lib/domain/node-notes"
 import { autocorrected, spellProps } from "@/lib/use-autocorrect"
 import { correctText } from "@/lib/domain/autocorrect"
 import { NodePanel } from "@/components/mindmap/node-panel"
-import { outlineText, type AiAction, type AiResult } from "@/lib/domain/ai-map"
+import { outlineText, type AiAction, type AiResult, type MapOp } from "@/lib/domain/ai-map"
 import { EntityChip } from "@/components/entities/entity-bits"
 import { getUser } from "@/config/team"
 import { NODE_KIND_ICON } from "@/components/mindmap/node-kinds"
@@ -411,6 +413,8 @@ function useMapHistory(
 ) {
   const hist = useRef<History<Snapshot> | null>(null)
   const pending = useRef<{ timer: ReturnType<typeof setTimeout>; snap: Snapshot } | null>(null)
+  // Próxima mudança se junta ao passo anterior (ex.: aplicar a IA + organizar = um Ctrl+Z).
+  const merge = useRef(false)
   const [, bump] = useState(0)
 
   const commit = useCallback(() => {
@@ -419,8 +423,9 @@ function useMapHistory(
     clearTimeout(p.timer)
     pending.current = null
     if (p.snap.key === hist.current.present.key) return
-    hist.current = remoteApplied.current ? replacePresent(hist.current, p.snap) : record(hist.current, p.snap)
+    hist.current = remoteApplied.current || merge.current ? replacePresent(hist.current, p.snap) : record(hist.current, p.snap)
     remoteApplied.current = false
+    merge.current = false
     bump((x) => x + 1)
   }, [remoteApplied])
 
@@ -473,6 +478,11 @@ function useMapHistory(
   return {
     undo: () => go("undo"),
     redo: () => go("redo"),
+    /** A mudança que vem a seguir entra no mesmo passo do Ctrl+Z que a última. */
+    mergeNext: () => {
+      commit()
+      merge.current = true
+    },
     canUndo: !!hist.current?.past.length || !!pending.current,
     canRedo: !!hist.current?.future.length,
   }
@@ -932,17 +942,22 @@ function Editor({ map }: { map: MindMap }) {
    * a regra garante que filho nunca fica do tamanho do pai ou maior. Sem IA
    * (fora do ar, limite), usa só a hierarquia. Dá para desfazer.
    */
-  async function organizeSelected() {
-    const items = selectedAll.filter((n) => n.type === "idea")
+  function organizeSelected() {
+    return organizeNodes(selectedAll.filter((n) => n.type === "idea"), nodes, edges, true)
+  }
+
+  /** Organiza estes balões (importância → tamanhos → árvore). `useAi` = pede a importância para a IA. */
+  async function organizeNodes(items: IdeaNode[], allNodes: IdeaNode[], allEdges: Edge[], useAi: boolean) {
     if (items.length < 2) return
     const ids = new Set(items.map((n) => n.id))
-    if (!links.some((l) => l.kind !== "relacao" && ids.has(l.source) && ids.has(l.target)))
+    const allLinks = allEdges.map(toMapEdge)
+    if (!allLinks.some((l) => l.kind !== "relacao" && ids.has(l.source) && ids.has(l.target)))
       return toast("Nenhuma linha de hierarquia entre os selecionados", { description: "Ligue os balões (pai → filho) e tente de novo." })
-    setSizing(true)
-    const rows = outline(items.map(toMapNode), links)
+    const rows = outline(items.map(toMapNode), allLinks)
     let suggested: Map<string, number> | undefined
     let usedAi = false
-    try {
+    if (useAi) setSizing(true)
+    if (useAi) try {
       const res = await fetch("/api/ia/mapa", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -957,13 +972,97 @@ function Editor({ map }: { map: MindMap }) {
       // Sem IA: segue só pela hierarquia.
     }
     setSizing(false)
-    applyScale(organize(items.map(sized), links, suggested))
+    // Tamanhos medidos mais recentes (balões que acabaram de nascer já foram medidos).
+    const fresh = new Map(allNodes.map((n) => [n.id, n]))
+    applyScale(organize(items.map((n) => sized(fresh.get(n.id) ?? n)), allLinks, suggested))
     // Árvore da esquerda para a direita: as linhas do conjunto saem pela direita do pai e entram pela esquerda do filho.
     setEdges((es) => es.map((e) => (isHierarchy(e) && ids.has(e.source) && ids.has(e.target) ? { ...e, sourceHandle: "r", targetHandle: "l" } : e)))
     toast.success(usedAi ? "Mapa organizado pela importância (IA)" : "Mapa organizado pela hierarquia", {
-      description: usedAi ? "Principal maior, detalhes menores, cada ramo no seu lugar. Ctrl+Z desfaz." : "A IA não respondeu agora; usei só as linhas pai → filho. Ctrl+Z desfaz.",
+      description: usedAi ? "Principal maior, detalhes menores, cada ramo no seu lugar. Ctrl+Z desfaz." : useAi ? "A IA não respondeu agora; usei só as linhas pai → filho. Ctrl+Z desfaz." : "Cada ramo no seu lugar. Ctrl+Z desfaz.",
       action: { label: "Desfazer", onClick: history.undo },
     })
+  }
+
+  // Pedido livre à IA: sobre os balões selecionados ou o mapa inteiro.
+  const meId = useStore((s) => s.meId)
+  const latest = useRef({ nodes, edges })
+  latest.current = { nodes, edges }
+
+  function aiScope(): AiScope {
+    const sel = nodes.filter((n) => n.selected && n.type === "idea")
+    const scope = sel.length ? sel : nodes.filter((n) => n.type === "idea")
+    const rows = outline(scope.map(toMapNode), links)
+    return {
+      label: sel.length ? `${sel.length} ${sel.length === 1 ? "balão selecionado" : "balões selecionados"}` : "o mapa inteiro",
+      mapTitle: map.title,
+      outline: outlineText(rows),
+      rows: rows.map((r) => ({ number: r.number, id: r.node.id, label: r.node.label })),
+    }
+  }
+
+  /** Aplica as mudanças escolhidas do rascunho da IA, tudo de uma vez (um Ctrl+Z desfaz). */
+  function applyPlan(ops: MapOp[], organizeAfter: boolean, rows: ScopeRow[]) {
+    const idOf = new Map(rows.map((r) => [r.number, r.id]))
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    const created = new Map<string, { id: string; position: { x: number; y: number }; scale?: number }>()
+    const childCount = new Map<string, number>()
+    const newNodes: IdeaNode[] = []
+    const newEdges: Edge[] = []
+    const patches = new Map<string, Partial<IdeaData>>()
+    const removed = new Set<string>()
+    const patch = (id: string, p: Partial<IdeaData>) => patches.set(id, { ...patches.get(id), ...p })
+    const scopeNodes = rows.map((r) => byId.get(r.id)).filter((n): n is IdeaNode => !!n)
+    const bottom = scopeNodes.length ? Math.max(...scopeNodes.map((n) => n.position.y + box(n).height)) : 0
+    const left = scopeNodes.length ? Math.min(...scopeNodes.map((n) => n.position.x)) : 0
+    let loose = 0
+
+    for (const op of ops) {
+      if (op.op === "adicionar") {
+        const parentId = op.parent ? (idOf.get(op.parent) ?? created.get(op.parent)?.id) : undefined
+        const parentNode = parentId ? byId.get(parentId) : undefined
+        const parentNew = op.parent ? created.get(op.parent) : undefined
+        const parent = parentNode ? { position: parentNode.position, scale: parentNode.data.scale } : parentNew
+        const id = uid()
+        let position: { x: number; y: number }
+        if (parentId && parent) {
+          const existing = edges.filter((e) => e.source === parentId && isHierarchy(e) && (dirOfHandle(e.sourceHandle) ?? "direita") === "direita").length
+          const i = existing + (childCount.get(parentId) ?? 0)
+          childCount.set(parentId, (childCount.get(parentId) ?? 0) + 1)
+          position = childPosition(parent.position, "direita", i, parent.scale ?? 1)
+        } else position = { x: left, y: bottom + 120 + loose++ * ROW_DY }
+        const scale = parent?.scale
+        newNodes.push({ id, type: "idea", position, data: { label: op.label, ...(op.description ? { description: op.description } : {}), ...(scale ? { scale } : {}) } })
+        if (parentId) newEdges.push({ id: uid(), source: parentId, target: id, sourceHandle: "r", targetHandle: "l" })
+        if (op.ref) created.set(op.ref, { id, position, scale })
+      } else {
+        const id = idOf.get(op.target)
+        if (!id) continue
+        if (op.op === "renomear") patch(id, { label: op.label })
+        else if (op.op === "descrever") patch(id, { description: op.description })
+        else if (op.op === "anotar") {
+          const note = makeNote({ kind: op.kind, text: op.text, app: op.app }, meId, uid())
+          if (note) patch(id, { notes: addNote(patches.get(id)?.notes ?? byId.get(id)?.data.notes, note) })
+        } else if (op.op === "remover") removed.add(id)
+      }
+    }
+
+    setNodes((ns) => [
+      ...ns.filter((n) => !removed.has(n.id)).map((n) => (patches.has(n.id) ? { ...n, data: { ...n.data, ...patches.get(n.id) } } : n)),
+      ...newNodes,
+    ])
+    setEdges((es) => [...es.filter((e) => !removed.has(e.source) && !removed.has(e.target)), ...newEdges])
+    const total = ops.length
+    if (total) toast.success(`${total} ${total === 1 ? "mudança aplicada" : "mudanças aplicadas"}`, { description: "Ctrl+Z desfaz tudo de uma vez.", action: { label: "Desfazer", onClick: history.undo } })
+
+    // Organizar depois: espera os balões novos serem medidos.
+    if (organizeAfter) {
+      const ids = new Set([...rows.map((r) => r.id), ...newNodes.map((n) => n.id)].filter((id) => !removed.has(id)))
+      setTimeout(() => {
+        const cur = latest.current
+        history.mergeNext()
+        organizeNodes(cur.nodes.filter((n) => ids.has(n.id) && n.type === "idea"), cur.nodes, cur.edges, false)
+      }, 450)
+    }
   }
 
   /** Volta os selecionados ao tamanho normal (sem ampliação e sem tamanho fixo): conserta balões distorcidos. */
@@ -1016,7 +1115,7 @@ function Editor({ map }: { map: MindMap }) {
         >
           <InfiniteBackground />
           <MapControls onPresent={() => setPresenting(0)} history={history} />
-          {presenting === null && <ToolPanel tool={tool} setTool={setTool} pen={pen} setPen={setPen} />}
+          {presenting === null && <ToolPanel tool={tool} setTool={setTool} pen={pen} setPen={setPen} ai={<AiCommand getScope={aiScope} onApply={applyPlan} />} />}
           {presenting !== null && (
             <Panel position="bottom-center" className="!mb-6">
               <div className="flex animate-enter items-center gap-1 rounded-xl border bg-card p-1 shadow-lift">
@@ -2237,7 +2336,7 @@ function LayerMenu({ ids }: { ids: string[] }) {
  * Ferramentas do quadro: selecionar (V), texto (T) e desenhar (D).
  * Desenhando: cor e espessura da caneta.
  */
-function ToolPanel({ tool, setTool, pen, setPen }: { tool: Tool; setTool: (t: Tool) => void; pen: { hue?: number; size: number }; setPen: (p: { hue?: number; size: number }) => void }) {
+function ToolPanel({ tool, setTool, pen, setPen, ai }: { tool: Tool; setTool: (t: Tool) => void; pen: { hue?: number; size: number }; setPen: (p: { hue?: number; size: number }) => void; ai: React.ReactNode }) {
   const tools: { id: Tool; label: string; icon: React.ComponentType<{ className?: string }>; key: string }[] = [
     { id: "selecionar", label: "Selecionar e mover", icon: MousePointer2Icon, key: "V" },
     { id: "texto", label: "Texto no quadro: clique onde quer escrever", icon: TypeIcon, key: "T" },
@@ -2245,6 +2344,7 @@ function ToolPanel({ tool, setTool, pen, setPen }: { tool: Tool; setTool: (t: To
   ]
   return (
     <Panel position="top-left" className="flex items-start gap-2">
+      <div className="flex flex-col gap-2">
       <div className="flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
         {tools.map((t, i) => (
           <Tooltip key={t.id}>
@@ -2268,6 +2368,9 @@ function ToolPanel({ tool, setTool, pen, setPen }: { tool: Tool; setTool: (t: To
             </TooltipContent>
           </Tooltip>
         ))}
+      </div>
+      {/* IA para pedidos gerais sobre o mapa. */}
+      {ai}
       </div>
       {tool === "desenhar" && (
         <div className="flex animate-enter items-center gap-2 rounded-lg border bg-card p-1.5 shadow-lift">
@@ -2523,7 +2626,7 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
  * Zoom e enquadrar com o visual do app (os controles padrão da biblioteca ficavam
  * claro-sobre-claro no tema escuro). Nome de cada botão aparece ao passar o mouse.
  */
-function MapControls({ onPresent, history }: { onPresent: () => void; history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } }) {
+function MapControls({ onPresent, history }: { onPresent: () => void; history: Pick<ReturnType<typeof useMapHistory>, "undo" | "redo" | "canUndo" | "canRedo"> }) {
   const { zoomIn, zoomOut, fitView, zoomTo } = useReactFlow()
   const zoom = useFlowStore((st) => st.transform[2])
   const buttons = [

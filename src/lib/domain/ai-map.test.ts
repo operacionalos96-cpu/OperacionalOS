@@ -29,6 +29,53 @@ describe("IA no mapa", () => {
     expect(parseAiResult("resumir", { items: [] })).toBeNull()
   })
 
+  it("pedido livre: exige o pedido e monta o prompt com as operações", () => {
+    expect(validateAiRequest({ action: "pedido", focus: { label: "Mapa" }, outline: "1 A" })).toBeNull()
+    const r = validateAiRequest({ action: "pedido", focus: { label: "Mapa" }, outline: "1 A", request: "  sugira passos  " })!
+    expect(r.request).toBe("sugira passos")
+    const p = buildPrompt(r)
+    expect(p).toContain('"sugira passos"')
+    expect(p).toContain('"op":"adicionar"')
+  })
+
+  it("pedido livre: lê o plano com desconfiança", () => {
+    const raw = {
+      answer: "  Faltam métricas. ",
+      organize: true,
+      ops: [
+        { op: "adicionar", ref: "n1", parent: "1.2", label: "Funil" },
+        { op: "adicionar", parent: "n1", label: "Topo" }, // pai = balão novo criado antes
+        { op: "adicionar", parent: "n9", label: "Pai inexistente" }, // vira solto
+        { op: "adicionar", label: "" }, // sem texto: fora
+        { op: "renomear", target: "1", label: "Operação" },
+        { op: "renomear", target: "abc", label: "x" }, // número inválido: fora
+        { op: "anotar", target: "1.1", kind: "citacao", text: "", app: "Hotmart" },
+        { op: "anotar", target: "1.1", kind: "estranho", text: "ok" }, // tipo desconhecido → comentário
+        { op: "apagar_tudo" }, // desconhecida: fora
+        { op: "remover", target: "1.3" },
+      ],
+    }
+    const r = parseAiResult("pedido", raw)
+    expect(r).toEqual({
+      plan: {
+        answer: "Faltam métricas.",
+        organize: true,
+        ops: [
+          { op: "adicionar", ref: "n1", parent: "1.2", label: "Funil" },
+          { op: "adicionar", parent: "n1", label: "Topo" },
+          { op: "adicionar", label: "Pai inexistente" },
+          { op: "renomear", target: "1", label: "Operação" },
+          { op: "anotar", target: "1.1", kind: "citacao", text: "", app: "Hotmart" },
+          { op: "anotar", target: "1.1", kind: "comentario", text: "ok" },
+          { op: "remover", target: "1.3" },
+        ],
+      },
+    })
+    expect(parseAiResult("pedido", { answer: "", ops: [] })).toBeNull()
+    const many = { ops: Array.from({ length: 50 }, (_, i) => ({ op: "adicionar", label: `x${i}` })) }
+    expect((parseAiResult("pedido", many) as { plan: { ops: unknown[] } }).plan.ops).toHaveLength(30)
+  })
+
   it("hierarquia: aceita só números da lista e níveis válidos", () => {
     expect(validateAiRequest({ action: "hierarquia", focus: { label: "Raiz" }, outline: "1 Raiz" })?.action).toBe("hierarquia")
     expect(buildPrompt({ action: "hierarquia", mapTitle: "M", focus: { label: "Raiz" }, outline: "1 Raiz" })).toContain('{"levels"')

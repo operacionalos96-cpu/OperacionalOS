@@ -34,7 +34,7 @@ export async function generateJson(prompt: string): Promise<string> {
       headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 1024 },
+        generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 2048 },
       }),
       signal: AbortSignal.timeout(10_000),
     }).catch(() => undefined) // demorou demais: tenta o próximo modelo
