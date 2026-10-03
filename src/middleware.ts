@@ -11,6 +11,10 @@ const PUBLIC_PATHS = [
   "/api/integracoes/sincronizar",
   // Vendas da Hotmart/Kiwify: a rota exige o segredo de cada plataforma.
   "/api/webhooks",
+  // AI Office: workers (REST/MCP) entram com token próprio; o agendador com CRON_SECRET.
+  "/api/workers",
+  "/api/mcp",
+  "/api/runner",
 ]
 
 export async function middleware(request: NextRequest) {
