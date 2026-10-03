@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { drawingFromStroke, gridGap, levelsInSet, moveLayer, pathBox, resizeByHierarchy, roundScale, scaleForZoom, scaleSet, simplify, visualLevels, zOf } from "./canvas"
+import { TREE_GAP, drawingFromStroke, gridGap, levelsInSet, moveLayer, organize, pathBox, resizeByHierarchy, roundScale, scaleForZoom, scaleSet, simplify, tidyTree, visualLevels, zOf } from "./canvas"
 
 describe("zoom infinito", () => {
   it("balão nasce do tamanho da tela: aproximou 10x, nasce 10x menor", () => {
@@ -88,6 +88,46 @@ describe("tamanho pela hierarquia", () => {
     // centro (350, 20) continua no mesmo lugar: 100*1.6 = 160 de largura
     expect(out[1].x).toBe(270)
     expect(out[1].y).toBe(-12)
+  })
+})
+
+describe("organizar em árvore", () => {
+  // r → a, r → b, a → c (c fora do lugar, embaixo de tudo)
+  const edges = [
+    { source: "r", target: "a" },
+    { source: "r", target: "b" },
+    { source: "a", target: "c" },
+  ]
+  const items = [
+    { id: "r", x: 0, y: 0, w: 200, h: 60 },
+    { id: "a", x: 500, y: -300, w: 100, h: 40 },
+    { id: "b", x: 50, y: 400, w: 100, h: 40 },
+    { id: "c", x: -300, y: 900, w: 100, h: 40 },
+  ]
+  const overlap = (p: { x: number; y: number }, a: { w: number; h: number }, q: { x: number; y: number }, b: { w: number; h: number }) =>
+    p.x < q.x + b.w && q.x < p.x + a.w && p.y < q.y + b.h && q.y < p.y + a.h
+
+  it("raiz fica no lugar; filhos à direita, netos mais à direita; nada se sobrepõe", () => {
+    const pos = tidyTree(items, edges)
+    const r = pos.get("r")!
+    const a = pos.get("a")!
+    const b = pos.get("b")!
+    const c = pos.get("c")!
+    expect(r.x).toBe(0)
+    expect(r.y + 30).toBeCloseTo(30) // centro da raiz não mudou
+    expect(a.x).toBe(200 + TREE_GAP.x)
+    expect(c.x).toBe(a.x + 100 + TREE_GAP.x)
+    expect(a.y).toBeLessThan(b.y) // ordem de cima para baixo mantida
+    const all = items.map((i) => [pos.get(i.id)!, i] as const)
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) expect(overlap(all[i][0], all[i][1], all[j][0], all[j][1])).toBe(false)
+  })
+
+  it("organizar: filhos menores que o pai e ainda sem sobrepor", () => {
+    const out = new Map(organize(items, edges).map((p) => [p.id, p]))
+    expect(out.get("r")!.scale).toBeUndefined()
+    expect(out.get("a")!.scale).toBe(0.8)
+    expect(out.get("c")!.scale).toBe(0.64)
+    expect(out.get("c")!.x).toBeGreaterThan(out.get("a")!.x)
   })
 })
 

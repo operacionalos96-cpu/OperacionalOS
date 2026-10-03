@@ -168,6 +168,77 @@ export function resizeByHierarchy(items: SizedItem[], edges: Link[], suggested?:
   })
 }
 
+// ---------- organizar em árvore ----------
+
+/** Distâncias da árvore (multiplicadas pela ampliação do filho). */
+export const TREE_GAP = { x: 90, y: 28 }
+
+/**
+ * Organiza o conjunto como árvore da esquerda para a direita, seguindo as linhas
+ * de hierarquia: raiz → filhos → netos, cada ramo no seu "andar", sem sobrepor,
+ * pai centralizado nos filhos. A ordem dos irmãos é a de cima para baixo atual.
+ * A primeira raiz fica onde está (canto esquerdo e centro vertical); outras raízes
+ * (itens sem pai no conjunto) vêm logo abaixo. Devolve a nova posição de cada item.
+ */
+export function tidyTree(items: SizedItem[], edges: Link[]): Map<string, { x: number; y: number }> {
+  const byId = new Map(items.map((i) => [i.id, i]))
+  const levels = levelsInSet(items.map((i) => i.id), edges)
+  const children = new Map<string, SizedItem[]>()
+  for (const [id, l] of levels) if (l.parent) children.set(l.parent, [...(children.get(l.parent) ?? []), byId.get(id)!])
+  const centerY = (i: SizedItem) => i.y + i.h / 2
+  for (const list of children.values()) list.sort((a, b) => centerY(a) - centerY(b) || a.x - b.x)
+
+  // Altura que cada ramo ocupa.
+  const span = new Map<string, number>()
+  const measure = (i: SizedItem): number => {
+    const kids = children.get(i.id) ?? []
+    const gap = TREE_GAP.y * (i.scale ?? 1)
+    const kidsH = kids.reduce((acc, k) => acc + measure(k), 0) + gap * Math.max(0, kids.length - 1)
+    const h = Math.max(i.h, kidsH)
+    span.set(i.id, h)
+    return h
+  }
+
+  const out = new Map<string, { x: number; y: number }>()
+  const place = (i: SizedItem, x: number, top: number) => {
+    const h = span.get(i.id)!
+    out.set(i.id, { x: r1(x), y: r1(top + (h - i.h) / 2) })
+    const kids = children.get(i.id) ?? []
+    const kidsH = kids.reduce((acc, k) => acc + span.get(k.id)!, 0) + TREE_GAP.y * (i.scale ?? 1) * Math.max(0, kids.length - 1)
+    let y = top + (h - kidsH) / 2
+    for (const k of kids) {
+      place(k, x + i.w + TREE_GAP.x * (k.scale ?? 1), y)
+      y += span.get(k.id)! + TREE_GAP.y * (i.scale ?? 1)
+    }
+  }
+
+  const roots = items.filter((i) => !levels.get(i.id)?.parent).sort((a, b) => centerY(a) - centerY(b) || a.x - b.x)
+  if (!roots.length) return out
+  for (const r of roots) measure(r)
+  const first = roots[0]
+  let top = centerY(first) - span.get(first.id)! / 2
+  for (const r of roots) {
+    place(r, first.x, top)
+    top += span.get(r.id)! + TREE_GAP.y * 2 * (first.scale ?? 1)
+  }
+  return out
+}
+
+/**
+ * "Organizar": tamanho pela importância (hierarquia + sugestão da IA) e depois
+ * a árvore arrumada com os tamanhos novos. Uma única mudança (um Ctrl+Z desfaz).
+ */
+export function organize(items: SizedItem[], edges: Link[], suggested?: Map<string, number>): ScalePatch[] {
+  const sizedPatches = resizeByHierarchy(items, edges, suggested)
+  const resized: SizedItem[] = items.map((i, k) => {
+    const p = sizedPatches[k]
+    const f = (p.scale ?? 1) / (i.scale ?? 1)
+    return { ...i, w: i.w * f, h: i.h * f, scale: p.scale, width: p.width, height: p.height }
+  })
+  const pos = tidyTree(resized, edges)
+  return sizedPatches.map((p) => ({ ...p, ...(pos.get(p.id) ?? {}) }))
+}
+
 // ---------- desenho à mão ----------
 
 /** Limites do traço: cabe com folga no registro do balão no banco. */

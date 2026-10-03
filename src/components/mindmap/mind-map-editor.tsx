@@ -31,7 +31,7 @@ import {
   useStore as useFlowStore,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon, MousePointer2Icon, TypeIcon, PencilIcon, LayersIcon, MessageSquareIcon, MessageSquarePlusIcon, NetworkIcon, ZoomInIcon } from "lucide-react"
+import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon, MousePointer2Icon, Undo2Icon, Redo2Icon, TypeIcon, PencilIcon, LayersIcon, MessageSquareIcon, MessageSquarePlusIcon, NetworkIcon, ZoomInIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
@@ -49,7 +49,7 @@ import {
   resolveLinkedTask,
   type NodeKind,
 } from "@/lib/domain/mindmap"
-import { DRAW_LIMITS, LAYER_MOVES, ZOOM_LIMITS, drawingFromStroke, gridGap, moveLayer, pathBox, pathD, resizeByHierarchy, roundScale, scaleForZoom, scaleOf, scaleSet, zOf, type LayerMove, type ScalePatch, type SizedItem } from "@/lib/domain/canvas"
+import { DRAW_LIMITS, LAYER_MOVES, ZOOM_LIMITS, drawingFromStroke, gridGap, moveLayer, organize, pathBox, pathD, roundScale, scaleForZoom, scaleOf, scaleSet, zOf, type LayerMove, type ScalePatch, type SizedItem } from "@/lib/domain/canvas"
 import { NoteBranches } from "@/components/mindmap/node-notes"
 import { autocorrected, spellProps } from "@/lib/use-autocorrect"
 import { correctText } from "@/lib/domain/autocorrect"
@@ -66,6 +66,7 @@ import { Chip } from "@/components/shared/fields"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { MindMap, MindMapEdge, MindMapNode } from "@/lib/domain/types"
 import { diffItems, edgeRow, isRowMap, nodeRow, rowId, signature } from "@/lib/domain/map-rows"
+import { record, redo, replacePresent, startHistory, undo, type History } from "@/lib/domain/history"
 import { useMindMaps } from "@/lib/maps"
 import { RELATION_KINDS } from "@/lib/entities/types"
 import { useMapEdges, useMapNodes } from "@/lib/modules"
@@ -276,6 +277,7 @@ function useMapSync(
   edges: Edge[],
   setNodes: React.Dispatch<React.SetStateAction<IdeaNode[]>>,
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>,
+  remoteApplied: React.RefObject<boolean>,
 ) {
   const saveMap = useStore((s) => s.saveMap)
   const rows = isRowMap(map)
@@ -331,6 +333,7 @@ function useMapSync(
       if (key === lastSaved.current) return
       lastSaved.current = key
       const fresh = toFlow(map)
+      remoteApplied.current = true
       setNodes((current) => {
         const selected = new Set(current.filter((n) => n.selected).map((n) => n.id))
         return fresh.nodes.map((n) => ({ ...n, selected: selected.has(n.id) }))
@@ -345,6 +348,7 @@ function useMapSync(
     const changed = map.nodes.filter((n) => before.get(n.id) !== signature(n))
     const gone = [...before.keys()].filter((id) => !remote.has(id))
     if (changed.length || gone.length) {
+      remoteApplied.current = true
       for (const n of changed) savedNodes.current.set(n.id, signature(n))
       for (const id of gone) savedNodes.current.delete(id)
       const goneSet = new Set(gone)
@@ -369,6 +373,7 @@ function useMapSync(
     const changedE = map.edges.filter((e) => beforeE.get(e.id) !== signature(e))
     const goneE = [...beforeE.keys()].filter((id) => !remoteE.has(id))
     if (changedE.length || goneE.length) {
+      remoteApplied.current = true
       for (const e of changedE) savedEdges.current.set(e.id, signature(e))
       for (const id of goneE) savedEdges.current.delete(id)
       const goneSet = new Set(goneE)
@@ -381,7 +386,96 @@ function useMapSync(
         return next
       })
     }
-  }, [map, rows, setNodes, setEdges])
+  }, [map, rows, setNodes, setEdges, remoteApplied])
+}
+
+type Snapshot = { nodes: MindMapNode[]; edges: MindMapEdge[]; key: string }
+
+const snapshotOf = (nodes: IdeaNode[], edges: Edge[]): Snapshot => {
+  const ns = nodes.map(toMapNode)
+  const es = edges.map(toMapEdge)
+  return { nodes: ns, edges: es, key: JSON.stringify([ns.map(signature), es.map(signature)]) }
+}
+
+/**
+ * Ctrl+Z / Ctrl+Shift+Z (ou Ctrl+Y) no mapa. Cada pausa de edição (~0,4s) vira um
+ * passo: arrastar, digitar, organizar, apagar… Seleção e medidas não contam.
+ * Desfazer grava normalmente (o sócio vê o mapa voltar).
+ */
+function useMapHistory(
+  nodes: IdeaNode[],
+  edges: Edge[],
+  setNodes: React.Dispatch<React.SetStateAction<IdeaNode[]>>,
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>,
+  remoteApplied: React.RefObject<boolean>,
+) {
+  const hist = useRef<History<Snapshot> | null>(null)
+  const pending = useRef<{ timer: ReturnType<typeof setTimeout>; snap: Snapshot } | null>(null)
+  const [, bump] = useState(0)
+
+  const commit = useCallback(() => {
+    const p = pending.current
+    if (!p || !hist.current) return
+    clearTimeout(p.timer)
+    pending.current = null
+    if (p.snap.key === hist.current.present.key) return
+    hist.current = remoteApplied.current ? replacePresent(hist.current, p.snap) : record(hist.current, p.snap)
+    remoteApplied.current = false
+    bump((x) => x + 1)
+  }, [remoteApplied])
+
+  useEffect(() => {
+    const snap = snapshotOf(nodes, edges)
+    if (!hist.current) {
+      hist.current = startHistory(snap)
+      return
+    }
+    if (snap.key === (pending.current?.snap.key ?? hist.current.present.key)) return
+    if (pending.current) clearTimeout(pending.current.timer)
+    pending.current = { snap, timer: setTimeout(commit, 400) }
+  }, [nodes, edges, commit])
+
+  const restore = useCallback(
+    (snap: Snapshot) => {
+      // Reaproveita o que não mudou (sem piscar: o React Flow não precisa medir de novo).
+      setNodes((current) => {
+        const byId = new Map(current.map((n) => [n.id, n]))
+        return snap.nodes.map((n) => {
+          const cur = byId.get(n.id)
+          if (cur && signature(toMapNode(cur)) === signature(n)) return cur
+          return { ...flowNode(n), selected: !!cur?.selected, ...(cur?.measured ? { measured: cur.measured } : {}) }
+        })
+      })
+      setEdges((current) => {
+        const byId = new Map(current.map((e) => [e.id, e]))
+        return snap.edges.map((e) => {
+          const cur = byId.get(e.id)
+          return cur && signature(toMapEdge(cur)) === signature(e) ? cur : { ...flowEdge(e), selected: !!cur?.selected }
+        })
+      })
+    },
+    [setNodes, setEdges],
+  )
+
+  const go = useCallback(
+    (dir: "undo" | "redo") => {
+      commit() // a edição de agora vira passo antes de desfazer
+      if (!hist.current) return
+      const next = dir === "undo" ? undo(hist.current) : redo(hist.current)
+      if (!next) return
+      hist.current = next
+      restore(next.present)
+      bump((x) => x + 1)
+    },
+    [commit, restore],
+  )
+
+  return {
+    undo: () => go("undo"),
+    redo: () => go("redo"),
+    canUndo: !!hist.current?.past.length || !!pending.current,
+    canRedo: !!hist.current?.future.length,
+  }
 }
 
 export function MindMapEditor({ map }: { map: MindMap }) {
@@ -398,7 +492,10 @@ function Editor({ map }: { map: MindMap }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges)
   const [editingId, setEditingId] = useState<string | null>(null)
   const { screenToFlowPosition, flowToScreenPosition, getZoom, setCenter, fitView } = useReactFlow()
-  useMapSync(map, nodes, edges, setNodes, setEdges)
+  // Mudança que veio do sócio: entra no histórico sem virar um passo do Ctrl+Z daqui.
+  const remoteApplied = useRef(false)
+  useMapSync(map, nodes, edges, setNodes, setEdges, remoteApplied)
+  const history = useMapHistory(nodes, edges, setNodes, setEdges, remoteApplied)
   const [focusId, setFocus] = useState<string | null>(null)
   const [tool, setTool] = useState<Tool>("selecionar")
   const [pen, setPen] = useState<{ hue?: number; size: number }>({ size: 4 })
@@ -665,11 +762,18 @@ function Editor({ map }: { map: MindMap }) {
   const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id).join()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || editingId || presenting !== null) return
+      if (editingId || presenting !== null) return
       const t = e.target as HTMLElement
       if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return
       if (t !== document.body && !wrapRef.current?.contains(t)) return
       const k = e.key.toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === "z" || k === "y")) {
+        e.preventDefault()
+        if (k === "y" || e.shiftKey) history.redo()
+        else history.undo()
+        return
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
       if (k === "v" || (k === "escape" && tool !== "selecionar")) setTool("selecionar")
       else if (k === "t") setTool("texto")
       else if (k === "d") setTool("desenhar")
@@ -685,7 +789,7 @@ function Editor({ map }: { map: MindMap }) {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [tool, editingId, presenting, selectedIds, fitView, nodes])
+  }, [tool, editingId, presenting, selectedIds, fitView, nodes, history])
 
   function onDoubleClick(e: React.MouseEvent) {
     if (tool !== "selecionar" || !(e.target as HTMLElement).classList.contains("react-flow__pane")) return
@@ -828,7 +932,7 @@ function Editor({ map }: { map: MindMap }) {
    * a regra garante que filho nunca fica do tamanho do pai ou maior. Sem IA
    * (fora do ar, limite), usa só a hierarquia. Dá para desfazer.
    */
-  async function sizeByHierarchy() {
+  async function organizeSelected() {
     const items = selectedAll.filter((n) => n.type === "idea")
     if (items.length < 2) return
     const ids = new Set(items.map((n) => n.id))
@@ -853,12 +957,20 @@ function Editor({ map }: { map: MindMap }) {
       // Sem IA: segue só pela hierarquia.
     }
     setSizing(false)
-    const before = items.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, scale: n.data.scale, width: n.width, height: n.height }))
-    applyScale(resizeByHierarchy(items.map(sized), links, suggested))
-    toast.success(usedAi ? "Tamanhos ajustados pela hierarquia (IA)" : "Tamanhos ajustados pela hierarquia", {
-      description: usedAi ? "Filho sempre menor que o pai; a IA decidiu o que é detalhe." : "A IA não respondeu agora; usei só as linhas pai → filho.",
-      action: { label: "Desfazer", onClick: () => applyScale(before) },
+    applyScale(organize(items.map(sized), links, suggested))
+    // Árvore da esquerda para a direita: as linhas do conjunto saem pela direita do pai e entram pela esquerda do filho.
+    setEdges((es) => es.map((e) => (isHierarchy(e) && ids.has(e.source) && ids.has(e.target) ? { ...e, sourceHandle: "r", targetHandle: "l" } : e)))
+    toast.success(usedAi ? "Mapa organizado pela importância (IA)" : "Mapa organizado pela hierarquia", {
+      description: usedAi ? "Principal maior, detalhes menores, cada ramo no seu lugar. Ctrl+Z desfaz." : "A IA não respondeu agora; usei só as linhas pai → filho. Ctrl+Z desfaz.",
+      action: { label: "Desfazer", onClick: history.undo },
     })
+  }
+
+  /** Volta os selecionados ao tamanho normal (sem ampliação e sem tamanho fixo): conserta balões distorcidos. */
+  function resetSize() {
+    const ids = new Set(selectedAll.map((n) => n.id))
+    setNodes((ns) => ns.map((n) => (ids.has(n.id) && n.type === "idea" ? { ...n, width: undefined, height: undefined, data: { ...n.data, scale: undefined } } : n)))
+    toast("Tamanho normal", { description: "Ctrl+Z desfaz.", action: { label: "Desfazer", onClick: history.undo } })
   }
 
   const drawing = tool === "desenhar"
@@ -903,7 +1015,7 @@ function Editor({ map }: { map: MindMap }) {
           proOptions={{ hideAttribution: true }}
         >
           <InfiniteBackground />
-          <MapControls onPresent={() => setPresenting(0)} />
+          <MapControls onPresent={() => setPresenting(0)} history={history} />
           {presenting === null && <ToolPanel tool={tool} setTool={setTool} pen={pen} setPen={setPen} />}
           {presenting !== null && (
             <Panel position="bottom-center" className="!mb-6">
@@ -944,7 +1056,8 @@ function Editor({ map }: { map: MindMap }) {
                 edgeCount={selectedLinks.length}
                 sizing={sizing}
                 onScale={(factor) => actions.scaleItems(selectedAll.map((n) => n.id), factor)}
-                onHierarchy={sizeByHierarchy}
+                onHierarchy={organizeSelected}
+                onReset={resetSize}
                 onLayer={(move) => actions.moveLayers(selectedAll.map((n) => n.id), move)}
                 onEdges={(patch) => setEdges((es) => es.map((e) => (e.selected ? { ...e, data: { ...(e.data as LinkData | undefined), ...patch } } : e)))}
                 onGroup={groupSelected}
@@ -1002,7 +1115,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-foreground">{children}</kbd>
 }
 
-function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>) {
+function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
   const map = useMap()
   const internal = useInternalNode(id)
   const measured = !!internal?.measured.width
@@ -1019,11 +1132,14 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
   // Cor: escolhida à mão > cor da etiqueta > neutro.
   const hue = data.hue ?? (data.tag ? labelHue(data.tag) : undefined)
   const colored = hue !== undefined
-  const sized = !!width
+  // Só balão com tamanho escolhido (cantos ou P/M/G) tem letra que "preenche" a caixa.
+  // A caixa vem do que foi gravado, nunca do tamanho medido: medir → letra → medir
+  // virava um ciclo que distorcia o balão (letra gigante, palavra quebrada).
+  const sized = !!fixed
   // Zoom infinito: o balão inteiro (texto, bolinhas, ícones) é desenhado em escala.
   const s = scaleOf(data)
-  const localW = sized ? width! / s : undefined
-  const localH = sized ? (height ?? width! * 0.4) / s : undefined
+  const localW = fixed?.width
+  const localH = fixed ? (fixed.height ?? fixed.width * 0.4) : undefined
   const notesOpen = selected && !editing && !map.multi && (!!data.notes?.length || map.notesFor === id)
   const status = nodeStatus({ status: data.status, taskId: linked ? data.taskId : undefined }, tasks)
   const kind = nodeKind({ kind: data.kind, taskId: linked ? data.taskId : undefined, leadId: lead ? data.leadId : undefined, ref: data.ref }, lead?.stage)
@@ -1069,7 +1185,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
         <KindPicker nodeId={id} kind={kind} chosen={!!data.kind} />
         {/* Tela larga: estilo e tudo mais ficam no painel lateral. */}
         <span className="lg:hidden">
-          <StylePicker nodeId={id} data={data} width={width} />
+          <StylePicker nodeId={id} data={data} width={internal?.width} />
         </span>
         <span className="hidden lg:inline-flex">
           <ToolbarButton onClick={map.openPanel} label="Detalhes: vínculo, estilo, conexões e contexto">
@@ -1087,7 +1203,7 @@ function IdeaNodeView({ id, data, selected, width, height }: NodeProps<IdeaNode>
           <Trash2Icon />
         </ToolbarButton>
       </NodeToolbar>
-      <div className={cn("group/node relative", !fixed && sized && s === 1 && "h-full w-full")} style={{ ...(s !== 1 ? { zoom: s } : {}), ...fixed }}>
+      <div className="group/node relative" style={{ ...(s !== 1 ? { zoom: s } : {}), ...fixed }}>
       <div
         onDoubleClick={(e) => {
           e.stopPropagation()
@@ -1417,6 +1533,7 @@ function MultiToolbar({
   sizing,
   onScale,
   onHierarchy,
+  onReset,
   onLayer,
   onGroup,
   onKind,
@@ -1432,6 +1549,7 @@ function MultiToolbar({
   sizing: boolean
   onScale: (factor: number) => void
   onHierarchy: () => void
+  onReset: () => void
   onLayer: (move: LayerMove) => void
   onGroup: () => void
   onKind: (k: NodeKind | undefined) => void
@@ -1457,11 +1575,14 @@ function MultiToolbar({
             <PlusIcon />
           </ToolbarButton>
           {nodeCount >= 2 && (
-            <Button size="xs" variant="ghost" disabled={sizing} onClick={onHierarchy} title="IA: redimensiona os balões seguindo a hierarquia das linhas (pai maior, filhos menores)">
-              {sizing ? <Loader2Icon className="animate-spin" /> : <NetworkIcon />} {sizing ? "Pensando…" : "Hierarquia"}
+            <Button size="xs" variant="ghost" disabled={sizing} onClick={onHierarchy} title="IA: organiza o conjunto pela importância — principal maior, detalhes menores, árvore clara da esquerda para a direita">
+              {sizing ? <Loader2Icon className="animate-spin" /> : <NetworkIcon />} {sizing ? "Organizando…" : "Organizar"}
               {!sizing && <SparklesIcon className="text-brand" />}
             </Button>
           )}
+          <Button size="xs" variant="ghost" className="px-1.5" onClick={onReset} title="Voltar ao tamanho normal (conserta balão distorcido)">
+            100%
+          </Button>
           <LayerPicker onMove={onLayer} />
         </span>
       )}
@@ -2402,10 +2523,12 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
  * Zoom e enquadrar com o visual do app (os controles padrão da biblioteca ficavam
  * claro-sobre-claro no tema escuro). Nome de cada botão aparece ao passar o mouse.
  */
-function MapControls({ onPresent }: { onPresent: () => void }) {
+function MapControls({ onPresent, history }: { onPresent: () => void; history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } }) {
   const { zoomIn, zoomOut, fitView, zoomTo } = useReactFlow()
   const zoom = useFlowStore((st) => st.transform[2])
   const buttons = [
+    { label: "Desfazer (Ctrl+Z)", icon: Undo2Icon, onClick: history.undo, disabled: !history.canUndo },
+    { label: "Refazer (Ctrl+Shift+Z)", icon: Redo2Icon, onClick: history.redo, disabled: !history.canRedo },
     { label: "Aproximar", icon: PlusIcon, onClick: () => zoomIn({ duration: 200 }) },
     { label: "Afastar", icon: MinusIcon, onClick: () => zoomOut({ duration: 200 }) },
     { label: "Enquadrar tudo", icon: MaximizeIcon, onClick: () => fitView({ padding: 0.3, maxZoom: 1, duration: 300 }) },
@@ -2428,8 +2551,9 @@ function MapControls({ onPresent }: { onPresent: () => void }) {
               type="button"
               onClick={b.onClick}
               aria-label={b.label}
+              disabled={"disabled" in b && b.disabled}
               className={cn(
-                "flex size-9 items-center justify-center text-foreground/80 transition-colors hover:bg-accent hover:text-foreground",
+                "flex size-9 items-center justify-center text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
                 i > 0 && "border-t",
               )}
             >
