@@ -28,6 +28,7 @@ import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { registeredCollections } from "@/lib/collection-store"
 import { emit } from "@/lib/events"
+import { recordEvent } from "@/lib/event-service"
 import "@/lib/modules"
 
 /** Falhas de persistência não travam a UI, mas o usuário é avisado. */
@@ -258,6 +259,10 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ leads: [...s.leads, lead] }))
       persist(repos().leads.upsert(lead))
       addActivity(lead.id, "criado", "Lead criado")
+      const actor = { type: "human" as const, id: get().meId }
+      recordEvent({ type: "lead.created", entity: { type: "lead", id: lead.id }, actor, metadata: { name: lead.name, source: lead.source, segment: lead.segment, city: lead.city } })
+      if (lead.analysis)
+        recordEvent({ type: "lead.analyzed", entity: { type: "lead", id: lead.id }, actor: { type: lead.analysis.analyzedBy === "planilha" ? "system" : "agent", id: lead.analysis.analyzedBy ?? "planilha" }, metadata: { name: lead.name, ...lead.analysis } })
       return lead
     },
 
@@ -287,6 +292,10 @@ export const useStore = create<State>((set, get) => {
       addActivity(id, "estagio", `${stageLabel(lead.stage)} → ${stageLabel(stage)}${reason}`)
       if (stage === "ganho") emit({ type: "lead.ganho", leadId: id })
       if (stage === "perdido") emit({ type: "lead.perdido", leadId: id })
+      // Histórico gravado (AI Office): etapas que importam para o aprendizado.
+      const stageEvent = ({ proposta: "lead.proposal", negociacao: "lead.interested", ganho: "lead.converted", perdido: "lead.lost" } as const)[stage as "proposta"]
+      if (stageEvent)
+        recordEvent({ type: stageEvent, entity: { type: "lead", id }, actor: { type: "human", id: get().meId }, metadata: { name: lead.name, from: lead.stage, to: stage, valueCents: lead.valueCents, lostReason: extra?.lostReason } })
     },
 
     completeNextAction(id, next) {

@@ -71,3 +71,22 @@ describe("prospecção", () => {
     expect(duration(42_000)).toBe("42 s")
   })
 })
+
+describe("dados para aprendizado", () => {
+  it("feedback traz a decisão humana ao lado da análise; funil por segmento conta certo", async () => {
+    const { conversionData, feedbackRows } = await import("./prospecting")
+    const leads = [
+      lead({ id: "a", segment: "Clínica", analysis: { siteScore: 3, problems: ["sem mobile"] }, review: { status: "approved" }, contactStatus: "contacted", stage: "proposta" }),
+      lead({ id: "b", segment: "Clínica", analysis: { siteScore: 8 }, review: { status: "rejected", rejectionReason: "site_bom", rejectionNotes: "ok" } }),
+      lead({ id: "c", segment: "Loja" }),
+    ]
+    const fb = feedbackRows(leads)
+    expect(fb.map((f) => [f.leadId, f.decision, f.siteScore, f.reasonLabel])).toEqual([
+      ["a", "approved", 3, undefined],
+      ["b", "rejected", 8, "Site já é bom"],
+    ])
+    const cd = conversionData(leads)
+    expect(cd.bySegment[0]).toEqual({ segment: "Clínica", total: 2, approved: 1, rejected: 1, contacted: 1, proposal: 1, won: 0, lost: 0 })
+    expect(cd.rejectionReasons).toEqual({ site_bom: 1 })
+  })
+})

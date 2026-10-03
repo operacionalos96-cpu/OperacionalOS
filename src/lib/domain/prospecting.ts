@@ -82,3 +82,52 @@ export function duration(ms: number) {
   const m = Math.floor(s / 60)
   return m ? `${m} min ${String(s % 60).padStart(2, "0")} s` : `${s} s`
 }
+
+// ---------- dados para o Intelligence Agent (comparar IA × humano × resultado) ----------
+
+/** Feedback de cada decisão humana, ao lado do que a análise previu. */
+export function feedbackRows(leads: Lead[]) {
+  return leads
+    .filter((l) => reviewStatus(l) !== "pending")
+    .map((l) => ({
+      leadId: l.id,
+      name: l.name,
+      segment: l.segment,
+      city: l.city,
+      decision: reviewStatus(l),
+      reason: l.review?.rejectionReason,
+      reasonLabel: l.review?.rejectionReason ? rejectionLabel(l.review.rejectionReason) : undefined,
+      notes: l.review?.rejectionNotes,
+      /** O que a IA/planilha pensou. */
+      siteScore: l.analysis?.siteScore,
+      qualificationScore: l.analysis?.qualificationScore,
+      problems: l.analysis?.problems ?? [],
+      contacted: l.contactStatus === "contacted",
+      stage: l.stage,
+      decidedAt: l.review?.approvedAt ?? l.review?.rejectedAt,
+    }))
+}
+
+/** Funil por segmento: revisados → aprovados → contatados → propostas → ganhos (+ motivos de descarte). */
+export function conversionData(leads: Lead[]) {
+  const seg = new Map<string, { segment: string; total: number; approved: number; rejected: number; contacted: number; proposal: number; won: number; lost: number }>()
+  const reasons: Record<string, number> = {}
+  for (const l of leads) {
+    const key = l.segment || "sem segmento"
+    const row = seg.get(key) ?? { segment: key, total: 0, approved: 0, rejected: 0, contacted: 0, proposal: 0, won: 0, lost: 0 }
+    row.total++
+    const st = reviewStatus(l)
+    if (st === "approved") row.approved++
+    if (st === "rejected") {
+      row.rejected++
+      const r = l.review?.rejectionReason ?? "outro"
+      reasons[r] = (reasons[r] ?? 0) + 1
+    }
+    if (l.contactStatus === "contacted") row.contacted++
+    if (["proposta", "negociacao", "ganho"].includes(l.stage)) row.proposal++
+    if (l.stage === "ganho") row.won++
+    if (l.stage === "perdido" && st !== "rejected") row.lost++
+    seg.set(key, row)
+  }
+  return { bySegment: [...seg.values()].sort((a, b) => b.total - a.total), rejectionReasons: reasons }
+}

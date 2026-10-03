@@ -43,6 +43,7 @@ import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/le
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { startAutomations } from "@/lib/automations"
+import { startEventFeed } from "@/lib/event-service"
 import { NAV, NAV_SECTIONS, isActive } from "./nav"
 
 /** Telas sem barra lateral e sem dados (login, redefinir senha). */
@@ -66,7 +67,9 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   // Automações começam depois que os dados chegaram (senão tudo pareceria "novo").
   const router = useRouter()
   useEffect(() => {
-    if (hydrated) startAutomations((href) => router.push(href))
+    if (!hydrated) return
+    startAutomations((href) => router.push(href))
+    startEventFeed()
   }, [hydrated, router])
 
   useGlobalShortcuts()

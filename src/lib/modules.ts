@@ -6,6 +6,7 @@ import type { ContentAccount, ContentItem } from "@/lib/domain/content"
 import type { EntityContext, Relation } from "@/lib/entities/types"
 import type { MapEdgeRow, MapNodeRow } from "@/lib/domain/map-rows"
 import type { Goal } from "@/lib/domain/insights"
+import type { Agent, Hypothesis, Learning } from "@/lib/domain/ai-office"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -25,3 +26,8 @@ export const useMapEdges = createCollection<MapEdgeRow>("map_edges")
 
 // Metas (SQL 0006): entidade própria, progresso automático por receita, vendas ou tarefas ligadas.
 export const useGoals = createCollection<Goal>("goals")
+
+// AI Office (SQL 0010): funcionários IA (cadastro/status), aprendizados e hipóteses.
+export const useAgents = createCollection<Agent>("agents")
+export const useLearnings = createCollection<Learning>("learnings")
+export const useHypotheses = createCollection<Hypothesis>("hypotheses")
