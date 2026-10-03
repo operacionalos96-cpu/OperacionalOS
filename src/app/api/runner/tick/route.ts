@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto"
+import { createHash, timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { deliverDue } from "@/lib/server/webhooks"
@@ -18,8 +18,18 @@ function authorized(req: Request) {
   return secret.length >= 16 && got.length === want.length && timingSafeEqual(got, want)
 }
 
+/** Impressão digital curta (6 primeiros hex do SHA-256): compara valores sem revelar nenhum. */
+const fp = (v: string) => (v ? createHash("sha256").update(v).digest("hex").slice(0, 6) : "vazio")
+
 export async function POST(req: Request) {
-  if (!authorized(req)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
+  if (!authorized(req)) {
+    const expected = (process.env.CRON_SECRET ?? "").trim()
+    const sent = (req.headers.get("authorization") ?? "").trim().replace(/^Bearer\s+/i, "").trim()
+    return NextResponse.json(
+      { erro: "não autorizado", servidor_tem_cron_secret: expected.length >= 16, recebido: fp(sent), esperado: expected ? fp(expected) : "vazio" },
+      { status: 401 },
+    )
+  }
   const started = Date.now()
   const { data: reaped, error } = await supabaseAdmin().rpc("reap_expired_leases")
   if (error) return NextResponse.json({ erro: "fila indisponível (rodou o SQL 0011?)" }, { status: 500 })
