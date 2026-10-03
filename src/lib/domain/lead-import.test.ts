@@ -6,8 +6,9 @@ const HEADER = ["Empresa", "Segmento", "CNPJ", "WhatsApp", "Site", "Situação C
 
 describe("importar leads de planilha", () => {
   it("reconhece colunas pelo nome, sem acento e sem depender da ordem", () => {
-    expect(detectColumns(HEADER)).toEqual(["empresa", "segmento", "ignorar", "contato", "site", "ignorar", "ignorar", "ignorar", "prioridade"])
+    expect(detectColumns(HEADER)).toEqual(["empresa", "segmento", "ignorar", "contato", "site", "ignorar", "qualificacao", "resumo", "prioridade"])
     expect(detectColumns(["Telefone", "Razão Social", "E-mail"])).toEqual(["contato", "empresa", "email"])
+    expect(detectColumns(["Cidade", "Origem", "Nota do site", "Problemas encontrados", "Oportunidade"])).toEqual(["cidade", "origem", "nota_site", "problemas", "oportunidade"])
   })
 
   it("prioridade vira temperatura", () => {
@@ -33,7 +34,9 @@ describe("importar leads de planilha", () => {
     expect(r.leads).toHaveLength(2)
     expect(r.leads[0]).toMatchObject({
       name: "Costa Lion",
-      company: "Materiais",
+      company: undefined,
+      segment: "Materiais",
+      source: "planilha",
       contact: "(11) 5564-8966",
       website: "https://costalion.com.br/",
       temperature: "quente",
@@ -41,7 +44,9 @@ describe("importar leads de planilha", () => {
       row: 2,
     })
     expect(r.leads[0].note).toContain("CNPJ: 60.600.046/0001-73")
-    expect(r.leads[0].note).toContain("Diagnóstico: Site antigo")
+    // Nota e diagnóstico viram ANÁLISE (dado estruturado), não anotação.
+    expect(r.leads[0].analysis).toMatchObject({ qualificationScore: 9, summary: "Site antigo", analyzedBy: "planilha" })
+    expect(r.leads[0].note).not.toContain("Diagnóstico")
     // WhatsApp e site viraram campos: não se repetem na anotação.
     expect(r.leads[0].note).not.toContain("WhatsApp:")
     expect(r.leads[0].note).not.toContain("Site:")

@@ -34,6 +34,44 @@ export interface Lead {
   productId?: string
   /** Site atual do lead (só http/https). */
   website?: string
+  // ---- AI Office / prospecção (todos opcionais: leads antigos continuam válidos) ----
+  segment?: string
+  city?: string
+  /** De onde veio: "planilha", "prospector", "indicacao"… */
+  source?: string
+  /** O que a análise (IA ou planilha) concluiu. NUNCA é sobrescrito pela decisão humana. */
+  analysis?: LeadAnalysis
+  /** Decisão humana sobre o lead (separada da análise, para comparar depois). */
+  review?: LeadReview
+  contactStatus?: "pending" | "contacted"
+  firstContactAt?: ISODate
+  firstContactMessage?: string
+  firstContactChannel?: "whatsapp" | "email" | "telefone" | "outro"
+}
+
+export interface LeadAnalysis {
+  /** 0–10 (nota do site). */
+  siteScore?: number
+  summary?: string
+  problems?: string[]
+  opportunity?: string
+  /** 0–10 (vale a pena prospectar?). */
+  qualificationScore?: number
+  analyzedAt?: ISODate
+  /** Quem analisou: "planilha", id do agente ("web-analyst"), id de pessoa… */
+  analyzedBy?: string
+}
+
+export type ReviewStatus = "pending" | "approved" | "rejected"
+
+export interface LeadReview {
+  status: ReviewStatus
+  approvedAt?: ISODate
+  approvedBy?: string
+  rejectedAt?: ISODate
+  rejectedBy?: string
+  rejectionReason?: string
+  rejectionNotes?: string
 }
 
 export type ActivityKind = "nota" | "ligacao" | "reuniao" | "mensagem" | "estagio" | "acao_concluida" | "criado"

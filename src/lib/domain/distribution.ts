@@ -4,9 +4,10 @@
  * Com produto, equilibra dentro daquele produto (cada campanha fica meio a meio).
  * Funções puras, testadas em distribution.test.ts.
  */
+import { isDiscarded } from "./prospecting"
 import type { Lead } from "./types"
 
-const isOpen = (l: Lead) => l.stage !== "ganho" && l.stage !== "perdido"
+const isOpen = (l: Lead) => l.stage !== "ganho" && l.stage !== "perdido" && !isDiscarded(l)
 
 export function openCounts(leads: Lead[], teamIds: string[], productId?: string) {
   const counts = new Map(teamIds.map((id) => [id, 0]))
@@ -46,7 +47,7 @@ export function distributeOwners(count: number, leads: Lead[], teamIds: string[]
 export function rebalance(leads: Lead[], teamIds: string[], productId?: string): { leadId: string; ownerId: string }[] {
   const counts = openCounts(leads, teamIds, productId)
   const movable = leads
-    .filter((l) => l.stage === "novo" && (productId === undefined || l.productId === productId) && counts.has(l.ownerId))
+    .filter((l) => l.stage === "novo" && !isDiscarded(l) && (productId === undefined || l.productId === productId) && counts.has(l.ownerId))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) // mais novos primeiro
   const moves: { leadId: string; ownerId: string }[] = []
   for (;;) {

@@ -48,6 +48,10 @@ export interface NewLeadInput {
   nextAction: NextAction
   productId?: string
   website?: string
+  segment?: string
+  city?: string
+  source?: string
+  analysis?: Lead["analysis"]
 }
 
 export interface NewTaskInput {
@@ -242,6 +246,11 @@ export const useStore = create<State>((set, get) => {
         temperature: input.temperature,
         productId: input.productId,
         website: input.website,
+        segment: input.segment?.trim() || undefined,
+        city: input.city?.trim() || undefined,
+        source: input.source?.trim() || undefined,
+        analysis: input.analysis,
+        review: { status: "pending" },
         nextAction: { text: input.nextAction.text.trim(), dueDate: input.nextAction.dueDate },
         lastActivityAt: now,
         createdAt: now,

@@ -120,6 +120,11 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
       const contactIsUrl = !!lead.contact && /^https?:\/\//.test(lead.contact)
       if ((!lead.contact || contactIsUrl) && row.contact !== lead.contact) patch.contact = row.contact
       if (!lead.productId && productId) patch.productId = productId
+      // Dados novos da planilha (segmento, cidade, origem, análise) entram onde ainda está vazio.
+      if (!lead.segment && row.segment) patch.segment = row.segment
+      if (!lead.city && row.city) patch.city = row.city
+      if (!lead.source && row.source) patch.source = row.source
+      if (!lead.analysis && row.analysis) patch.analysis = row.analysis
       if (Object.keys(patch).length) {
         updateLead(lead.id, patch)
         updated++
@@ -143,6 +148,10 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
         company: l.company,
         contact: l.contact,
         website: l.website,
+        segment: l.segment,
+        city: l.city,
+        source: l.source,
+        analysis: l.analysis,
         valueCents: l.valueCents,
         temperature: l.temperature,
         ownerId,

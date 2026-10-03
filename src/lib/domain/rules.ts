@@ -2,6 +2,7 @@
  * Regras de negócio puras (sem React, sem storage). Toda função recebe `now`
  * para ser determinística e testável.
  */
+import { isDiscarded } from "./prospecting"
 import {
   addDays,
   addMonths,
@@ -48,7 +49,8 @@ export type LeadUrgency = "vencida" | "hoje" | "parado"
 
 /** Por que este lead precisa de atenção (ou null se está em dia). */
 export function leadUrgency(lead: Lead, now: Date): LeadUrgency | null {
-  if (!isOpenStage(lead.stage)) return null
+  // Descartado na revisão: fora do Pipeline (alertas, contadores) — continua guardado para aprendizado.
+  if (!isOpenStage(lead.stage) || isDiscarded(lead)) return null
   if (isOverdue(lead.nextAction.dueDate, now)) return "vencida"
   if (isDueToday(lead.nextAction.dueDate, now)) return "hoje"
   if (isStale(lead, now)) return "parado"
@@ -77,7 +79,7 @@ export interface StageSummary {
 
 export function pipelineSummary(leads: Lead[]) {
   const stages: StageSummary[] = OPEN_STAGES.map((stage) => {
-    const inStage = leads.filter((l) => l.stage === stage)
+    const inStage = leads.filter((l) => l.stage === stage && !isDiscarded(l))
     return { stage, count: inStage.length, valueCents: sum(inStage.map((l) => l.valueCents)) }
   })
   return {

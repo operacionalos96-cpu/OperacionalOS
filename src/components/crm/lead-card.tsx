@@ -36,7 +36,7 @@ export function LeadCard({ lead, dragging = false }: { lead: Lead; dragging?: bo
             <TemperatureDot lead={lead} />
             <span className="truncate">{lead.name}</span>
           </p>
-          {lead.company && <p className="truncate text-xs text-muted-foreground">{lead.company}</p>}
+          {(lead.company || lead.segment) && <p className="truncate text-xs text-muted-foreground">{[lead.company, lead.segment, lead.city].filter(Boolean).join(" · ")}</p>}
         </div>
         <UserAvatar userId={lead.ownerId} />
       </div>

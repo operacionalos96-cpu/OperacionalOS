@@ -3,10 +3,26 @@
  * depender da ordem nem de acento ("Situação CNPJ" = "situacao cnpj").
  * Função pura, testada em lead-import.test.ts.
  */
-import type { Temperature } from "./types"
+import type { LeadAnalysis, Temperature } from "./types"
 import { safeUrl as safeHttpUrl } from "./products"
 
-export type ImportField = "nome" | "empresa" | "contato" | "email" | "site" | "segmento" | "prioridade" | "valor" | "ignorar"
+export type ImportField =
+  | "nome"
+  | "empresa"
+  | "contato"
+  | "email"
+  | "site"
+  | "segmento"
+  | "cidade"
+  | "origem"
+  | "nota_site"
+  | "qualificacao"
+  | "problemas"
+  | "oportunidade"
+  | "resumo"
+  | "prioridade"
+  | "valor"
+  | "ignorar"
 
 /** Palavras que identificam cada campo (já normalizadas). A primeira coluna que casar vence. */
 const FIELD_HINTS: [ImportField, RegExp][] = [
@@ -16,6 +32,14 @@ const FIELD_HINTS: [ImportField, RegExp][] = [
   ["email", /(e ?mail)/],
   ["site", /^(site|website|url|link)$/],
   ["segmento", /(segmento|nicho|setor|ramo|categoria)/],
+  ["cidade", /^(cidade|municipio|city|localidade)$/],
+  ["origem", /^(origem|fonte|source|canal)$/],
+  ["nota_site", /^(nota( do)? site|nota|score( do)? site|site score|pontuacao( do)? site|avaliacao( do)? site)$/],
+  // "Nota oportunidade (0-10)" é NOTA (vem antes de "oportunidade", que é texto).
+  ["qualificacao", /^(qualificacao|score|lead score|potencial|pontuacao)$|^nota (de )?(oportunidade|qualificacao|potencial)/],
+  ["problemas", /(problema|falha|defeito)/],
+  ["oportunidade", /(oportunidade|proposta de valor|o que oferecer)/],
+  ["resumo", /^(resumo|analise|diagnostico|observacao da analise)$/],
   ["prioridade", /^(prioridade|temperatura)$/],
   ["valor", /^(valor|ticket|orcamento|valor estimado)$/],
 ]
@@ -71,6 +95,10 @@ export interface ImportedLead {
   company?: string
   contact?: string
   website?: string
+  segment?: string
+  city?: string
+  source?: string
+  analysis?: LeadAnalysis
   temperature?: Temperature
   valueCents: number
   /** Tudo que não virou campo: vai como anotação no histórico do lead. */
@@ -128,7 +156,7 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
     const website = safeHttpUrl(get("site"))
 
     // O que já virou campo não se repete na anotação.
-    const asField = new Set<ImportField>(["nome", "empresa", "valor", "site", "segmento", "prioridade"])
+    const asField = new Set<ImportField>(["nome", "empresa", "valor", "site", "segmento", "cidade", "origem", "nota_site", "qualificacao", "problemas", "oportunidade", "resumo", "prioridade"])
     if (hasPhone) asField.add("contato")
     if (contact && !hasPhone) asField.add("email")
     const noteLines = header
@@ -139,7 +167,11 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
     const valueIdx = fields.indexOf("valor")
     ;(isExisting ? result.existing : result.leads).push({
       name,
-      company: nome && empresa ? empresa : get("segmento") || undefined,
+      company: nome && empresa ? empresa : undefined,
+      segment: get("segmento") || undefined,
+      city: get("cidade") || undefined,
+      source: get("origem") || "planilha",
+      analysis: analysisFrom(get),
       contact,
       website: website ?? undefined,
       temperature: temperatureFrom(get("prioridade")),
@@ -149,4 +181,31 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
     })
   })
   return result
+}
+
+/** Nota 0–10 de um texto ("7", "7,5", "75%", "7/10", "70"). */
+function score(v: string): number | undefined {
+  const t = v.replace(",", ".").trim()
+  if (!t) return undefined
+  const frac = t.match(/^([\d.]+)\s*\/\s*([\d.]+)$/)
+  let n = frac ? (Number(frac[1]) / Number(frac[2])) * 10 : Number(t.replace(/[^\d.]/g, ""))
+  if (!Number.isFinite(n)) return undefined
+  if (/%/.test(t) || n > 10) n = n / 10
+  return Math.max(0, Math.min(10, Math.round(n * 10) / 10))
+}
+
+/** Problemas separados por ; | quebra de linha ou • */
+const list = (v: string) => v.split(/[;|\n•]+/).map((x) => x.replace(/^[-*\s]+/, "").trim()).filter(Boolean)
+
+/** Análise que veio na planilha (nota do site, problemas, oportunidade…). Sem nada: undefined. */
+function analysisFrom(get: (f: ImportField) => string): LeadAnalysis | undefined {
+  const a: LeadAnalysis = {
+    siteScore: score(get("nota_site")),
+    qualificationScore: score(get("qualificacao")),
+    problems: get("problemas") ? list(get("problemas")) : undefined,
+    opportunity: get("oportunidade") || undefined,
+    summary: get("resumo") || undefined,
+  }
+  const filled = Object.values(a).some((x) => x !== undefined)
+  return filled ? { ...a, analyzedAt: new Date().toISOString(), analyzedBy: "planilha" } : undefined
 }

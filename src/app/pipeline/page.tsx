@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { leadMatches } from "@/lib/domain/contact"
+import { isDiscarded } from "@/lib/domain/prospecting"
 import { FileSpreadsheetIcon, KanbanIcon, PlusIcon, SearchIcon, UserPlusIcon } from "lucide-react"
 import { leadsNeedingAction } from "@/lib/domain/rules"
 import { useStore } from "@/lib/store"
@@ -49,7 +50,8 @@ function Pipeline() {
   }
 
   const leads = useMemo(() => {
-    return allLeads.filter((l) => (owner === "todos" || l.ownerId === meId) && leadMatches(l, query))
+    // Descartados na revisão ficam fora do Pipeline (estão no Modo Prospecção → Descartados).
+    return allLeads.filter((l) => !isDiscarded(l) && (owner === "todos" || l.ownerId === meId) && leadMatches(l, query))
   }, [allLeads, owner, meId, query])
 
   const needsCount = leadsNeedingAction(leads, new Date()).length
