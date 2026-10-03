@@ -1,4 +1,4 @@
-import { CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, KeyRoundIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
+import { BotIcon, RadarIcon, CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, KeyRoundIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
 
 export interface NavItem {
   href: string
@@ -20,10 +20,15 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
   {
     title: "Vendas",
     items: [
+      { href: "/prospeccao", label: "Prospecção", icon: RadarIcon },
       { href: "/pipeline", label: "Pipeline", icon: KanbanIcon },
       { href: "/clientes", label: "Clientes", icon: HandshakeIcon },
       { href: "/produtos", label: "Produtos", icon: PackageIcon },
     ],
+  },
+  {
+    title: "Inteligência",
+    items: [{ href: "/ai-office", label: "AI Office", short: "IA", icon: BotIcon }],
   },
   {
     title: "Marketing",

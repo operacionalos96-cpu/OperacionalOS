@@ -103,3 +103,25 @@ No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "
 - Regras puras em `src/lib/domain/ai-map.ts` (o que vai, limites, leitura da resposta); modelo no servidor em
   `src/lib/server/ai.ts` (hoje Gemini: `GEMINI_API_KEY`, opcional `GEMINI_MODEL`); rota `POST /api/ia/mapa`
   só para membros, com limite de 10 pedidos/min por pessoa. Só vai o texto do mapa.
+
+## AI Office (prospecção + aprendizado, sem API de IA paga)
+
+**Fluxo:** lead encontrado (planilha / futuro Prospector) → `lead.created` → análise (planilha / futuro
+Web Analyst: `lead.analysis`) → **revisão humana** no Modo Prospecção (`/prospeccao`) → aprovar (`lead.approved`)
+ou descartar com motivo (`lead.rejected`, sai do Pipeline mas fica guardado) → WhatsApp com "Bom dia/Boa tarde"
+→ humano confirma "ENVIEI" (`lead.contacted`, etapa "Contato feito") → próximo da fila.
+
+| Peça | Onde |
+| --- | --- |
+| Campos do lead (segmento, cidade, origem, `analysis`, `review`, contato) | `src/lib/domain/types.ts` (opcionais, no JSON do lead) |
+| Regras da prospecção (fila, saudação, aprovar/descartar/contato, dados p/ aprendizado) | `src/lib/domain/prospecting.ts` (+ testes) |
+| Agentes, eventos, aprendizados, hipóteses (tipos e regras) | `src/lib/domain/ai-office.ts` (+ testes) |
+| Event System: grava em `events` (imutável), avisa inscritos, feed ao vivo | `src/lib/event-service.ts` · SQL 0010 |
+| **Camada de serviços** (nomes = futuras ferramentas MCP: `search_leads`, `get_next_lead`, `get_feedback`…) | `src/lib/services/ai-office.ts` |
+| Telas | `/prospeccao`, `/ai-office`, painel "Revisão e análise" no lead |
+
+**Regras:** análise (IA) e revisão (humano) ficam separadas para comparar; nada é apagado; hipótese só muda
+de status por humano e nunca altera regra sozinha; `preferredModel` é só preferência (model-agnostic).
+
+**Próximo (MCP/webhooks):** um servidor MCP expõe `tools` de `src/lib/services/ai-office.ts` (versão servidor com
+`supabaseAdmin`) e lê/escreve `events`; webhooks/workers se inscrevem em `events` (tempo real) ou leem a tabela.

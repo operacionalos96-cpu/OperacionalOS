@@ -31,6 +31,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } from "@/components/shared/fields"
 import { InlineText } from "@/components/shared/inline-edit"
+import { ReviewPanel } from "@/components/prospecting/review-panel"
 import { EmptyState } from "@/components/shared/layout"
 import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
@@ -114,6 +115,7 @@ function LeadDetail({ lead }: { lead: Lead }) {
           <Timeline leadId={lead.id} />
         </div>
         <aside className="flex flex-col gap-4">
+          <ReviewPanel lead={lead} />
           <Properties lead={lead} />
           <LinkedTasks lead={lead} />
           <LinkedMoney lead={lead} />
@@ -315,6 +317,13 @@ function Properties({ lead }: { lead: Lead }) {
       </Prop>
       <Prop label="Produto">
         <ProductSelect value={lead.productId} onChange={(productId) => updateLead(lead.id, { productId })} />
+      </Prop>
+      <Prop label="Segmento · cidade · origem">
+        <div className="grid grid-cols-3 gap-1.5">
+          <InlineText value={lead.segment ?? ""} placeholder="segmento" onSave={(v) => updateLead(lead.id, { segment: v.trim() || undefined })} className="min-w-0 truncate text-sm" />
+          <InlineText value={lead.city ?? ""} placeholder="cidade" onSave={(v) => updateLead(lead.id, { city: v.trim() || undefined })} className="min-w-0 truncate text-sm" />
+          <InlineText value={lead.source ?? ""} placeholder="origem" onSave={(v) => updateLead(lead.id, { source: v.trim() || undefined })} className="min-w-0 truncate text-sm" />
+        </div>
       </Prop>
       <Prop label="WhatsApp / contato">
         <div className="flex items-center gap-2">
