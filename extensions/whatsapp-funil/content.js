@@ -167,21 +167,44 @@
   }
 
   const clickable = (el) => el?.closest('button, [role="button"]') || el
+  /** Aperta como um mouse de verdade (alguns botões do WhatsApp só reagem ao "apertar"). */
+  function press(el) {
+    const t = clickable(el)
+    const r = t.getBoundingClientRect()
+    const o = { bubbles: true, cancelable: true, composed: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }
+    t.dispatchEvent(new PointerEvent("pointerdown", o))
+    t.dispatchEvent(new MouseEvent("mousedown", o))
+    t.dispatchEvent(new PointerEvent("pointerup", o))
+    t.dispatchEvent(new MouseEvent("mouseup", o))
+    t.dispatchEvent(new MouseEvent("click", o))
+  }
+  const visible = (el) => !!el && el.getClientRects().length > 0
+  /** Botões da barra de mensagem (para achar microfone/pausa e para o diagnóstico). */
+  const footerButtons = () => {
+    const f = main()?.querySelector("footer") || main()
+    if (!f) return []
+    const els = [...f.querySelectorAll('button, [role="button"], [data-icon]')].filter(visible)
+    return els.map((el) => ({ el, label: `${el.getAttribute("aria-label") || ""} ${el.getAttribute("title") || ""} ${el.getAttribute("data-icon") || ""} ${el.querySelector("[data-icon]")?.getAttribute("data-icon") || ""}`.toLowerCase() }))
+  }
+  const findButton = (re, not) => footerButtons().find((b) => re.test(b.label) && !(not && not.test(b.label)))?.el
   /** Botão do microfone do WhatsApp (só aparece com a caixa de mensagem vazia). */
   function clickMic() {
-    const f = main()?.querySelector("footer")
-    const el = f?.querySelector('[aria-label="Mensagem de voz"], [aria-label="Voice message"], [aria-label*="gravar" i], [data-icon="ptt"], [data-icon*="mic"]')
+    const el = findButton(/mensagem de voz|voice message|gravar|record|microfone|ptt|mic/, /pause|pausar|send|enviar|delete|excluir/)
     if (!el) return false
-    clickable(el).click()
+    press(el)
     return true
   }
   /** Para (pausa) a gravação quando o áudio do funil acaba — NÃO envia; o enviar é seu. */
   function pauseRecording() {
-    const f = main()?.querySelector("footer") || document
-    const el = f.querySelector('[aria-label="Pausar"], [aria-label="Pause"], [aria-label*="ausar" i], [data-icon="ptt-pause"], [data-icon*="pause"]')
+    const el = findButton(/pausar|pause|parar|stop/, /send|enviar|delete|excluir|lixeira/)
     if (!el) return false
-    clickable(el).click()
+    press(el)
     return true
+  }
+  /** O que a extensão vê (sem conteúdo de conversa): para eu saber o nome dos botões no seu WhatsApp. */
+  const micLog = []
+  function diagnostics() {
+    return JSON.stringify({ v: chrome.runtime.getManifest?.().version, ua: navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0], botoes: footerButtons().slice(0, 25).map((b) => b.label.trim()), eventos: micLog.slice(-12) }, null, 1)
   }
   const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`
 
@@ -270,6 +293,10 @@
   window.addEventListener("message", (e) => {
     if (e.source !== window || e.origin !== location.origin || !e.data?.__oosMic) return
     const st = e.data.__oosMic
+    micLog.push(`${new Date().toLocaleTimeString("pt-BR")} ${st}${e.data.armed !== undefined ? ` armado=${e.data.armed}` : ""}${e.data.reason ? ` ${e.data.reason}` : ""}`)
+    if (st === "gum" && voice) voice.gum = true
+    if (st === "armed" && voice) voice.armedOk = true
+    if (st === "pong" && voice) voice.pong = true
     if (!voice) return
     if (st === "playing") voice = { ...voice, phase: "playing", seconds: e.data.seconds, startedAt: Date.now() }
     else if (st === "ended") {
@@ -278,11 +305,12 @@
       setTimeout(() => {
         if (voice?.phase === "ended") {
           voice.paused = pauseRecording()
+          voice.pauseTried = true
           render()
         }
       }, 250)
     }
-    else if (st === "error") voice = { ...voice, phase: "error" }
+    else if (st === "error") voice = { ...voice, phase: "error", reason: e.data.reason }
     else return
     render()
   })
@@ -422,11 +450,13 @@
               ? `<div class="ok">Começando a gravação…</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
               : `<div class="ok"><b>Clique no microfone 🎤 do WhatsApp</b> (apague o texto da caixa se houver). O áudio do funil entra no lugar da sua voz.</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
           else if (voice.phase === "playing") html += `<div class="ok">🔴 Gravando o áudio do funil: <b class="vt">0:00</b> de ${mmss(voice.seconds)}. Não clique em nada — eu paro sozinho no fim.</div>`
+          else if (voice.phase === "ended" && !voice.pauseTried) html += `<div class="ok">Parando a gravação…</div>`
           else if (voice.phase === "ended")
             html += voice.paused
               ? `<div class="ok"><b>Áudio pronto (${mmss(voice.seconds || 0)}).</b> Ouça se quiser e clique em <b>enviar ➤</b> no WhatsApp. Eu registro sozinho.</div>`
-              : `<div class="ok"><b>Terminou (${mmss(voice.seconds || 0)}) — clique em enviar ➤ agora.</b> Eu registro sozinho.</div>`
-          else html += `<div class="warn">Não consegui usar este arquivo como áudio de voz. Use “Anexar como arquivo”.</div>`
+              : `<div class="warn"><b>Terminou (${mmss(voice.seconds || 0)}), mas não achei o botão de parar.</b> Clique em enviar ➤ agora (ou ⏸ para ouvir antes).</div><button class="b ghost" data-a="diag">Copiar diagnóstico</button>`
+          else if (voice.phase === "problem") html += `<div class="warn">${esc(voice.problem)}</div><button class="b" data-a="voice">Tentar de novo</button><button class="b ghost" data-a="diag">Copiar diagnóstico (para o suporte)</button>`
+          else html += `<div class="warn">Não consegui usar este arquivo como áudio de voz${voice.reason ? ` (${esc(voice.reason)})` : ""}. Use “Anexar como arquivo”.</div><button class="b ghost" data-a="diag">Copiar diagnóstico</button>`
           html += `<button class="b ghost" data-a="attach">Anexar como arquivo</button>`
         } else if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
         else html += `<div class="warn">Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.</div>`
@@ -456,16 +486,39 @@
       render()
       try {
         const buffer = await (await fetchMedia(next.media)).arrayBuffer()
-        window.postMessage({ __oos: "arm", buffer }, location.origin, [buffer])
         voice = { phase: "armed", micClicked: false }
+        window.postMessage({ __oos: "ping" }, location.origin)
+        window.postMessage({ __oos: "arm", buffer }, location.origin, [buffer])
+        await sleep(300)
+        if (!voice.armedOk) {
+          voice = { phase: "problem", problem: voice.pong ? "O WhatsApp não aceitou o arquivo de áudio." : "A parte da extensão que troca o microfone não carregou. Recarregue o WhatsApp (F5) e tente de novo." }
+          return render()
+        }
         // Começa a gravação por você (gravar não é enviar).
-        await sleep(150)
         voice.micClicked = clickMic()
+        render()
+        if (voice.micClicked) {
+          // O WhatsApp tem que pedir o microfone logo depois do clique.
+          for (let i = 0; i < 15 && voice && !voice.gum; i++) await sleep(200)
+          if (voice && !voice.gum)
+            voice = { phase: "problem", problem: "Cliquei no microfone, mas o WhatsApp não começou a gravar. Clique você no microfone 🎤 agora (o áudio do funil continua preparado por 2 min) ou copie o diagnóstico.", keepArmed: true }
+          else if (voice && voice.gum && voice.phase === "armed") await sleep(0)
+        }
         pendingSend = { leadId: lead.id, step: next.index, text: "", title: s.title, media: true }
         baselineLast = lastMessage()?.id ?? null
       } catch (e) {
         voice = null
         state.note = `⚠ ${e.message}`
+      }
+      render()
+    })
+    on("diag", async () => {
+      const text = diagnostics()
+      try {
+        await navigator.clipboard.writeText(text)
+        state.note = "Diagnóstico copiado — cole na conversa com o suporte."
+      } catch {
+        state.note = "Não consegui copiar. Diagnóstico: " + text
       }
       render()
     })

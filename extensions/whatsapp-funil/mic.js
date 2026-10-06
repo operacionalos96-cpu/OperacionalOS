@@ -14,9 +14,12 @@
   window.addEventListener("message", (e) => {
     if (e.source !== window || e.origin !== location.origin) return
     const d = e.data
-    if (d?.__oos === "arm" && d.buffer instanceof ArrayBuffer) {
+    // O arquivo vem do "mundo" da extensão: instanceof ArrayBuffer falha entre mundos, então checa pelo tipo.
+    if (d?.__oos === "arm" && Object.prototype.toString.call(d.buffer) === "[object ArrayBuffer]") {
       armed = { buffer: d.buffer, at: Date.now() }
-      say("armed")
+      say("armed", { bytes: d.buffer.byteLength })
+    } else if (d?.__oos === "ping") {
+      say("pong", { armed: !!armed })
     } else if (d?.__oos === "disarm") {
       armed = null
       say("disarmed")
@@ -48,13 +51,14 @@
 
   proto.getUserMedia = async function (constraints) {
     const wantsAudioOnly = constraints && constraints.audio && !constraints.video
+    say("gum", { armed: !!armed, audioOnly: !!wantsAudioOnly })
     if (armed && wantsAudioOnly && Date.now() - armed.at < 120_000) {
       const { buffer } = armed
       armed = null
       try {
         return await fakeStream(buffer)
-      } catch {
-        say("error")
+      } catch (err) {
+        say("error", { reason: String(err && err.message || err).slice(0, 120) })
       }
     }
     return original.call(this, constraints)
