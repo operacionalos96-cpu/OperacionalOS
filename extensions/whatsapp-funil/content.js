@@ -313,8 +313,15 @@
 
     if (!next) html += `<p class="muted">${funnel.stopped ? "Fora do funil." : "Funil concluído para este lead."}</p>`
     else if (next.waitingReply) {
-      html += `<p><b>Próximo: ${esc(next.label)}</b> (${KIND[next.kind]})</p><div class="warn">Esperando ele responder. Quando a resposta chegar aqui, eu marco sozinho.</div>
-        <button class="b" data-a="replied">Ele respondeu</button>`
+      // A última mensagem da conversa é dele? (respondeu antes de a extensão estar aberta)
+      const all = messages()
+      const lastEl = all[all.length - 1]
+      const lastIn = lastMessage()?.incoming
+      const lastText = lastIn ? (lastEl?.querySelector("span.selectable-text, .copyable-text span")?.innerText || "").trim().slice(0, 120) : ""
+      html += `<p><b>Próximo: ${esc(next.label)}</b> (${KIND[next.kind]})</p>`
+      html += lastIn
+        ? `<div class="ok">A última mensagem é dele${lastText ? `: “${esc(lastText)}”` : ""}. Se for a resposta, libere o próximo passo.</div><button class="b main" data-a="replied">Ele respondeu — liberar passo ${next.index + 1}</button>`
+        : `<div class="warn">Esperando ele responder. Quando a resposta chegar aqui, eu marco sozinho.</div><button class="b" data-a="replied">Ele respondeu</button>`
     } else {
       html += `<p><b>Passo ${next.index + 1}: ${esc(next.label)}</b> · ${KIND[next.kind]}${!next.due ? ` <span class="muted">(vence ${when(next.dueAt)})</span>` : ""}</p>`
       const noun = next.kind === "audio" ? "áudio" : "vídeo"
