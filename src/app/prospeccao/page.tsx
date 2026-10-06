@@ -12,7 +12,7 @@ import { regionOf, segmentPhrase } from "@/lib/domain/lead-context"
 import { InlineText } from "@/components/shared/inline-edit"
 import { needsSiteInfo, readSite, useSiteInfoRunner } from "@/lib/site-info-runner"
 import { useFunnel } from "@/lib/funnel-store"
-import { dayStats, duration, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
+import { dayStats, duration, isDiscarded, wasContacted, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { approveLead, funnelSent, undoReview } from "@/lib/services/ai-office"
@@ -127,7 +127,7 @@ export default function ProspectingPage() {
   const stats = dayStats(leads, new Date(), meId)
   const elapsed = session.current.start ? Date.now() - session.current.start : 0
   const done = session.current.done
-  const waiting = leads.filter((l) => reviewStatus(l) === "approved" && l.contactStatus !== "contacted" && (scope === "todos" || l.review?.approvedBy === meId))
+  const waiting = leads.filter((l) => reviewStatus(l) === "approved" && !wasContacted(l) && (scope === "todos" || l.review?.approvedBy === meId))
   const discarded = leads.filter((l) => isDiscarded(l)).sort((a, b) => (b.review?.rejectedAt ?? "").localeCompare(a.review?.rejectedAt ?? ""))
 
   return (

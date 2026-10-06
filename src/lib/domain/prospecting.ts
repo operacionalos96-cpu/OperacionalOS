@@ -3,7 +3,6 @@
  * A análise (o que a IA/planilha pensou) e a revisão (o que o humano decidiu) ficam
  * em campos separados do lead e nunca se sobrescrevem: é o dado de aprendizado.
  */
-import { isOpenStage } from "./constants"
 import type { Lead, ReviewStatus } from "./types"
 
 export const REJECTION_REASONS = [
@@ -34,9 +33,13 @@ export function prospectQueue<L extends Lead>(leads: L[], ownerId?: string): L[]
   const q = (l: Lead) => l.analysis?.qualificationScore ?? -1
   const site = (l: Lead) => l.analysis?.siteScore ?? 11
   return leads
-    .filter((l) => reviewStatus(l) === "pending" && isOpenStage(l.stage) && l.contactStatus !== "contacted" && (!ownerId || l.ownerId === ownerId))
+    // Só quem ainda está em "Novo": lead movido para "Contato feito" no Pipeline já foi contatado.
+    .filter((l) => reviewStatus(l) === "pending" && l.stage === "novo" && !wasContacted(l) && (!ownerId || l.ownerId === ownerId))
     .sort((a, b) => q(b) - q(a) || site(a) - site(b) || a.createdAt.localeCompare(b.createdAt))
 }
+
+/** Já recebeu o 1º contato: pelo ENVIEI/extensão ou porque foi movido de "Novo" no Pipeline. */
+export const wasContacted = (l: Pick<Lead, "contactStatus" | "stage">) => l.contactStatus === "contacted" || l.stage !== "novo"
 
 /** "Bom dia, tudo bem?" antes do meio-dia (horário de quem está usando); senão "Boa tarde, tudo bem?". */
 export const greeting = (now: Date) => (now.getHours() < 12 ? "Bom dia, tudo bem?" : "Boa tarde, tudo bem?")

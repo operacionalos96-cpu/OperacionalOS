@@ -7,6 +7,7 @@ import { ArrowDownIcon, ArrowUpIcon, CheckIcon, DownloadIcon, MessageCircleIcon,
 import type { WhatsappTarget } from "@/lib/domain/contact"
 import { FUNNEL_MEDIA_MAX, followupsDue, nextStep, renderTemplate, type FunnelStep } from "@/lib/domain/funnel"
 import { signedContentUrl, uploadFunnelMedia } from "@/lib/content-storage"
+import { wasContacted } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { useFunnel } from "@/lib/funnel-store"
@@ -34,7 +35,7 @@ export function FunnelTab({ leads, ownerId, whatsTarget, onPending }: { leads: L
   const now = new Date()
   const due = followupsDue(leads, steps, now, ownerId)
   const waiting = leads
-    .filter((l) => l.contactStatus === "contacted" && (!ownerId || l.ownerId === ownerId))
+    .filter((l) => wasContacted(l) && (!ownerId || l.ownerId === ownerId))
     .flatMap((l) => {
       const n = nextStep(l, steps, now)
       return n && n.waitingReply ? [{ lead: l, ...n }] : []

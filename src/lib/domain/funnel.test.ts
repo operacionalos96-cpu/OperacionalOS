@@ -45,7 +45,7 @@ describe("funil de WhatsApp", () => {
   })
 
   it("registrar envio avança o passo e guarda o histórico", () => {
-    const f = sentPatch(lead({}), 0, "t1", "u2")
+    const f = sentPatch(lead({ stage: "novo" }), 0, "t1", "u2")
     expect(f).toEqual({ step: 1, lastSentAt: "t1", history: [{ step: 0, at: "t1", by: "u2" }] })
     expect(sentPatch({ funnel: f }, 1, "t2").step).toBe(2)
   })
@@ -134,5 +134,14 @@ describe("passos de áudio e vídeo (arquivo)", () => {
       { path: "funil/a.exe", name: "a", mime: "application/x-msdownload", size: 1 },
     ]
     for (const media of bad) expect(mergeFunnel([{ template: "x" }, { kind: "audio", media }])[1].media).toBeUndefined()
+  })
+})
+
+describe("leads movidos para Contato feito no Pipeline (antes do funil)", () => {
+  it("contam como 1ª mensagem enviada, esperando resposta", () => {
+    const l = lead({ stage: "contato", lastActivityAt: "2026-10-01T12:00:00Z" })
+    expect(nextStep(l, DEFAULT_FUNNEL, new Date("2026-10-06T12:00:00Z"))).toMatchObject({ index: 1, waitingReply: true })
+    const replied = { ...l, funnel: repliedPatch(l, "2026-10-06T13:00:00Z") }
+    expect(followupsDue([replied], DEFAULT_FUNNEL, new Date("2026-10-06T14:00:00Z")).map((x) => x.index)).toEqual([1])
   })
 })

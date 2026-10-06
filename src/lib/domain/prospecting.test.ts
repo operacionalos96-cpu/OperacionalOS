@@ -25,10 +25,11 @@ describe("prospecção", () => {
       lead({ id: "apr", review: { status: "approved" } }),
       lead({ id: "contatado", contactStatus: "contacted" }),
       lead({ id: "ganho", stage: "ganho" }),
+      lead({ id: "movido", stage: "contato" }), // movido para "Contato feito" no Pipeline
       lead({ id: "dele", ownerId: "u2" }),
     ]
     expect(prospectQueue([a, b, c, old, ...outros], "u1").map((l) => l.id)).toEqual(["b", "c", "a", "d"])
-    expect(prospectQueue([a, outros[4]]).map((l) => l.id)).toEqual(["a", "dele"])
+    expect(prospectQueue([a, outros[5]]).map((l) => l.id)).toEqual(["a", "dele"])
   })
 
   it("saudação pelo horário local", () => {

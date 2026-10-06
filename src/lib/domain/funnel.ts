@@ -4,6 +4,7 @@
  * O envio é SEMPRE humano (o sistema/extensão só escreve a mensagem e registra).
  */
 import { rawSegment, regionOf, segmentPhrase } from "./lead-context"
+import { wasContacted } from "./prospecting"
 import type { Lead } from "./types"
 
 export interface FunnelStep {
@@ -149,11 +150,16 @@ export function renderTemplate(template: string, lead: Partial<Lead>, now: Date)
     .trim()
 }
 
-export const funnelOf = (l: Pick<Lead, "funnel" | "firstContactAt">): LeadFunnel =>
-  l.funnel ?? (l.firstContactAt ? { step: 1, lastSentAt: l.firstContactAt, history: [{ step: 0, at: l.firstContactAt }] } : { step: 0, history: [] })
+export const funnelOf = (l: Pick<Lead, "funnel" | "firstContactAt"> & Partial<Pick<Lead, "stage" | "lastActivityAt">>): LeadFunnel => {
+  if (l.funnel) return l.funnel
+  if (l.firstContactAt) return { step: 1, lastSentAt: l.firstContactAt, history: [{ step: 0, at: l.firstContactAt }] }
+  // Movido de "Novo" no Pipeline antes do funil existir: a 1ª mensagem já foi.
+  if (l.stage && l.stage !== "novo" && l.lastActivityAt) return { step: 1, lastSentAt: l.lastActivityAt, history: [{ step: 0, at: l.lastActivityAt }] }
+  return { step: 0, history: [] }
+}
 
 /** Próximo passo do lead: qual, quando vence e se já pode mandar. null = funil terminado/parado. */
-export function nextStep(lead: Pick<Lead, "funnel" | "firstContactAt" | "stage">, steps: FunnelStep[], now: Date) {
+export function nextStep(lead: Pick<Lead, "funnel" | "firstContactAt" | "stage"> & Partial<Pick<Lead, "lastActivityAt">>, steps: FunnelStep[], now: Date) {
   const f = funnelOf(lead)
   if (f.stopped || f.step >= steps.length || ["ganho", "perdido", "negociacao", "proposta"].includes(lead.stage)) return null
   const step = steps[f.step]
@@ -177,7 +183,7 @@ export function followupsDue<L extends Lead>(leads: L[], steps: FunnelStep[], no
   const endOfDay = new Date(now)
   endOfDay.setHours(23, 59, 59, 999)
   return leads
-    .filter((l) => l.contactStatus === "contacted" && (!ownerId || l.ownerId === ownerId))
+    .filter((l) => wasContacted(l) && (!ownerId || l.ownerId === ownerId))
     .flatMap((l) => {
       const n = nextStep(l, steps, now)
       return n && n.index > 0 && n.dueAt && n.dueAt.getTime() <= endOfDay.getTime() ? [{ lead: l, ...n, dueAt: n.dueAt }] : []
