@@ -11,6 +11,7 @@
   const urlPhone = new URLSearchParams(location.search).get("phone")
   if (urlPhone && /^\d{10,15}$/.test(urlPhone)) sessionStorage.setItem("oos-url-phone", urlPhone)
 
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const api = (action, body) => chrome.runtime.sendMessage({ type: "api", action, body }).catch(() => ({ ok: false, data: { erro: "Extensão recarregada — recarregue a página." } }))
   const digits = (s) => (s || "").replace(/\D/g, "")
 
@@ -56,17 +57,32 @@
   }
 
   /** Escreve na caixa de mensagem (como colar). NÃO aperta Enter. */
-  function writeInComposer(text) {
-    const box = main()?.querySelector('footer div[contenteditable="true"]') || document.querySelector('div[contenteditable="true"][data-tab="10"]')
+  const composer = () => main()?.querySelector('footer div[contenteditable="true"]') || document.querySelector('div[contenteditable="true"][data-tab="10"]')
+  const flat = (s) => (s || "").replace(/\s+/g, " ").trim()
+  /** A mensagem já está na caixa (ex.: o sistema abriu a conversa com ela)? */
+  const composerHas = (text) => !!text && flat(composer()?.innerText).includes(flat(text))
+
+  /** Troca o que estiver na caixa pela mensagem (como colar). NÃO aperta Enter. */
+  async function writeInComposer(text) {
+    const box = composer()
     if (!box) return false
     box.focus()
-    const before = box.textContent
+    // Limpa rascunho/mensagem antiga para não duplicar.
+    document.execCommand("selectAll", false)
+    document.execCommand("delete", false)
+    await sleep(80)
     try {
       const dt = new DataTransfer()
       dt.setData("text/plain", text)
       box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }))
     } catch {}
-    if (box.textContent === before) document.execCommand("insertText", false, text)
+    // O WhatsApp atualiza a caixa um instante depois: só usa o plano B se a colagem não entrou.
+    await sleep(250)
+    if (!composerHas(text)) {
+      document.execCommand("selectAll", false)
+      document.execCommand("delete", false)
+      document.execCommand("insertText", false, text)
+    }
     return true
   }
 
@@ -89,7 +105,6 @@
   const previewOpen = () =>
     !!document.querySelector("[data-animate-media-viewer], [data-animate-modal-body]") ||
     [...document.querySelectorAll('[data-icon="send"], [data-icon="wds-ic-send-filled"]')].some((el) => !el.closest("footer"))
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const waitPreview = async () => {
     for (let i = 0; i < 10 && !previewOpen(); i++) await sleep(200)
     return previewOpen()
@@ -133,11 +148,12 @@
   root.innerHTML = `
     <style>
       :host { all: initial; }
-      .wrap { position: fixed; top: 0; right: 0; bottom: 0; width: 320px; z-index: 2147483000; background: #fff; color: #111b21; border-left: 1px solid #d1d7db;
+      .wrap { position: fixed; top: 0; right: 0; bottom: 0; width: 300px; z-index: 2147483000; background: #fff; color: #111b21; border-left: 1px solid #d1d7db;
         font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; flex-direction: column; box-shadow: -4px 0 16px rgba(0,0,0,.06); }
       .wrap.closed { width: 0; border: 0; }
-      .toggle { position: fixed; top: 74px; right: 0; z-index: 2147483001; background: #128c4a; color: #fff; border: 0; border-radius: 8px 0 0 8px; padding: 8px 6px; cursor: pointer; font: 600 12px system-ui; writing-mode: vertical-rl; }
-      .wrap:not(.closed) + .toggle { right: 320px; }
+      .toggle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 2147483001; background: #128c4a; color: #fff; border: 0; border-radius: 8px 0 0 8px; padding: 10px 4px; cursor: pointer; font: 600 11px system-ui; writing-mode: vertical-rl; opacity: .85; }
+      .toggle:hover { opacity: 1; }
+      .wrap:not(.closed) + .toggle { right: 300px; }
       header { padding: 12px 14px; border-bottom: 1px solid #e9edef; display: flex; gap: 6px; align-items: center; }
       header b { flex: 1; }
       .tabs button { background: none; border: 0; padding: 4px 8px; border-radius: 6px; cursor: pointer; color: #54656f; font: inherit; }
@@ -170,9 +186,14 @@
   const body = root.querySelector(".body")
   let tab = "chat"
 
+  // O WhatsApp ocupa a tela toda: com o painel aberto, ele encolhe para o lado (não fica nada por baixo).
+  const shrinkStyle = document.createElement("style")
+  shrinkStyle.textContent = `html.oos-funil-open #app { width: calc(100vw - 300px) !important; max-width: calc(100vw - 300px) !important; position: relative !important; overflow: hidden !important; }
+    html.oos-funil-open #app > div { width: 100% !important; min-width: 0 !important; }`
+  ;(document.head || document.documentElement).appendChild(shrinkStyle)
   const appShrink = (open) => {
-    const app = document.querySelector("#app")
-    if (app) app.style.width = open ? "calc(100% - 320px)" : ""
+    document.documentElement.classList.toggle("oos-funil-open", open)
+    window.dispatchEvent(new Event("resize"))
   }
   chrome.storage.local.get("panelClosed").then(({ panelClosed }) => {
     wrap.classList.toggle("closed", !!panelClosed)
@@ -300,7 +321,12 @@
         } else if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
         else html += `<div class="warn">Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.</div>`
       }
-      if (next.text) html += `<pre>${esc(next.text)}</pre><button class="b ${next.kind === "texto" ? "main" : ""}" data-a="write">Escrever no WhatsApp</button>`
+      if (next.text && !pendingSend && composerHas(next.text)) {
+        // O sistema já abriu a conversa com a mensagem: só falta o Enter.
+        pendingSend = { leadId: lead.id, step: next.index, text: next.text, title: s.title }
+        baselineLast = lastMessage()?.id ?? null
+      }
+      if (next.text) html += `<pre>${esc(next.text)}</pre><button class="b ${next.kind === "texto" && !pendingSend ? "main" : ""}" data-a="write">${pendingSend && !pendingSend.media ? "Escrever de novo" : "Escrever no WhatsApp"}</button>`
       if (pendingSend)
         html += `<div class="ok">${pendingSend.media ? `Arquivo anexado. Confira a prévia e clique em <b>enviar</b>` : "Escrito na caixa. Confira e aperte <b>Enter</b>"} — eu registro sozinho quando sair.</div>`
       html += `<button class="b" data-a="sent">${next.kind === "texto" ? "Já enviei" : `Enviei o ${next.kind === "audio" ? "áudio" : "vídeo"}`}</button>`
@@ -309,8 +335,8 @@
     body.innerHTML = html
 
     const on = (a, fn) => body.querySelector(`[data-a="${a}"]`)?.addEventListener("click", fn)
-    on("write", () => {
-      if (!writeInComposer(next.text)) return (state.note = "⚠ Não achei a caixa de mensagem."), render()
+    on("write", async () => {
+      if (!(await writeInComposer(next.text))) return (state.note = "⚠ Não achei a caixa de mensagem."), render()
       pendingSend = { leadId: lead.id, step: next.index, text: next.text, title: s.title }
       baselineLast = lastMessage()?.id ?? null
       render()
