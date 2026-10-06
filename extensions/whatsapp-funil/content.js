@@ -380,9 +380,12 @@
     }
   }
 
+  /** Hora do último envio registrado: logo depois, a última mensagem visível ainda é a antiga dele. */
+  let justSentAt = 0
   async function act(action, extra, note) {
     const lead = state.data?.lead
     if (!lead) return
+    if (action === "sent" || (action === "sync" && extra?.sent?.length)) justSentAt = Date.now()
     const r = await api(action, { leadId: lead.id, ...extra })
     if (r.ok) {
       state.data = { found: true, ...r.data }
@@ -431,11 +434,14 @@
     else if (next.waitingReply) {
       // A última mensagem da conversa é dele? (respondeu antes de a extensão estar aberta)
       const msgs = extractMessages()
-      const lastIn = !!msgs.length && !msgs[msgs.length - 1].out
+      // Só sugere "ele respondeu" se a resposta é DEPOIS do nosso último passo na conversa
+      // (logo após enviar, a mensagem antiga dele ainda aparece como a última).
+      const recent = Date.now() - justSentAt < 45_000
+      const lastIn = !recent && (chatView?.sent.length ? chatView.replied : !!msgs.length && !msgs[msgs.length - 1].out)
       const lastText = lastIn ? (msgs[msgs.length - 1].text || "").slice(0, 120) : ""
       html += `<p><b>Próximo: ${esc(next.label)}</b> (${KIND[next.kind]})</p>`
       html += lastIn
-        ? `<div class="ok">A última mensagem é dele${lastText ? `: “${esc(lastText)}”` : ""}. Se for a resposta, libere o próximo passo.</div><button class="b main" data-a="replied">Ele respondeu — liberar passo ${next.index + 1}</button>`
+        ? `<div class="ok">Ele respondeu depois da sua última mensagem${lastText ? `: “${esc(lastText)}”` : ""}. Confira e libere o próximo passo.</div><button class="b main" data-a="replied">Ele respondeu — liberar passo ${next.index + 1}</button>`
         : `<div class="warn">Esperando ele responder. Quando a resposta chegar aqui, eu marco sozinho.</div><button class="b" data-a="replied">Ele respondeu</button>`
     } else {
       html += `<p><b>Passo ${next.index + 1}: ${esc(next.label)}</b> · ${KIND[next.kind]}${!next.due ? ` <span class="muted">(vence ${when(next.dueAt)})</span>` : ""}</p>`
