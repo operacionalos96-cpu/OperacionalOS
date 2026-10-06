@@ -1,17 +1,43 @@
 {
   "manifest_version": 3,
   "name": "Funil Operacional OS",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Mostra o lead e o próximo passo do funil dentro do WhatsApp Web. Escreve a mensagem e anexa o áudio/vídeo; quem clica em enviar é você.",
-  "permissions": ["storage"],
-  "host_permissions": ["https://operacional-os.vercel.app/*", "http://localhost:3000/*", "https://*.supabase.co/*"],
-  "background": { "service_worker": "background.js" },
-  "action": { "default_title": "Funil Operacional OS", "default_popup": "popup.html" },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://operacional-os.vercel.app/*",
+    "http://localhost:3000/*",
+    "https://*.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Funil Operacional OS",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "mic.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     }
-  ]
+  ],
+  "minimum_chrome_version": "111"
 }

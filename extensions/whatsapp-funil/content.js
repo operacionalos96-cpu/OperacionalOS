@@ -201,10 +201,27 @@
   /** Mensagem escrita pela extensão esperando o Enter da pessoa (aí registra sozinho). */
   let pendingSend = null
   let baselineLast = null
+  /** Áudio de voz: estado vindo do mic.js (página). */
+  let voice = null
+  window.addEventListener("message", (e) => {
+    if (e.source !== window || e.origin !== location.origin || !e.data?.__oosMic) return
+    const st = e.data.__oosMic
+    if (!voice) return
+    if (st === "playing") voice = { ...voice, phase: "playing", seconds: e.data.seconds }
+    else if (st === "ended") voice = { ...voice, phase: "ended" }
+    else if (st === "error") voice = { ...voice, phase: "error" }
+    else return
+    render()
+  })
+  const disarmVoice = () => {
+    if (voice) window.postMessage({ __oos: "disarm" }, location.origin)
+    voice = null
+  }
 
   async function load(title) {
     state = { title, phone: null, data: null, error: null, loading: true, note: "" }
     pendingSend = null
+    disarmVoice()
     render()
     const phone = await chatPhone(title)
     if (title !== state.title) return
@@ -271,7 +288,16 @@
       html += `<p><b>Passo ${next.index + 1}: ${esc(next.label)}</b> · ${KIND[next.kind]}${!next.due ? ` <span class="muted">(vence ${when(next.dueAt)})</span>` : ""}</p>`
       const noun = next.kind === "audio" ? "áudio" : "vídeo"
       if (next.kind !== "texto") {
-        if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
+        if (next.media && next.kind === "audio") {
+          html += `<div class="muted">📎 ${esc(next.media.name)}</div>`
+          if (!voice) html += `<button class="b main" data-a="voice">🎤 Enviar como áudio gravado</button>`
+          else if (voice.phase === "loading") html += `<div class="ok">Preparando o áudio…</div>`
+          else if (voice.phase === "armed") html += `<div class="ok"><b>Agora clique no microfone 🎤 do WhatsApp.</b> O áudio do funil entra no lugar da sua voz.</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
+          else if (voice.phase === "playing") html += `<div class="ok">Gravando o áudio do funil (${voice.seconds}s)… <b>não clique em nada</b> até terminar.</div>`
+          else if (voice.phase === "ended") html += `<div class="ok"><b>Terminou — clique em enviar (➤) no WhatsApp.</b> Eu registro sozinho.</div>`
+          else html += `<div class="warn">Não consegui usar este arquivo como áudio de voz. Use “Anexar como arquivo”.</div>`
+          html += `<button class="b ghost" data-a="attach">Anexar como arquivo</button>`
+        } else if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
         else html += `<div class="warn">Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.</div>`
       }
       if (next.text) html += `<pre>${esc(next.text)}</pre><button class="b ${next.kind === "texto" ? "main" : ""}" data-a="write">Escrever no WhatsApp</button>`
@@ -287,6 +313,26 @@
       if (!writeInComposer(next.text)) return (state.note = "⚠ Não achei a caixa de mensagem."), render()
       pendingSend = { leadId: lead.id, step: next.index, text: next.text, title: s.title }
       baselineLast = lastMessage()?.id ?? null
+      render()
+    })
+    on("voice", async () => {
+      voice = { phase: "loading" }
+      render()
+      try {
+        const buffer = await (await fetchMedia(next.media)).arrayBuffer()
+        window.postMessage({ __oos: "arm", buffer }, location.origin, [buffer])
+        voice = { phase: "armed" }
+        pendingSend = { leadId: lead.id, step: next.index, text: "", title: s.title, media: true }
+        baselineLast = lastMessage()?.id ?? null
+      } catch (e) {
+        voice = null
+        state.note = `⚠ ${e.message}`
+      }
+      render()
+    })
+    on("voice-cancel", () => {
+      disarmVoice()
+      pendingSend = null
       render()
     })
     on("attach", async () => {
@@ -366,6 +412,7 @@
         // A pessoa apertou Enter: registra o passo.
         const p = pendingSend
         pendingSend = null
+        voice = null
         await act("sent", { step: p.step, text: p.text }, "Enviado e registrado no Operacional OS.")
       } else if (last.incoming && state.data.next?.waitingReply) {
         await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
