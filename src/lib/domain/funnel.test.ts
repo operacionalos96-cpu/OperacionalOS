@@ -95,6 +95,13 @@ describe("roteiro de vocês (passo depois da resposta)", () => {
   })
 })
 
+describe("saudação no horário de Brasília (servidor em UTC)", () => {
+  it("12:00 UTC = 9h em SP → bom dia; 18:00 UTC = 15h → boa tarde", () => {
+    expect(renderTemplate("{saudacao}", lead({}), new Date("2026-10-06T12:00:00Z"))).toBe("Bom dia, tudo bem?")
+    expect(renderTemplate("{saudacao}", lead({}), new Date("2026-10-06T18:00:00Z"))).toBe("Boa tarde, tudo bem?")
+  })
+})
+
 describe("passos de áudio e vídeo", () => {
   it("roteiro de vocês tem 4 passos: 2 textos, áudio e vídeo, todos depois da resposta", () => {
     expect(DEFAULT_FUNNEL.map((s) => [s.kind, s.trigger])).toEqual([

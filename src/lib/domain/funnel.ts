@@ -97,7 +97,9 @@ export function mergeFunnel(raw: unknown): FunnelStep[] {
   return steps.length ? steps.slice(0, 10) : DEFAULT_FUNNEL
 }
 
-export const greetingFor = (now: Date) => (now.getHours() < 12 ? "Bom dia, tudo bem?" : "Boa tarde, tudo bem?")
+/** Hora em Brasília (o servidor roda em UTC; a saudação tem que ser a do lead). */
+const hourBR = (now: Date) => Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(now))
+export const greetingFor = (now: Date) => (hourBR(now) < 12 ? "Bom dia, tudo bem?" : "Boa tarde, tudo bem?")
 
 /** Preenche as variáveis. O que não existir some sem deixar "{...}" na mensagem. */
 export function renderTemplate(template: string, lead: Partial<Lead>, now: Date) {
