@@ -20,6 +20,7 @@ import { dateTime, dueLabel, money, parseMoney, relative, shortDate } from "@/li
 import { deleteLeadWithUndo, deleteTaskWithUndo, toggleTaskWithFeedback } from "@/lib/actions"
 import { useStore } from "@/lib/store"
 import { whatsappLink } from "@/lib/domain/contact"
+import { openWhatsapp } from "@/lib/whatsapp-open"
 import { safeUrl } from "@/lib/domain/products"
 import { toast } from "sonner"
 import { ExternalLinkIcon, MessageCircleIcon } from "lucide-react"
@@ -334,14 +335,14 @@ function Properties({ lead }: { lead: Lead }) {
             className="min-w-0 flex-1 text-sm"
           />
           {whatsappLink(lead.contact) && (
-            <a
-              href={whatsappLink(lead.contact)!}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
+            <button
+              type="button"
+              onClick={() => openWhatsapp(lead.contact)}
               className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-medium text-success transition-colors hover:bg-success-soft"
+              title="Abre no WhatsApp escolhido no Modo Prospecção (Web, App ou Celular)"
             >
               <MessageCircleIcon className="size-3.5" /> Conversar
-            </a>
+            </button>
           )}
         </div>
       </Prop>

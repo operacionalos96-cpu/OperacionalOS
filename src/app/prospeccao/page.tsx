@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
+import { CopyIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
-import { whatsappLink } from "@/lib/domain/contact"
+import { isLikelyMobile, whatsappLink, whatsappNumber, whatsappProblem, type WhatsappTarget } from "@/lib/domain/contact"
+import { openWhatsapp, useWhatsappTarget } from "@/lib/whatsapp-open"
 import { dayStats, duration, greeting, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
@@ -31,6 +32,7 @@ export default function ProspectingPage() {
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [pending, setPending] = useState<{ leadId: string; name: string; message: string } | null>(null)
   const [rejecting, setRejecting] = useState(false)
+  const [whatsTarget, setWhatsTarget] = useWhatsappTarget()
   // Sessão: começa na primeira decisão.
   const session = useRef<{ start: number | null; done: number }>({ start: null, done: 0 })
   const [, tick] = useState(0)
@@ -66,17 +68,15 @@ export default function ProspectingPage() {
     countDecision()
     const message = greeting(new Date())
     approveLead(current.id)
-    const link = whatsappLink(current.contact)
     const following = queue[index + 1]?.id ?? null
-    if (!link) {
-      toast.warning(`${current.name} aprovado, mas sem WhatsApp válido`, { description: "Contate por outro meio e registre na página do lead." })
+    if (!openWhatsapp(current.contact, message, whatsTarget)) {
+      toast.warning(`${current.name} aprovado, mas sem WhatsApp válido`, { description: `${whatsappProblem(current.contact)}. Contate por outro meio ou cadastre o número no lead.` })
       setCurrentId(following)
       return
     }
-    window.open(`${link}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer")
     setPending({ leadId: current.id, name: current.name, message })
     setCurrentId(following)
-  }, [current, pending, queue, index])
+  }, [current, pending, queue, index, whatsTarget])
 
   const confirmSent = useCallback(() => {
     if (!pending) return
@@ -125,12 +125,15 @@ export default function ProspectingPage() {
         title="Prospecção"
         description="Revise rápido: aprovar e chamar no WhatsApp, ou descartar dizendo o porquê."
         actions={
-          <div className="flex rounded-lg border p-0.5 text-xs">
-            {(["meus", "todos"] as const).map((s) => (
-              <button key={s} onClick={() => setScope(s)} className={cn("rounded-md px-2.5 py-1 font-medium", scope === s ? "bg-accent" : "text-muted-foreground hover:text-foreground")}>
-                {s === "meus" ? "Meus leads" : "Todos"}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <WhatsTargetSwitch value={whatsTarget} onChange={setWhatsTarget} />
+            <div className="flex rounded-lg border p-0.5 text-xs">
+              {(["meus", "todos"] as const).map((s) => (
+                <button key={s} onClick={() => setScope(s)} className={cn("rounded-md px-2.5 py-1 font-medium", scope === s ? "bg-accent" : "text-muted-foreground hover:text-foreground")}>
+                  {s === "meus" ? "Meus leads" : "Todos"}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -175,7 +178,7 @@ export default function ProspectingPage() {
 
         {tab === "fila" &&
           (current ? (
-            <LeadCard lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
+            <LeadCard whatsTarget={whatsTarget} lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
           ) : (
             <EmptyState icon={PartyPopperIcon} title="Fila zerada" description={scope === "meus" ? "Nenhum lead seu esperando revisão. Veja “Todos” ou importe mais." : "Nenhum lead esperando revisão."} className="py-16" />
           ))}
@@ -185,14 +188,14 @@ export default function ProspectingPage() {
             empty="Nenhum lead aprovado esperando contato."
             items={waiting.map((l) => ({
               lead: l,
-              detail: `aprovado ${l.review?.approvedAt ? relative(l.review.approvedAt) : ""}`,
+              detail: `aprovado ${l.review?.approvedAt ? relative(l.review.approvedAt) : ""}${whatsappProblem(l.contact) ? ` · ${whatsappProblem(l.contact)}` : ""}`,
               action: whatsappLink(l.contact) ? (
                 <Button
                   size="xs"
                   variant="outline"
                   onClick={() => {
                     const message = greeting(new Date())
-                    window.open(`${whatsappLink(l.contact)}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer")
+                    openWhatsapp(l.contact, message, whatsTarget)
                     setPending({ leadId: l.id, name: l.name, message })
                   }}
                 >
@@ -250,6 +253,7 @@ export default function ProspectingPage() {
 }
 
 function LeadCard({
+  whatsTarget,
   lead,
   position,
   total,
@@ -259,6 +263,7 @@ function LeadCard({
   onReject,
   blocked,
 }: {
+  whatsTarget: WhatsappTarget
   lead: Lead
   position: number
   total: number
@@ -299,9 +304,7 @@ function LeadCard({
         ) : (
           <span className="inline-flex h-9 items-center rounded-lg border border-dashed px-3 text-sm text-muted-foreground">Sem site</span>
         )}
-        <span className={cn("inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm", !whatsappLink(lead.contact) && "text-muted-foreground")}>
-          <PhoneIcon className="size-4" /> {lead.contact || "Sem telefone"}
-        </span>
+        <WhatsChip lead={lead} target={whatsTarget} />
       </div>
 
       <section className="rounded-xl bg-muted/40 p-4">
@@ -354,4 +357,99 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: string
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="ml-1 rounded border bg-muted px-1 font-sans text-[10px] text-muted-foreground">{children}</kbd>
+}
+
+const TARGETS: { id: WhatsappTarget; label: string; hint: string }[] = [
+  { id: "web", label: "Web", hint: "WhatsApp Web direto na conversa, sempre na mesma aba" },
+  { id: "app", label: "App", hint: "WhatsApp instalado no computador" },
+  { id: "celular", label: "Celular", hint: "wa.me (no celular abre o app)" },
+]
+
+/** Onde o WhatsApp abre (lembrado neste navegador). */
+function WhatsTargetSwitch({ value, onChange }: { value: WhatsappTarget; onChange: (t: WhatsappTarget) => void }) {
+  return (
+    <div className="flex items-center rounded-lg border p-0.5 text-xs" title="Onde abrir o WhatsApp">
+      <MessageCircleIcon className="mx-1.5 size-3.5 text-success" />
+      {TARGETS.map((t) => (
+        <button key={t.id} onClick={() => onChange(t.id)} title={t.hint} className={cn("rounded-md px-2 py-1 font-medium", value === t.id ? "bg-accent" : "text-muted-foreground hover:text-foreground")}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Telefone da empresa: clicar abre a conversa (sem aprovar); copiar; aviso se parecer fixo. */
+function WhatsChip({ lead, target }: { lead: Lead; target: WhatsappTarget }) {
+  const contact = lead.contact
+  const number = whatsappNumber(contact)
+  if (!number) return <NoWhatsapp lead={lead} />
+  const mobile = isLikelyMobile(number)
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => openWhatsapp(contact, greeting(new Date()), target)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-success/40 px-3 text-sm font-medium text-success transition-colors hover:bg-success-soft"
+        title="Abrir a conversa (não aprova o lead)"
+      >
+        <MessageCircleIcon className="size-4" /> {contact}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(`+${number}`)
+          toast.success("Número copiado")
+        }}
+        className="inline-flex size-9 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground"
+        aria-label="Copiar número"
+        title="Copiar número"
+      >
+        <CopyIcon className="size-4" />
+      </button>
+      {!mobile && <span className="text-[11px] text-warning">fixo — pode não ter WhatsApp</span>}
+    </span>
+  )
+}
+
+/** Sem WhatsApp válido: diz POR QUÊ e deixa cadastrar o número ali mesmo. */
+function NoWhatsapp({ lead }: { lead: Lead }) {
+  const [value, setValue] = useState("")
+  const problem = whatsappProblem(lead.contact)
+  const ok = !!whatsappLink(value)
+  function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (!ok) return toast.error(whatsappProblem(value) ?? "Número inválido")
+    // Contato antigo que não era telefone (e-mail etc.) não se perde: vai para o histórico.
+    if (lead.contact) useStore.getState().logInteraction(lead.id, "nota", `Contato anterior: ${lead.contact}`)
+    useStore.getState().updateLead(lead.id, { contact: value.trim() })
+    toast.success("WhatsApp adicionado")
+    setValue("")
+  }
+  return (
+    <div className="grid w-full gap-1.5 rounded-lg border border-dashed border-warning/50 px-3 py-2">
+      <p className="flex items-center gap-1.5 text-sm text-warning">
+        <PhoneIcon className="size-4" /> {problem}
+        {lead.contact && problem !== "Sem telefone cadastrado" && <span className="truncate text-xs text-muted-foreground">· “{lead.contact}”</span>}
+      </p>
+      <form onSubmit={save} className="flex flex-wrap items-center gap-1.5">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="(11) 90000-0000"
+          inputMode="tel"
+          className="h-8 min-w-40 flex-1 rounded-md border bg-background px-2 text-sm outline-none focus:border-brand"
+          aria-label="WhatsApp da empresa"
+        />
+        <Button type="submit" size="sm" variant="outline" disabled={!value.trim()}>
+          Adicionar WhatsApp
+        </Button>
+        {lead.website && (
+          <a href={lead.website} target="_blank" rel="noopener noreferrer nofollow" className="text-xs text-muted-foreground underline hover:text-foreground">
+            procurar no site
+          </a>
+        )}
+      </form>
+    </div>
+  )
 }
