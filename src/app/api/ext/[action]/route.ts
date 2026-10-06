@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { FunnelError, loadFunnel, lookupByPhone, markReplied, markSent, stopFunnel, todayList } from "@/lib/server/whatsapp-funnel"
+import { FunnelError, syncFromChat, loadFunnel, lookupByPhone, markReplied, markSent, stopFunnel, todayList } from "@/lib/server/whatsapp-funnel"
 import { WorkerAuthError, authWorker, requireScope } from "@/lib/server/workers"
 
 /**
@@ -30,6 +30,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
           return markSent(str("leadId"), Number(b.step), str("text").slice(0, 4000), w.createdBy!)
         case "replied":
           return markReplied(str("leadId"), w.createdBy!, b.auto === true)
+        case "sync":
+          return syncFromChat(str("leadId"), Array.isArray(b.sent) ? (b.sent as unknown[]).map(Number).slice(0, 20) : [], b.replied === true, w.createdBy!)
         case "stop":
           return stopFunnel(str("leadId"), w.createdBy!)
         case "today":

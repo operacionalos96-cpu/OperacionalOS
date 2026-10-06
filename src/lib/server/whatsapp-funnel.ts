@@ -80,7 +80,8 @@ async function view(l: Lead, steps: FunnelStep[], now: Date) {
   return {
     lead: { id: l.id, name: l.name, company: l.company ?? null, segment: l.segment ?? null, city: l.city ?? null, stage: l.stage, website: l.website ?? null, problems: l.analysis?.problems?.slice(0, 3) ?? [] },
     funnel: { step: f.step, total: steps.length, lastSentAt: f.lastSentAt ?? null, repliedAt: f.repliedAt ?? null, stopped: !!f.stopped },
-    steps: steps.map((s, i) => ({ index: i, label: s.label, kind: s.kind, trigger: s.trigger, delayDays: s.delayDays, done: i < f.step })),
+    // Texto de cada passo já personalizado: a extensão compara com o que está na conversa.
+    steps: steps.map((s, i) => ({ index: i, label: s.label, kind: s.kind, trigger: s.trigger, delayDays: s.delayDays, done: i < f.step, text: s.template ? renderTemplate(s.template, l, now) : "", sentAt: [...f.history].reverse().find((h) => h.step === i)?.at ?? null })),
     next: n
       ? {
           index: n.index,
@@ -135,6 +136,29 @@ export async function markReplied(leadId: string, actorId: string, auto = false)
   const next: Lead = { ...l, funnel: repliedPatch(l, at), lastActivityAt: at }
   await saveLead(next)
   await log(next, actorId, auto ? "Respondeu no WhatsApp (detectado pela extensão)" : "Respondeu no WhatsApp", "lead.replied", { step: f.step, auto })
+  return view(next, steps, new Date())
+}
+
+/**
+ * O que a extensão viu na conversa do WhatsApp: passos já enviados e se ele respondeu depois.
+ * Só anda para frente (nunca desfaz um registro).
+ */
+export async function syncFromChat(leadId: string, sent: number[], replied: boolean, actorId: string) {
+  const [steps, l] = await Promise.all([loadFunnel(), getLead(leadId)])
+  const f = funnelOf(l)
+  const fresh = [...new Set(sent)].filter((i) => Number.isInteger(i) && i >= f.step && i < steps.length).sort((a, b) => a - b)
+  const waiting = nextStep(l, steps, new Date())?.waitingReply
+  if (!fresh.length && !(replied && waiting)) return view(l, steps, new Date())
+  let next: Lead = l
+  const at = new Date()
+  for (const i of fresh) {
+    const iso = new Date(at.getTime() + i).toISOString()
+    next = { ...next, ...(i === 0 && next.contactStatus !== "contacted" ? contactedPatch(next, renderTemplate(steps[0].template, next, at), iso, "whatsapp") : {}), funnel: sentPatch(next, i, iso, actorId), lastActivityAt: iso }
+  }
+  if (replied) next = { ...next, funnel: repliedPatch(next, new Date(at.getTime() + 100).toISOString()) }
+  await saveLead(next)
+  const parts = [fresh.length ? `enviado(s): ${fresh.map((i) => steps[i].label).join(", ")}` : "", replied ? "ele respondeu" : ""].filter(Boolean)
+  await log(next, actorId, `Funil atualizado pela conversa do WhatsApp — ${parts.join("; ")}`, fresh.length ? "lead.followup_sent" : "lead.replied", { synced: true, steps: fresh, replied })
   return view(next, steps, new Date())
 }
 

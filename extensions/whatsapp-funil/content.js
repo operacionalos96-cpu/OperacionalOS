@@ -39,6 +39,22 @@
     const id = el.getAttribute("data-id")
     return { id, incoming: id.startsWith("false_") || !!el.closest(".message-in") || !!el.querySelector(".message-in") }
   }
+  /** Tipo da mensagem pelo que aparece nela (player de áudio, vídeo, texto). */
+  const kindOf = (el) => {
+    if (el.querySelector('[role="slider"], audio, [data-icon*="audio"], [data-icon*="ptt"]')) return "audio"
+    if (el.querySelector('video, [data-icon*="video"], [data-icon="media-play"]')) return "video"
+    if (el.querySelector("span.selectable-text, .copyable-text")) return "texto"
+    return "outro"
+  }
+  /** Mensagens visíveis da conversa, em ordem: quem mandou, tipo, texto e hora. */
+  function extractMessages() {
+    return messages().map((el) => {
+      const id = el.getAttribute("data-id") || ""
+      const pre = el.querySelector("[data-pre-plain-text]")?.getAttribute("data-pre-plain-text") || ""
+      return { out: id.startsWith("true_"), kind: kindOf(el), text: (el.querySelector("span.selectable-text")?.innerText || "").trim(), time: OOSAnalyze.timeFromPrePlain(pre) }
+    })
+  }
+
   /** Telefone da conversa: pelos ids das mensagens, pelo título, pelo link do sistema ou pelo que a pessoa informou. */
   async function chatPhone(title) {
     for (const el of messages()) {
@@ -150,6 +166,25 @@
     return false
   }
 
+  const clickable = (el) => el?.closest('button, [role="button"]') || el
+  /** Botão do microfone do WhatsApp (só aparece com a caixa de mensagem vazia). */
+  function clickMic() {
+    const f = main()?.querySelector("footer")
+    const el = f?.querySelector('[aria-label="Mensagem de voz"], [aria-label="Voice message"], [aria-label*="gravar" i], [data-icon="ptt"], [data-icon*="mic"]')
+    if (!el) return false
+    clickable(el).click()
+    return true
+  }
+  /** Para (pausa) a gravação quando o áudio do funil acaba — NÃO envia; o enviar é seu. */
+  function pauseRecording() {
+    const f = main()?.querySelector("footer") || document
+    const el = f.querySelector('[aria-label="Pausar"], [aria-label="Pause"], [aria-label*="ausar" i], [data-icon="ptt-pause"], [data-icon*="pause"]')
+    if (!el) return false
+    clickable(el).click()
+    return true
+  }
+  const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`
+
   // ---------- painel (shadow DOM: o CSS do WhatsApp não interfere) ----------
   const host = document.createElement("div")
   host.id = "oos-funil"
@@ -236,12 +271,26 @@
     if (e.source !== window || e.origin !== location.origin || !e.data?.__oosMic) return
     const st = e.data.__oosMic
     if (!voice) return
-    if (st === "playing") voice = { ...voice, phase: "playing", seconds: e.data.seconds }
-    else if (st === "ended") voice = { ...voice, phase: "ended" }
+    if (st === "playing") voice = { ...voice, phase: "playing", seconds: e.data.seconds, startedAt: Date.now() }
+    else if (st === "ended") {
+      // Acabou o áudio: para a gravação na hora (sem silêncio no fim). Você só clica em enviar.
+      voice = { ...voice, phase: "ended", paused: false }
+      setTimeout(() => {
+        if (voice?.phase === "ended") {
+          voice.paused = pauseRecording()
+          render()
+        }
+      }, 250)
+    }
     else if (st === "error") voice = { ...voice, phase: "error" }
     else return
     render()
   })
+  setInterval(() => {
+    if (voice?.phase !== "playing" || !voice.startedAt) return
+    const el = root.querySelector(".vt")
+    if (el) el.textContent = mmss(Math.min(voice.seconds, (Date.now() - voice.startedAt) / 1000))
+  }, 500)
   const disarmVoice = () => {
     if (voice) window.postMessage({ __oos: "disarm" }, location.origin)
     voice = null
@@ -266,8 +315,41 @@
       state.error = /context invalidated/i.test(String(e?.message)) ? RELOAD : `Erro: ${e?.message || e}`
     }
     state.loading = false
+    chatView = null
     baselineLast = lastMessage()?.id ?? null
     render()
+    await reconcile()
+  }
+
+  /** O que a leitura da conversa encontrou (passos enviados, horas, resposta). */
+  let chatView = null
+  let syncing = false
+  async function reconcile() {
+    const d = state.data
+    if (!d?.found || !d.lead || syncing || typeof OOSAnalyze === "undefined") return
+    const msgs = extractMessages()
+    if (!msgs.length) return
+    const a = OOSAnalyze.analyzeConversation(msgs, d.steps, d.funnel.step)
+    const before = JSON.stringify(chatView)
+    chatView = { ...a, times: Object.fromEntries(a.sent.map((i) => [i, msgs[a.positions[i]]?.time || ""])) }
+    if (d.funnel.stopped || !d.next) {
+      if (before !== JSON.stringify(chatView)) render()
+      return
+    }
+    const fresh = a.sent.filter((i) => i >= d.funnel.step)
+    const needReply = a.replied && !!d.next.waitingReply
+    if (!fresh.length && !needReply) {
+      if (before !== JSON.stringify(chatView)) render()
+      return
+    }
+    syncing = true
+    try {
+      const parts = [fresh.length ? `enviado: ${fresh.map((i) => d.steps[i].label).join(", ")}` : "", needReply ? "ele respondeu" : ""].filter(Boolean)
+      if (pendingSend && fresh.includes(pendingSend.step)) pendingSend = null
+      await act("sync", { sent: fresh, replied: needReply }, `Atualizado pela conversa — ${parts.join("; ")}.`)
+    } finally {
+      syncing = false
+    }
   }
 
   async function act(action, extra, note) {
@@ -302,11 +384,17 @@
     if (!s.data?.found) return (body.innerHTML = `<p><b>${esc(s.title)}</b></p><p class="muted">Este número (${esc(s.phone)}) não é de nenhum lead do Operacional OS.</p>`)
 
     const { lead, funnel, steps, next } = s.data
-    const chips = steps.map((x) => `<span class="chip ${x.done ? "done" : next && x.index === next.index ? "now" : ""}">${x.done ? "✓ " : ""}${x.index + 1}. ${esc(x.label)}</span>`).join("")
+    const seenAt = (i) => chatView?.times?.[i] || (steps[i].sentAt ? when(steps[i].sentAt) : "")
+    const chips = steps
+      .map((x) => `<span class="chip ${x.done ? "done" : next && x.index === next.index ? "now" : ""}" title="${x.done ? `enviado ${esc(seenAt(x.index))}` : ""}">${x.done ? "✓ " : ""}${x.index + 1}. ${esc(x.label)}${x.done && seenAt(x.index) ? ` · ${esc(seenAt(x.index).split(" ")[0])}` : ""}</span>`)
+      .join("")
+    const convo = chatView?.sent.length
+      ? `<div class="muted">Na conversa: ${chatView.sent.map((i) => `${i + 1}✓`).join(" ")}${chatView.replied ? ` · ele respondeu${chatView.lastIncomingText ? `: “${esc(chatView.lastIncomingText.slice(0, 60))}”` : ""}` : " · sem resposta depois"}</div>`
+      : ""
     let html = `${s.data.byName ? `<div class="warn">Achei pelo nome da conversa — confira se é <b>${esc(lead.name)}</b>.</div>` : ""}<div class="card"><div class="name">${esc(lead.name)}</div>
       <div class="muted">${esc([lead.company, lead.segment, lead.city].filter(Boolean).join(" · "))}</div>
       ${lead.problems.length ? `<div class="muted" style="margin-top:4px">Problema: ${esc(lead.problems[0])}</div>` : ""}
-      <div class="steps">${chips}</div>
+      <div class="steps">${chips}</div>${convo}
       ${funnel.lastSentAt ? `<div class="muted">Última nossa: ${when(funnel.lastSentAt)}${funnel.repliedAt ? ` · respondeu: ${when(funnel.repliedAt)}` : ""}</div>` : ""}
     </div>`
     if (s.note) html += `<div class="${s.note.startsWith("⚠") ? "warn" : "ok"}">${esc(s.note)}</div>`
@@ -314,10 +402,9 @@
     if (!next) html += `<p class="muted">${funnel.stopped ? "Fora do funil." : "Funil concluído para este lead."}</p>`
     else if (next.waitingReply) {
       // A última mensagem da conversa é dele? (respondeu antes de a extensão estar aberta)
-      const all = messages()
-      const lastEl = all[all.length - 1]
-      const lastIn = lastMessage()?.incoming
-      const lastText = lastIn ? (lastEl?.querySelector("span.selectable-text, .copyable-text span")?.innerText || "").trim().slice(0, 120) : ""
+      const msgs = extractMessages()
+      const lastIn = !!msgs.length && !msgs[msgs.length - 1].out
+      const lastText = lastIn ? (msgs[msgs.length - 1].text || "").slice(0, 120) : ""
       html += `<p><b>Próximo: ${esc(next.label)}</b> (${KIND[next.kind]})</p>`
       html += lastIn
         ? `<div class="ok">A última mensagem é dele${lastText ? `: “${esc(lastText)}”` : ""}. Se for a resposta, libere o próximo passo.</div><button class="b main" data-a="replied">Ele respondeu — liberar passo ${next.index + 1}</button>`
@@ -330,9 +417,15 @@
           html += `<div class="muted">📎 ${esc(next.media.name)}</div>`
           if (!voice) html += `<button class="b main" data-a="voice">🎤 Enviar como áudio gravado</button>`
           else if (voice.phase === "loading") html += `<div class="ok">Preparando o áudio…</div>`
-          else if (voice.phase === "armed") html += `<div class="ok"><b>Agora clique no microfone 🎤 do WhatsApp.</b> O áudio do funil entra no lugar da sua voz.</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
-          else if (voice.phase === "playing") html += `<div class="ok">Gravando o áudio do funil (${voice.seconds}s)… <b>não clique em nada</b> até terminar.</div>`
-          else if (voice.phase === "ended") html += `<div class="ok"><b>Terminou — clique em enviar (➤) no WhatsApp.</b> Eu registro sozinho.</div>`
+          else if (voice.phase === "armed")
+            html += voice.micClicked
+              ? `<div class="ok">Começando a gravação…</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
+              : `<div class="ok"><b>Clique no microfone 🎤 do WhatsApp</b> (apague o texto da caixa se houver). O áudio do funil entra no lugar da sua voz.</div><button class="b ghost" data-a="voice-cancel">Cancelar</button>`
+          else if (voice.phase === "playing") html += `<div class="ok">🔴 Gravando o áudio do funil: <b class="vt">0:00</b> de ${mmss(voice.seconds)}. Não clique em nada — eu paro sozinho no fim.</div>`
+          else if (voice.phase === "ended")
+            html += voice.paused
+              ? `<div class="ok"><b>Áudio pronto (${mmss(voice.seconds || 0)}).</b> Ouça se quiser e clique em <b>enviar ➤</b> no WhatsApp. Eu registro sozinho.</div>`
+              : `<div class="ok"><b>Terminou (${mmss(voice.seconds || 0)}) — clique em enviar ➤ agora.</b> Eu registro sozinho.</div>`
           else html += `<div class="warn">Não consegui usar este arquivo como áudio de voz. Use “Anexar como arquivo”.</div>`
           html += `<button class="b ghost" data-a="attach">Anexar como arquivo</button>`
         } else if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
@@ -364,7 +457,10 @@
       try {
         const buffer = await (await fetchMedia(next.media)).arrayBuffer()
         window.postMessage({ __oos: "arm", buffer }, location.origin, [buffer])
-        voice = { phase: "armed" }
+        voice = { phase: "armed", micClicked: false }
+        // Começa a gravação por você (gravar não é enviar).
+        await sleep(150)
+        voice.micClicked = clickMic()
         pendingSend = { leadId: lead.id, step: next.index, text: "", title: s.title, media: true }
         baselineLast = lastMessage()?.id ?? null
       } catch (e) {
@@ -433,6 +529,7 @@
 
   // ---------- acompanha a conversa aberta e as mensagens novas ----------
   let busy = false
+  let ticks = 0
   async function watch() {
     if (busy) return
     busy = true
@@ -449,6 +546,7 @@
       }
       const lead = state.data?.lead
       const last = lastMessage()
+      if (lead && ++ticks % 4 === 0) await reconcile()
       if (!lead || !last || last.id === baselineLast) return
       baselineLast = last.id
       if (!last.incoming && pendingSend && pendingSend.leadId === lead.id && pendingSend.title === title) {
@@ -457,8 +555,10 @@
         pendingSend = null
         voice = null
         await act("sent", { step: p.step, text: p.text }, "Enviado e registrado no Operacional OS.")
-      } else if (last.incoming && state.data.next?.waitingReply) {
-        await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
+      } else {
+        // Enviou algo sem o botão (digitou, mandou áudio/vídeo) ou ele respondeu: a leitura da conversa acerta a etapa.
+        await reconcile()
+        if (last.incoming && state.data?.next?.waitingReply) await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
       }
     } finally {
       busy = false
