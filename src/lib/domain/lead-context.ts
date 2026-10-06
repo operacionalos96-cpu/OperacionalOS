@@ -31,16 +31,19 @@ const PHRASE: Record<string, string> = {
 const key = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
 
 /** Texto do segmento como está no lead (campo próprio ou, nos leads antigos, o campo "empresa"). */
-export function rawSegment(l: Pick<Lead, "segment" | "company" | "name">): string {
+export function rawSegment(l: Pick<Lead, "segment" | "company" | "name" | "siteInfo">): string {
   if (l.segment?.trim()) return l.segment.trim()
+  if (l.siteInfo?.segment?.trim()) return l.siteInfo.segment.trim()
   const c = l.company?.trim()
   return c && key(c) !== key(l.name ?? "") ? c : ""
 }
 
 /** "Desentupidora / serviços locais" → "desentupimento"; "Contabilidade" → "contabilidade". */
-export function segmentPhrase(l: Pick<Lead, "segment" | "company" | "name">): string {
+export function segmentPhrase(l: Pick<Lead, "segment" | "company" | "name" | "siteInfo">): string {
   const raw = rawSegment(l)
   if (!raw) return ""
+  // Vindo do site já está pronto para a frase ("empresas de …").
+  if (!l.segment?.trim() && l.siteInfo?.segment?.trim()) return raw.toLowerCase()
   if (PHRASE[key(raw)]) return PHRASE[key(raw)]
   const parts = raw.split(/\s*\/\s*/).filter(Boolean)
   const main = parts.find((p) => !GENERIC.has(key(p))) ?? parts[0]
@@ -72,8 +75,9 @@ export function dddOf(contact: string | undefined): string | null {
 }
 
 /** Cidade do lead; sem ela, a região do DDD; sem DDD, "". */
-export function regionOf(l: Pick<Lead, "city" | "contact">): string {
+export function regionOf(l: Pick<Lead, "city" | "contact" | "siteInfo">): string {
   if (l.city?.trim()) return l.city.trim()
+  if (l.siteInfo?.city?.trim()) return l.siteInfo.city.trim()
   const ddd = dddOf(l.contact)
   return (ddd && DDD[ddd]) || ""
 }

@@ -47,8 +47,21 @@ export interface Lead {
   firstContactAt?: ISODate
   firstContactMessage?: string
   firstContactChannel?: "whatsapp" | "email" | "telefone" | "outro"
+  /** Segmento e cidade lidos no site da empresa (não sobrescreve segment/city, que são correções humanas). */
+  siteInfo?: SiteInfo
   /** Funil de WhatsApp (1ª mensagem + follow-ups). Ver src/lib/domain/funnel.ts. */
   funnel?: { step: number; lastSentAt?: string; history: { step: number; at: string; by?: string }[]; repliedAt?: string; stopped?: boolean }
+}
+
+export interface SiteInfo {
+  segment?: string
+  city?: string
+  uf?: string
+  confidence?: "alta" | "media" | "baixa"
+  evidence?: string
+  checkedAt: ISODate
+  /** Por que não deu para ler (site fora do ar, sem site…). */
+  error?: string
 }
 
 export interface LeadAnalysis {

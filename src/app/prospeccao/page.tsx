@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { CopyIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
+import { GlobeIcon, LoaderIcon, CopyIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { isLikelyMobile, whatsappLink, whatsappNumber, whatsappProblem, type WhatsappTarget } from "@/lib/domain/contact"
 import { openWhatsapp, useWhatsappTarget } from "@/lib/whatsapp-open"
 import { renderTemplate } from "@/lib/domain/funnel"
 import { regionOf, segmentPhrase } from "@/lib/domain/lead-context"
 import { InlineText } from "@/components/shared/inline-edit"
+import { needsSiteInfo, readSite, useSiteInfoRunner } from "@/lib/site-info-runner"
 import { useFunnel } from "@/lib/funnel-store"
 import { dayStats, duration, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
@@ -136,6 +137,7 @@ export default function ProspectingPage() {
         description="Revise rápido: aprovar e chamar no WhatsApp, ou descartar dizendo o porquê."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <SiteInfoButton leads={leads} />
             <WhatsTargetSwitch value={whatsTarget} onChange={setWhatsTarget} />
             <div className="flex rounded-lg border p-0.5 text-xs">
               {(["meus", "todos"] as const).map((s) => (
@@ -171,6 +173,8 @@ export default function ProspectingPage() {
             </button>
           ))}
         </div>
+
+        <SiteInfoProgress />
 
         {pending && (
           <div className="flex animate-enter flex-wrap items-center gap-3 rounded-xl border border-brand/50 bg-card p-4 shadow-lift" role="alertdialog" aria-label="Confirmar envio">
@@ -473,13 +477,73 @@ function NoWhatsapp({ lead }: { lead: Lead }) {
 /** O que entra no [segmento] e no [cidade/região] da mensagem. Editar grava no lead (vazio = volta ao automático). */
 function FunnelContext({ lead }: { lead: Lead }) {
   const updateLead = useStore((s) => s.updateLead)
+  const [reading, setReading] = useState(false)
   const field = "h-7 rounded-md border border-transparent bg-muted/60 px-2 text-sm font-medium text-foreground hover:border-border focus:border-brand focus:outline-none"
+  const info = lead.siteInfo
+  const fromSite = (v: "segment" | "city") => !lead[v] && !!info?.[v]
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" title="Usado nas mensagens do funil. Clique para corrigir.">
       <span>Na mensagem: empresas de</span>
-      <InlineText value={segmentPhrase(lead)} placeholder="segmento" onSave={(v) => updateLead(lead.id, { segment: v || undefined })} className={cn(field, "w-48")} />
+      <InlineText value={segmentPhrase(lead)} placeholder="segmento" onSave={(v) => updateLead(lead.id, { segment: v || undefined })} className={cn(field, "w-52", fromSite("segment") && "bg-success-soft")} />
       <span>em</span>
-      <InlineText value={regionOf(lead)} placeholder="cidade/região" onSave={(v) => updateLead(lead.id, { city: v || undefined })} className={cn(field, "w-44")} />
+      <InlineText value={regionOf(lead)} placeholder="cidade/região" onSave={(v) => updateLead(lead.id, { city: v || undefined })} className={cn(field, "w-44", fromSite("city") && "bg-success-soft")} />
+      {lead.website && (
+        <button
+          type="button"
+          disabled={reading}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-accent hover:text-foreground disabled:opacity-60"
+          title={info ? `Lido do site ${new Date(info.checkedAt).toLocaleDateString("pt-BR")}${info.evidence ? ` — ${info.evidence}` : ""}${info.error ? ` (${info.error})` : ""}. Clique para ler de novo.` : "Ler segmento e cidade no site da empresa"}
+          onClick={async () => {
+            setReading(true)
+            const r = await readSite(lead.id)
+            setReading(false)
+            if (r.siteInfo) {
+              updateLead(lead.id, { siteInfo: r.siteInfo })
+              if (r.siteInfo.error && !r.siteInfo.city) toast.warning(`Não deu para ler: ${r.siteInfo.error}`)
+            } else toast.error(r.erro ?? "Falhou")
+          }}
+        >
+          {reading ? <LoaderIcon className="size-3.5 animate-spin" /> : <GlobeIcon className="size-3.5" />}
+          {info && !info.error ? "do site" : info?.error ? "site: erro" : "ler site"}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Lê o site de todos os leads ainda não lidos. */
+function SiteInfoButton({ leads }: { leads: Lead[] }) {
+  const { running, start, stop } = useSiteInfoRunner()
+  const missing = leads.filter(needsSiteInfo).length
+  if (running)
+    return (
+      <Button size="sm" variant="outline" onClick={stop}>
+        <XIcon /> Parar leitura
+      </Button>
+    )
+  if (!missing) return null
+  return (
+    <Button size="sm" variant="outline" onClick={() => start(leads)} title="Lê o site de cada empresa e descobre o segmento exato e a cidade (para as mensagens do funil)">
+      <GlobeIcon /> Ler sites ({missing})
+    </Button>
+  )
+}
+
+function SiteInfoProgress() {
+  const { running, done, total, current, last } = useSiteInfoRunner()
+  if (!running && !done) return null
+  const left = Math.max(0, total - done)
+  return (
+    <div className="grid gap-1.5 rounded-xl border bg-card px-4 py-3 text-xs">
+      <div className="flex items-center gap-2">
+        {running ? <LoaderIcon className="size-3.5 animate-spin text-brand" /> : <CheckIcon className="size-3.5 text-success" />}
+        <span className="font-medium">{running ? `Lendo sites: ${done}/${total}${current ? ` · ${current}` : ""}` : `Leitura dos sites: ${done}/${total}`}</span>
+        {running && <span className="ml-auto text-muted-foreground">~{Math.ceil((left * 7) / 60)} min · deixe esta aba aberta</span>}
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full bg-brand transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+      </div>
+      {last && <p className="truncate text-muted-foreground">{last}</p>}
     </div>
   )
 }

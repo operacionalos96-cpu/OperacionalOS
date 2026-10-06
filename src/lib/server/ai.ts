@@ -20,7 +20,7 @@ export function aiConfigured() {
 }
 
 /** Pede ao modelo uma resposta em JSON e devolve o texto dela. */
-export async function generateJson(prompt: string): Promise<string> {
+export async function generateJson(prompt: string, opts: { temperature?: number } = {}): Promise<string> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new AiError("IA não configurada: coloque GEMINI_API_KEY na Vercel.", 503)
   // Nome de modelo muda e o gratuito às vezes fica sobrecarregado: tenta o próximo da lista.
@@ -34,7 +34,7 @@ export async function generateJson(prompt: string): Promise<string> {
       headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 2048 },
+        generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.7, maxOutputTokens: 2048 },
       }),
       signal: AbortSignal.timeout(10_000),
     }).catch(() => undefined) // demorou demais: tenta o próximo modelo

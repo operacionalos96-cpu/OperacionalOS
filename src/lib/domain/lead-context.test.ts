@@ -32,3 +32,13 @@ describe("região para a mensagem", () => {
     expect(regionOf({ city: "Santo André", contact: "(11) 97739-0519" })).toBe("Santo André")
   })
 })
+
+describe("informação lida no site", () => {
+  const siteInfo = { segment: "desentupimento e limpeza de fossas", city: "Santo André", uf: "SP", checkedAt: "2026-10-06" }
+  it("site vence a dedução, mas a correção humana vence o site", () => {
+    expect(segmentPhrase({ name: "Azul", company: "Desentupidora / serviços locais", siteInfo })).toBe("desentupimento e limpeza de fossas")
+    expect(regionOf({ contact: "(11) 97739-0519", siteInfo })).toBe("Santo André")
+    expect(segmentPhrase({ name: "Azul", segment: "hidráulica", siteInfo })).toBe("hidráulica")
+    expect(regionOf({ city: "Mauá", siteInfo })).toBe("Mauá")
+  })
+})

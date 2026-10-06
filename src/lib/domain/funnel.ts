@@ -126,8 +126,8 @@ export function renderTemplate(template: string, lead: Partial<Lead>, now: Date)
     // Nos leads antigos o campo "empresa" guardava o segmento: aí o nome da empresa é o nome do lead.
     empresa: (!lead.segment?.trim() && lead.company && rawSegment({ company: lead.company, name: lead.name ?? "" }) === lead.company.trim() ? lead.name : lead.company || lead.name) || "sua empresa",
     // Segmento e região se adaptam a cada empresa (deduzidos se não estiverem preenchidos).
-    segmento: segmentPhrase({ segment: lead.segment, company: lead.company, name: lead.name ?? "" }) || "empresas como a sua",
-    cidade: regionOf({ city: lead.city, contact: lead.contact }),
+    segmento: segmentPhrase({ segment: lead.segment, company: lead.company, name: lead.name ?? "", siteInfo: lead.siteInfo }) || "empresas como a sua",
+    cidade: regionOf({ city: lead.city, contact: lead.contact, siteInfo: lead.siteInfo }),
     problema: lead.analysis?.problems?.[0]?.toLowerCase() || "a versão para celular",
     oportunidade: lead.analysis?.opportunity ?? "",
     site: lead.website?.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") ?? "",
