@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         case "funnel":
           return { steps: await loadFunnel() }
         case "lookup":
-          return lookupByPhone(str("phone"))
+          return lookupByPhone(str("phone"), str("name"))
         case "sent":
           return markSent(str("leadId"), Number(b.step), str("text").slice(0, 4000), w.createdBy!)
         case "replied":

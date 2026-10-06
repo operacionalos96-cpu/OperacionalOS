@@ -12,7 +12,16 @@
   if (urlPhone && /^\d{10,15}$/.test(urlPhone)) sessionStorage.setItem("oos-url-phone", urlPhone)
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  const api = (action, body) => chrome.runtime.sendMessage({ type: "api", action, body }).catch(() => ({ ok: false, data: { erro: "Extensão recarregada — recarregue a página." } }))
+  const RELOAD = "A extensão foi atualizada: recarregue o WhatsApp (F5)."
+  const withTimeout = (p, ms, fallback) => Promise.race([p, sleep(ms).then(() => fallback)])
+  async function api(action, body) {
+    try {
+      const r = await withTimeout(chrome.runtime.sendMessage({ type: "api", action, body }), 20000, { ok: false, data: { erro: "O Operacional OS não respondeu. Tente de novo." } })
+      return r || { ok: false, data: { erro: RELOAD } }
+    } catch {
+      return { ok: false, data: { erro: RELOAD } }
+    }
+  }
   const digits = (s) => (s || "").replace(/\D/g, "")
 
   // ---------- leitura do WhatsApp Web (tolerante a mudanças de layout) ----------
@@ -188,8 +197,7 @@
 
   // O WhatsApp ocupa a tela toda: com o painel aberto, ele encolhe para o lado (não fica nada por baixo).
   const shrinkStyle = document.createElement("style")
-  shrinkStyle.textContent = `html.oos-funil-open #app { width: calc(100vw - 300px) !important; max-width: calc(100vw - 300px) !important; position: relative !important; overflow: hidden !important; }
-    html.oos-funil-open #app > div { width: 100% !important; min-width: 0 !important; }`
+  shrinkStyle.textContent = `html.oos-funil-open #app { width: calc(100% - 300px) !important; }`
   ;(document.head || document.documentElement).appendChild(shrinkStyle)
   const appShrink = (open) => {
     document.documentElement.classList.toggle("oos-funil-open", open)
@@ -244,18 +252,20 @@
     pendingSend = null
     disarmVoice()
     render()
-    const phone = await chatPhone(title)
-    if (title !== state.title) return
-    state.phone = phone
-    if (!phone) {
-      state.loading = false
-      return render()
+    try {
+      const phone = await withTimeout(chatPhone(title), 5000, null)
+      if (title !== state.title) return
+      state.phone = phone
+      // Sem número visível (conta comercial, contato salvo): procura também pelo nome da conversa.
+      const r = await api("lookup", { phone: phone || "", name: title })
+      if (title !== state.title) return
+      if (r.ok) state.data = r.data
+      else state.error = r.data?.erro || "Falhou"
+    } catch (e) {
+      if (title !== state.title) return
+      state.error = /context invalidated/i.test(String(e?.message)) ? RELOAD : `Erro: ${e?.message || e}`
     }
-    const r = await api("lookup", { phone })
-    if (title !== state.title) return
     state.loading = false
-    if (r.ok) state.data = r.data
-    else state.error = r.data?.erro || "Falhou"
     baselineLast = lastMessage()?.id ?? null
     render()
   }
@@ -277,8 +287,8 @@
     if (!s.title) return (body.innerHTML = `<p class="muted">Abra uma conversa para ver o lead e o próximo passo do funil.</p>`)
     if (s.loading) return (body.innerHTML = `<p class="muted">Procurando ${esc(s.title)} no Operacional OS…</p>`)
     if (s.error) return (body.innerHTML = `<div class="warn">${esc(s.error)}</div>`)
-    if (!s.phone) {
-      body.innerHTML = `<p class="muted">Não consegui ler o número de <b>${esc(s.title)}</b>.</p><input placeholder="Número com DDD (ex.: 11 97739-0519)" /><button class="b main">Procurar</button>`
+    if (!s.phone && !s.data?.found) {
+      body.innerHTML = `<p class="muted">Não achei <b>${esc(s.title)}</b> no Operacional OS pelo nome e não consegui ler o número desta conversa.</p><p class="muted">Digite o número do lead:</p><input placeholder="Número com DDD (ex.: 11 97739-0519)" /><button class="b main">Procurar</button>`
       const input = body.querySelector("input")
       body.querySelector("button").onclick = async () => {
         const d = digits(input.value)
@@ -293,7 +303,7 @@
 
     const { lead, funnel, steps, next } = s.data
     const chips = steps.map((x) => `<span class="chip ${x.done ? "done" : next && x.index === next.index ? "now" : ""}">${x.done ? "✓ " : ""}${x.index + 1}. ${esc(x.label)}</span>`).join("")
-    let html = `<div class="card"><div class="name">${esc(lead.name)}</div>
+    let html = `${s.data.byName ? `<div class="warn">Achei pelo nome da conversa — confira se é <b>${esc(lead.name)}</b>.</div>` : ""}<div class="card"><div class="name">${esc(lead.name)}</div>
       <div class="muted">${esc([lead.company, lead.segment, lead.city].filter(Boolean).join(" · "))}</div>
       ${lead.problems.length ? `<div class="muted" style="margin-top:4px">Problema: ${esc(lead.problems[0])}</div>` : ""}
       <div class="steps">${chips}</div>

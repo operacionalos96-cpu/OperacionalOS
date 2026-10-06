@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_FUNNEL, findLeadByPhone, followupsDue, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "./funnel"
+import { DEFAULT_FUNNEL, findLeadByName, findLeadByPhone, followupsDue, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "./funnel"
 import type { Lead } from "./types"
 
 const lead = (p: Partial<Lead>): Lead => ({
@@ -143,5 +143,17 @@ describe("leads movidos para Contato feito no Pipeline (antes do funil)", () => 
     expect(nextStep(l, DEFAULT_FUNNEL, new Date("2026-10-06T12:00:00Z"))).toMatchObject({ index: 1, waitingReply: true })
     const replied = { ...l, funnel: repliedPatch(l, "2026-10-06T13:00:00Z") }
     expect(followupsDue([replied], DEFAULT_FUNNEL, new Date("2026-10-06T14:00:00Z")).map((x) => x.index)).toEqual([1])
+  })
+})
+
+describe("achar lead pelo nome da conversa", () => {
+  const leads = [lead({ id: "k", name: "Kozake Casa & Construções" }), lead({ id: "h", name: "Hidrosampa Desentupidora" }), lead({ id: "c1", name: "Planificar Contabilidade" }), lead({ id: "c2", name: "Innovata Contabilidade" })]
+  it("palavra distintiva em comum", () => {
+    expect(findLeadByName(leads, "Kozake Material De Construcao")?.id).toBe("k")
+    expect(findLeadByName(leads, "Hidrosampa")?.id).toBe("h")
+  })
+  it("só palavras genéricas ou nada em comum: não chuta", () => {
+    expect(findLeadByName(leads, "Contabilidade")).toBeUndefined()
+    expect(findLeadByName(leads, "João Silva")).toBeUndefined()
   })
 })

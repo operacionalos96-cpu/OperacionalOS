@@ -207,3 +207,31 @@ export function findLeadByPhone<L extends Pick<Lead, "contact">>(leads: L[], pho
 export function repliedPatch(lead: Pick<Lead, "funnel" | "firstContactAt">, at: string): LeadFunnel {
   return { ...funnelOf(lead), repliedAt: at }
 }
+
+/** Palavras que aparecem em nome de muita empresa: sozinhas não identificam ninguém. */
+const GENERIC_WORDS = new Set("de da do das dos e em a o ltda me eireli epp sa cia comercio servicos servico solucoes empresa grupo clinica consultorio escritorio loja casa centro material materiais construcao construcoes contabilidade advocacia advogados odontologia veterinaria psicologia estetica auto center express brasil sp rj oficial".split(" "))
+const words = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((w) => w.length >= 3)
+
+/**
+ * Acha o lead pelo nome da conversa (contas comerciais/contatos salvos sem número visível).
+ * Só devolve se houver UM lead que compartilha uma palavra distintiva ("Kozake Material De Construcao" ↔ "Kozake Casa & Construções").
+ */
+export function findLeadByName<L extends Pick<Lead, "name" | "company">>(leads: L[], chatName: string): L | undefined {
+  const target = new Set(words(chatName))
+  const distinct = [...target].filter((w) => !GENERIC_WORDS.has(w))
+  if (!distinct.length) return undefined
+  const scored = leads
+    .map((l) => {
+      const lw = new Set(words(l.name))
+      const shared = distinct.filter((w) => lw.has(w)).length
+      const all = [...target].filter((w) => lw.has(w)).length
+      return { l, shared, score: all / Math.max(1, Math.min(lw.size, target.size)) }
+    })
+    .filter((x) => x.shared > 0)
+    .sort((a, b) => b.shared - a.shared || b.score - a.score)
+  if (!scored.length) return undefined
+  // Empate na melhor pontuação = ambíguo: melhor não chutar.
+  if (scored[1] && scored[1].shared === scored[0].shared && scored[1].score === scored[0].score) return undefined
+  return scored[0].l
+}

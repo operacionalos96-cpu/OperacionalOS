@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Funil Operacional OS",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Mostra o lead e o próximo passo do funil dentro do WhatsApp Web. Escreve a mensagem e anexa o áudio/vídeo; quem clica em enviar é você.",
   "permissions": [
     "storage"

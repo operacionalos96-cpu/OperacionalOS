@@ -2,7 +2,7 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 import { publicId } from "@/lib/domain/jobs"
 import { makeEvent, type BusinessEventType } from "@/lib/domain/ai-office"
-import { findLeadByPhone, followupsDue, funnelOf, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
+import { findLeadByName, findLeadByPhone, followupsDue, funnelOf, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
 import { contactedPatch } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
 import { supabaseAdmin } from "./supabase-admin"
@@ -98,12 +98,15 @@ async function view(l: Lead, steps: FunnelStep[], now: Date) {
   }
 }
 
-export async function lookupByPhone(phone: string) {
+export async function lookupByPhone(phone: string, name = "") {
   const digits = phone.replace(/\D/g, "")
-  if (digits.length < 10 || digits.length > 15) throw new FunnelError("número inválido")
+  if (digits && (digits.length < 10 || digits.length > 15)) throw new FunnelError("número inválido")
+  if (!digits && name.trim().length < 3) throw new FunnelError("informe número ou nome")
   const [steps, leads] = await Promise.all([loadFunnel(), allLeads()])
-  const l = findLeadByPhone(leads, digits)
-  return l ? { found: true as const, ...(await view(l, steps, new Date())) } : { found: false as const }
+  const byPhone = digits ? findLeadByPhone(leads, digits) : undefined
+  // Sem número visível (conta comercial, contato salvo): tenta pelo nome da conversa.
+  const l = byPhone ?? (name.trim() ? findLeadByName(leads, name.slice(0, 120)) : undefined)
+  return l ? { found: true as const, byName: !byPhone, ...(await view(l, steps, new Date())) } : { found: false as const }
 }
 
 export async function markSent(leadId: string, index: number, text: string, actorId: string) {
