@@ -15,6 +15,7 @@ export const SCOPES = {
   "jobs:execute": "Iniciar, renovar, reportar, concluir, falhar e devolver os PRÓPRIOS jobs",
   "context:read": "Ler o contexto do job (dados do lead etc.)",
   "knowledge:read": "Ler aprendizados e hipóteses",
+  "whatsapp:funnel": "Extensão do WhatsApp: achar lead pelo número, ver o passo do funil e registrar envio/resposta",
 } as const
 export type Scope = keyof typeof SCOPES
 
@@ -27,6 +28,8 @@ export interface Worker {
   engine: string | null
   capabilities: string[]
   scopes: Scope[]
+  /** Membro (team id) que criou o token — é quem "assina" o que a extensão registrar. */
+  createdBy: string | null
 }
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex")
@@ -71,13 +74,13 @@ export async function authWorker(req: Request): Promise<Worker> {
   if (!/^oos_[A-Za-z0-9_-]{30,}$/.test(token)) throw new WorkerAuthError("token ausente ou inválido", 401)
   const { data } = await supabaseAdmin()
     .from("workers")
-    .select("id, name, agent_id, engine, capabilities, scopes, enabled")
+    .select("id, name, agent_id, engine, capabilities, scopes, enabled, created_by")
     .eq("token_hash", hash(token))
     .maybeSingle()
   if (!data || !data.enabled) throw new WorkerAuthError("token ausente ou inválido", 401)
   if (!(await rateHit(`worker:${data.id}`, 240, 60))) throw new WorkerAuthError("muitas requisições — respeite retry_after_seconds", 429)
   await supabaseAdmin().from("workers").update({ last_seen_at: new Date().toISOString() }).eq("id", data.id)
-  return { id: data.id, name: data.name, agent_id: data.agent_id, engine: data.engine, capabilities: data.capabilities ?? [], scopes: (data.scopes ?? []) as Scope[] }
+  return { id: data.id, name: data.name, agent_id: data.agent_id, engine: data.engine, capabilities: data.capabilities ?? [], scopes: (data.scopes ?? []) as Scope[], createdBy: data.created_by ?? null }
 }
 
 export function requireScope(w: Worker, scope: Scope) {

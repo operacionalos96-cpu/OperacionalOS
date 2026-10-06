@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px system-ui, sans-serif; width: 300px; margin: 0; padding: 14px; color: #111; }
+      h1 { font-size: 14px; margin: 0 0 4px; }
+      p { margin: 0 0 10px; color: #555; line-height: 1.4; }
+      label { display: block; font-weight: 600; margin: 10px 0 4px; }
+      input { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid #ccc; border-radius: 6px; font: inherit; }
+      button { margin-top: 10px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #128c4a; color: #fff; font-weight: 600; cursor: pointer; }
+      #status { margin-top: 10px; font-size: 12px; }
+      .ok { color: #128c4a; } .err { color: #c0392b; }
+      details { margin-top: 10px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>Funil Operacional OS</h1>
+    <p>Cole o token gerado em <b>Prospecção › Funil › Conectar extensão</b>. Depois abra o WhatsApp Web.</p>
+    <label for="token">Token</label>
+    <input id="token" type="password" placeholder="oos_…" autocomplete="off" />
+    <details>
+      <summary>Avançado</summary>
+      <label for="base">Endereço do sistema</label>
+      <input id="base" type="url" placeholder="https://operacional-os.vercel.app" />
+    </details>
+    <button id="save">Salvar e testar</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

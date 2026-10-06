@@ -3,6 +3,7 @@ import { JOB_TYPES, idempotencyKey, mergeConfig } from "@/lib/domain/jobs"
 import { requireMember } from "@/lib/server/auth"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { createWebhook, rotateWebhookSecret } from "@/lib/server/webhooks"
+import { saveFunnel } from "@/lib/server/whatsapp-funnel"
 import { createWorker, rotateWorkerToken, type Scope } from "@/lib/server/workers"
 
 /**
@@ -82,6 +83,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         const data = mergeConfig(b.data)
         await db.from("ai_settings").upsert({ id: "queue", data, updated_at: new Date().toISOString(), updated_by: member.teamId })
         return NextResponse.json({ ok: true, data }, { headers: noStore })
+      }
+      case "funnel.update":
+        return NextResponse.json({ ok: true, steps: await saveFunnel(b.steps, member.teamId) }, { headers: noStore })
+      case "ext.connect": {
+        // Token da extensão do WhatsApp: só o escopo do funil; aparece UMA vez.
+        const r = await createWorker({ name: `Extensão WhatsApp (${member.email.split("@")[0] || member.teamId})`, engine: "chrome-extension", capabilities: [], scopes: ["whatsapp:funnel"], createdBy: member.teamId })
+        return NextResponse.json(r, { headers: noStore })
       }
       default:
         return bad("ação desconhecida", 404)

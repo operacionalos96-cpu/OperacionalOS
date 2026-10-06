@@ -2,6 +2,7 @@
 
 import { defaultAgents, type Agent, type Hypothesis, type HypothesisStatus, type Learning } from "@/lib/domain/ai-office"
 import { leadMatches } from "@/lib/domain/contact"
+import { funnelOf, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
 import { approvePatch, contactedPatch, conversionData, feedbackRows, isDiscarded, prospectQueue, rejectPatch, rejectionLabel, reviewStatus, type RejectionReason } from "@/lib/domain/prospecting"
 import { moveHypothesis } from "@/lib/domain/ai-office"
 import type { Lead, LeadAnalysis } from "@/lib/domain/types"
@@ -78,7 +79,9 @@ export function confirmContact(id: string, message: string, channel: Lead["first
   const l = lead(id)
   if (!l) return
   const patch = contactedPatch(l, message, now(), channel)
-  useStore.getState().updateLead(id, { ...patch, lastActivityAt: patch.firstContactAt })
+  // 1ª mensagem = passo 0 do funil de WhatsApp.
+  const funnel = channel === "whatsapp" ? sentPatch(l, 0, patch.firstContactAt, me()) : l.funnel
+  useStore.getState().updateLead(id, { ...patch, funnel, lastActivityAt: patch.firstContactAt })
   useStore.getState().logInteraction(id, "mensagem", `Primeiro contato (${channel}): ${message}`)
   recordEvent({ type: "lead.contacted", entity: { type: "lead", id }, actor: human(), metadata: { ...snapshot(l), channel, message } })
 }
@@ -86,8 +89,28 @@ export function confirmContact(id: string, message: string, channel: Lead["first
 export function markReplied(id: string) {
   const l = lead(id)
   if (!l) return
-  useStore.getState().logInteraction(id, "mensagem", "Respondeu o primeiro contato")
+  useStore.getState().updateLead(id, { funnel: repliedPatch(l, now()) })
+  useStore.getState().logInteraction(id, "mensagem", "Respondeu no WhatsApp")
   recordEvent({ type: "lead.replied", entity: { type: "lead", id }, actor: human(), metadata: snapshot(l) })
+}
+
+/** Passo do funil enviado pela pessoa (o 1º usa confirmContact). */
+export function funnelSent(id: string, index: number, step: FunnelStep, text: string) {
+  const l = lead(id)
+  if (!l) return
+  if (index === 0) return confirmContact(id, text)
+  const at = now()
+  useStore.getState().updateLead(id, { funnel: sentPatch(l, index, at, me()), lastActivityAt: at })
+  useStore.getState().logInteraction(id, "mensagem", `Funil · ${step.label} (WhatsApp): ${text || (step.kind === "audio" ? "(áudio enviado)" : step.kind === "video" ? "(vídeo enviado)" : "")}`)
+  recordEvent({ type: "lead.followup_sent", entity: { type: "lead", id }, actor: human(), metadata: { ...snapshot(l), step: index, kind: step.kind, label: step.label, channel: "whatsapp" } })
+}
+
+/** Tira o lead do funil (não quer, pediu para parar…). */
+export function stopFunnel(id: string) {
+  const l = lead(id)
+  if (!l) return
+  useStore.getState().updateLead(id, { funnel: { ...funnelOf(l), stopped: true } })
+  useStore.getState().logInteraction(id, "mensagem", "Saiu do funil de WhatsApp")
 }
 
 /** Análise vinda de um agente ou da planilha. Guarda junto quem analisou. */

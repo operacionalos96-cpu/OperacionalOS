@@ -7,16 +7,19 @@ import { CopyIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, K
 import { getUser } from "@/config/team"
 import { isLikelyMobile, whatsappLink, whatsappNumber, whatsappProblem, type WhatsappTarget } from "@/lib/domain/contact"
 import { openWhatsapp, useWhatsappTarget } from "@/lib/whatsapp-open"
-import { dayStats, duration, greeting, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
+import { renderTemplate } from "@/lib/domain/funnel"
+import { useFunnel } from "@/lib/funnel-store"
+import { dayStats, duration, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
-import { approveLead, confirmContact, undoReview } from "@/lib/services/ai-office"
+import { approveLead, funnelSent, undoReview } from "@/lib/services/ai-office"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
 import { AnalysisBlock } from "@/components/prospecting/review-panel"
 import { RejectLeadDialog } from "@/components/prospecting/reject-dialog"
+import { FunnelTab, type FunnelPending } from "@/components/prospecting/funnel-tab"
 
 /**
  * Modo Prospecção: revisar dezenas de leads o mais rápido possível.
@@ -26,11 +29,16 @@ import { RejectLeadDialog } from "@/components/prospecting/reject-dialog"
 export default function ProspectingPage() {
   const leads = useStore((s) => s.leads)
   const meId = useStore((s) => s.meId)
-  const [tab, setTab] = useState<"fila" | "aguardando" | "descartados">("fila")
+  const [tab, setTab] = useState<"fila" | "aguardando" | "funil" | "descartados">("fila")
+  const steps = useFunnel((s) => s.steps)
+  const loadFunnel = useFunnel((s) => s.load)
+  useEffect(() => void loadFunnel(), [loadFunnel])
+  /** 1ª mensagem do funil, personalizada para o lead. */
+  const firstMessage = useCallback((l: Lead) => renderTemplate(steps[0].template, l, new Date()), [steps])
   const [scope, setScope] = useState<"meus" | "todos">("meus")
   const queue = useMemo(() => prospectQueue(leads, scope === "meus" ? meId : undefined), [leads, scope, meId])
   const [currentId, setCurrentId] = useState<string | null>(null)
-  const [pending, setPending] = useState<{ leadId: string; name: string; message: string } | null>(null)
+  const [pending, setPending] = useState<FunnelPending | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [whatsTarget, setWhatsTarget] = useWhatsappTarget()
   // Sessão: começa na primeira decisão.
@@ -66,7 +74,7 @@ export default function ProspectingPage() {
   const approveAndContact = useCallback(() => {
     if (!current || pending) return
     countDecision()
-    const message = greeting(new Date())
+    const message = firstMessage(current)
     approveLead(current.id)
     const following = queue[index + 1]?.id ?? null
     if (!openWhatsapp(current.contact, message, whatsTarget)) {
@@ -74,20 +82,20 @@ export default function ProspectingPage() {
       setCurrentId(following)
       return
     }
-    setPending({ leadId: current.id, name: current.name, message })
+    setPending({ leadId: current.id, name: current.name, message, step: 0 })
     setCurrentId(following)
-  }, [current, pending, queue, index, whatsTarget])
+  }, [current, pending, queue, index, whatsTarget, firstMessage])
 
   const confirmSent = useCallback(() => {
     if (!pending) return
-    confirmContact(pending.leadId, pending.message)
-    toast.success(`Contato com ${pending.name} registrado`)
+    funnelSent(pending.leadId, pending.step, steps[pending.step] ?? steps[0], pending.message)
+    toast.success(pending.step === 0 ? `Contato com ${pending.name} registrado` : `${steps[pending.step]?.label ?? "Passo"} enviado para ${pending.name}`)
     setPending(null) // o próximo da fila já está na tela
-  }, [pending])
+  }, [pending, steps])
 
   const notSent = useCallback(() => {
     if (!pending) return
-    toast(`${pending.name} ficou aprovado, sem contato`, { description: "Está em “Aguardando contato”." })
+    if (pending.step === 0) toast(`${pending.name} ficou aprovado, sem contato`, { description: "Está em “Aguardando contato”." })
     setPending(null)
   }, [pending])
 
@@ -152,6 +160,7 @@ export default function ProspectingPage() {
             [
               ["fila", `Fila (${queue.length})`],
               ["aguardando", `Aguardando contato (${waiting.length})`],
+              ["funil", "Funil"],
               ["descartados", `Descartados (${discarded.length})`],
             ] as const
           ).map(([id, label]) => (
@@ -178,7 +187,7 @@ export default function ProspectingPage() {
 
         {tab === "fila" &&
           (current ? (
-            <LeadCard whatsTarget={whatsTarget} lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
+            <LeadCard firstMessage={firstMessage} whatsTarget={whatsTarget} lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
           ) : (
             <EmptyState icon={PartyPopperIcon} title="Fila zerada" description={scope === "meus" ? "Nenhum lead seu esperando revisão. Veja “Todos” ou importe mais." : "Nenhum lead esperando revisão."} className="py-16" />
           ))}
@@ -194,9 +203,9 @@ export default function ProspectingPage() {
                   size="xs"
                   variant="outline"
                   onClick={() => {
-                    const message = greeting(new Date())
+                    const message = firstMessage(l)
                     openWhatsapp(l.contact, message, whatsTarget)
-                    setPending({ leadId: l.id, name: l.name, message })
+                    setPending({ leadId: l.id, name: l.name, message, step: 0 })
                   }}
                 >
                   <MessageCircleIcon /> Contatar
@@ -205,6 +214,8 @@ export default function ProspectingPage() {
             }))}
           />
         )}
+
+        {tab === "funil" && <FunnelTab leads={leads} ownerId={scope === "meus" ? meId : undefined} whatsTarget={whatsTarget} onPending={setPending} />}
 
         {tab === "descartados" && (
           <List
@@ -253,6 +264,7 @@ export default function ProspectingPage() {
 }
 
 function LeadCard({
+  firstMessage,
   whatsTarget,
   lead,
   position,
@@ -263,6 +275,7 @@ function LeadCard({
   onReject,
   blocked,
 }: {
+  firstMessage: (l: Lead) => string
   whatsTarget: WhatsappTarget
   lead: Lead
   position: number
@@ -304,7 +317,7 @@ function LeadCard({
         ) : (
           <span className="inline-flex h-9 items-center rounded-lg border border-dashed px-3 text-sm text-muted-foreground">Sem site</span>
         )}
-        <WhatsChip lead={lead} target={whatsTarget} />
+        <WhatsChip lead={lead} target={whatsTarget} message={firstMessage(lead)} />
       </div>
 
       <section className="rounded-xl bg-muted/40 p-4">
@@ -380,7 +393,7 @@ function WhatsTargetSwitch({ value, onChange }: { value: WhatsappTarget; onChang
 }
 
 /** Telefone da empresa: clicar abre a conversa (sem aprovar); copiar; aviso se parecer fixo. */
-function WhatsChip({ lead, target }: { lead: Lead; target: WhatsappTarget }) {
+function WhatsChip({ lead, target, message }: { lead: Lead; target: WhatsappTarget; message: string }) {
   const contact = lead.contact
   const number = whatsappNumber(contact)
   if (!number) return <NoWhatsapp lead={lead} />
@@ -389,7 +402,7 @@ function WhatsChip({ lead, target }: { lead: Lead; target: WhatsappTarget }) {
     <span className="inline-flex items-center gap-1">
       <button
         type="button"
-        onClick={() => openWhatsapp(contact, greeting(new Date()), target)}
+        onClick={() => openWhatsapp(contact, message, target)}
         className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-success/40 px-3 text-sm font-medium text-success transition-colors hover:bg-success-soft"
         title="Abrir a conversa (não aprova o lead)"
       >

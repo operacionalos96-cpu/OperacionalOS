@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Funil Operacional OS",
+  "version": "1.0.0",
+  "description": "Mostra o lead e o próximo passo do funil dentro do WhatsApp Web. Escreve a mensagem; quem envia é você.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://operacional-os.vercel.app/*", "http://localhost:3000/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Funil Operacional OS", "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

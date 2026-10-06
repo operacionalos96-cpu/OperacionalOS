@@ -15,6 +15,8 @@ const PUBLIC_PATHS = [
   "/api/workers",
   "/api/mcp",
   "/api/runner",
+  // Extensão do WhatsApp Web: token próprio (escopo whatsapp:funnel), verificado na rota.
+  "/api/ext",
 ]
 
 export async function middleware(request: NextRequest) {

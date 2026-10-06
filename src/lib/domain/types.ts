@@ -47,6 +47,8 @@ export interface Lead {
   firstContactAt?: ISODate
   firstContactMessage?: string
   firstContactChannel?: "whatsapp" | "email" | "telefone" | "outro"
+  /** Funil de WhatsApp (1ª mensagem + follow-ups). Ver src/lib/domain/funnel.ts. */
+  funnel?: { step: number; lastSentAt?: string; history: { step: number; at: string; by?: string }[]; repliedAt?: string; stopped?: boolean }
 }
 
 export interface LeadAnalysis {
