@@ -3,6 +3,7 @@
  * follow-ups com intervalo em dias. Regras puras, testadas em funnel.test.ts.
  * O envio é SEMPRE humano (o sistema/extensão só escreve a mensagem e registra).
  */
+import { rawSegment, regionOf, segmentPhrase } from "./lead-context"
 import type { Lead } from "./types"
 
 export interface FunnelStep {
@@ -122,9 +123,11 @@ export function renderTemplate(template: string, lead: Partial<Lead>, now: Date)
   const vars: Record<string, string> = {
     saudacao: greetingFor(now),
     nome: lead.name ?? "",
-    empresa: lead.company || lead.name || "sua empresa",
-    segmento: lead.segment || "empresas como a sua",
-    cidade: lead.city ?? "",
+    // Nos leads antigos o campo "empresa" guardava o segmento: aí o nome da empresa é o nome do lead.
+    empresa: (!lead.segment?.trim() && lead.company && rawSegment({ company: lead.company, name: lead.name ?? "" }) === lead.company.trim() ? lead.name : lead.company || lead.name) || "sua empresa",
+    // Segmento e região se adaptam a cada empresa (deduzidos se não estiverem preenchidos).
+    segmento: segmentPhrase({ segment: lead.segment, company: lead.company, name: lead.name ?? "" }) || "empresas como a sua",
+    cidade: regionOf({ city: lead.city, contact: lead.contact }),
     problema: lead.analysis?.problems?.[0]?.toLowerCase() || "a versão para celular",
     oportunidade: lead.analysis?.opportunity ?? "",
     site: lead.website?.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") ?? "",
@@ -139,6 +142,9 @@ export function renderTemplate(template: string, lead: Partial<Lead>, now: Date)
   return template
     .replace(/\[([^\]\n]{2,30})\]/g, (_, k: string) => bracket(k))
     .replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "")
+    // Preposição certa: "no Rio de Janeiro", "na sua região".
+    .replace(/(^|\s)em (Rio de Janeiro)/g, "$1no $2")
+    .replace(/(^|\s)em sua região/g, "$1na sua região")
     .replace(/[ \t]{2,}/g, " ")
     .trim()
 }

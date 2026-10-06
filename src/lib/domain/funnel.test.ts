@@ -84,7 +84,7 @@ describe("roteiro de vocês (passo depois da resposta)", () => {
     const msg = renderTemplate(DEFAULT_FUNNEL[0].template, l, new Date(2026, 9, 6, 15))
     expect(msg.startsWith("Boa tarde, tudo bem?\n\nEstava pesquisando algumas empresas de clínicas odontológicas aqui em Santo André")).toBe(true)
     expect(msg).not.toContain("[")
-    expect(renderTemplate("aqui em [cidade/região]", lead({}), new Date())).toBe("aqui em sua região")
+    expect(renderTemplate("aqui em [cidade/região]", lead({}), new Date())).toBe("aqui na sua região")
   })
   it("2ª mensagem só libera quando o lead responde depois da nossa", () => {
     const after1 = { ...l, stage: "contato" as const, contactStatus: "contacted" as const, funnel: sentPatch(l, 0, "2026-10-06T12:00:00Z") }
@@ -99,6 +99,15 @@ describe("saudação no horário de Brasília (servidor em UTC)", () => {
   it("12:00 UTC = 9h em SP → bom dia; 18:00 UTC = 15h → boa tarde", () => {
     expect(renderTemplate("{saudacao}", lead({}), new Date("2026-10-06T12:00:00Z"))).toBe("Bom dia, tudo bem?")
     expect(renderTemplate("{saudacao}", lead({}), new Date("2026-10-06T18:00:00Z"))).toBe("Boa tarde, tudo bem?")
+  })
+})
+
+describe("segmento e região de cada empresa", () => {
+  it("lead antigo (segmento no campo empresa) + DDD viram a abertura certa", () => {
+    const l = lead({ name: "Azul Serviços", company: "Desentupidora / serviços locais", contact: "(21) 98888-7777" })
+    expect(renderTemplate(DEFAULT_FUNNEL[0].template, l, new Date())).toContain("empresas de desentupimento aqui no Rio de Janeiro e encontrei vocês")
+    expect(renderTemplate("{empresa}", l, new Date())).toBe("Azul Serviços")
+    expect(renderTemplate("aqui em [cidade/região]", lead({ contact: "" }), new Date())).toBe("aqui na sua região")
   })
 })
 

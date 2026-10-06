@@ -8,6 +8,8 @@ import { getUser } from "@/config/team"
 import { isLikelyMobile, whatsappLink, whatsappNumber, whatsappProblem, type WhatsappTarget } from "@/lib/domain/contact"
 import { openWhatsapp, useWhatsappTarget } from "@/lib/whatsapp-open"
 import { renderTemplate } from "@/lib/domain/funnel"
+import { regionOf, segmentPhrase } from "@/lib/domain/lead-context"
+import { InlineText } from "@/components/shared/inline-edit"
 import { useFunnel } from "@/lib/funnel-store"
 import { dayStats, duration, isDiscarded, prospectQueue, rejectionLabel, reviewStatus } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
@@ -307,6 +309,7 @@ function LeadCard({
           {lead.name}
         </Link>
         <p className="mt-1 text-sm text-muted-foreground">{[lead.company, lead.segment, lead.city].filter(Boolean).join(" · ") || "Sem segmento/cidade"}</p>
+        <FunnelContext lead={lead} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -463,6 +466,20 @@ function NoWhatsapp({ lead }: { lead: Lead }) {
           </a>
         )}
       </form>
+    </div>
+  )
+}
+
+/** O que entra no [segmento] e no [cidade/região] da mensagem. Editar grava no lead (vazio = volta ao automático). */
+function FunnelContext({ lead }: { lead: Lead }) {
+  const updateLead = useStore((s) => s.updateLead)
+  const field = "h-7 rounded-md border border-transparent bg-muted/60 px-2 text-sm font-medium text-foreground hover:border-border focus:border-brand focus:outline-none"
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" title="Usado nas mensagens do funil. Clique para corrigir.">
+      <span>Na mensagem: empresas de</span>
+      <InlineText value={segmentPhrase(lead)} placeholder="segmento" onSave={(v) => updateLead(lead.id, { segment: v || undefined })} className={cn(field, "w-48")} />
+      <span>em</span>
+      <InlineText value={regionOf(lead)} placeholder="cidade/região" onSave={(v) => updateLead(lead.id, { city: v || undefined })} className={cn(field, "w-44")} />
     </div>
   )
 }
