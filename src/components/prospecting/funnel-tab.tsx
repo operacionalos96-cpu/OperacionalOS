@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, MessageCircleIcon, MicIcon, PlugIcon, PlusIcon, ReplyIcon, SettingsIcon, Trash2Icon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, DownloadIcon, MessageCircleIcon, PaperclipIcon, MicIcon, PlugIcon, PlusIcon, ReplyIcon, SettingsIcon, Trash2Icon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
 import type { WhatsappTarget } from "@/lib/domain/contact"
-import { followupsDue, nextStep, renderTemplate, type FunnelStep } from "@/lib/domain/funnel"
+import { FUNNEL_MEDIA_MAX, followupsDue, nextStep, renderTemplate, type FunnelStep } from "@/lib/domain/funnel"
+import { signedContentUrl, uploadFunnelMedia } from "@/lib/content-storage"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { useFunnel } from "@/lib/funnel-store"
@@ -97,8 +98,6 @@ export function FunnelTab({ leads, ownerId, whatsTarget, onPending }: { leads: L
 function StepRow({ lead, index, step, total, detail, whatsTarget, onPending }: { lead: Lead; index: number; step: FunnelStep; total: number; detail: string; whatsTarget: WhatsappTarget; onPending: (p: FunnelPending) => void }) {
   const Icon = KIND_ICON[step.kind]
   const text = step.template ? renderTemplate(step.template, lead, new Date()) : ""
-  const script = step.script ? renderTemplate(step.script, lead, new Date()) : ""
-  const [open, setOpen] = useState(false)
   return (
     <li className="grid gap-2 px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-3">
@@ -111,9 +110,9 @@ function StepRow({ lead, index, step, total, detail, whatsTarget, onPending }: {
             Passo {index + 1}/{total}: {step.label} · {detail}
           </p>
         </div>
-        {script && (
-          <Button size="xs" variant="ghost" onClick={() => setOpen((v) => !v)}>
-            Roteiro
+        {step.media && (
+          <Button size="xs" variant="ghost" onClick={async () => window.open(await signedContentUrl(step.media!.path), "_blank", "noopener")} title="Baixe e arraste para a conversa (com a extensão, ela anexa sozinha)">
+            <DownloadIcon /> {step.kind === "audio" ? "Áudio" : "Vídeo"}
           </Button>
         )}
         <Button
@@ -121,14 +120,13 @@ function StepRow({ lead, index, step, total, detail, whatsTarget, onPending }: {
           variant="outline"
           onClick={() => {
             if (!openWhatsapp(lead.contact, text, whatsTarget)) return toast.warning("Lead sem WhatsApp válido")
-            if (step.kind !== "texto") toast(`Grave e envie o ${step.kind === "audio" ? "áudio" : "vídeo"} na conversa`, { description: text ? "O texto de acompanhamento já está na caixa." : undefined })
+            if (step.kind !== "texto") toast(`Envie o ${step.kind === "audio" ? "áudio" : "vídeo"} na conversa`, { description: "Com a extensão, o botão “Anexar” do painel coloca o arquivo; sem ela, baixe e arraste." })
             onPending({ leadId: lead.id, name: lead.name, message: text, step: index })
           }}
         >
           <MessageCircleIcon /> {step.kind === "texto" ? "Abrir com a mensagem" : "Abrir conversa"}
         </Button>
       </div>
-      {open && script && <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-xs">{script}</pre>}
     </li>
   )
 }
@@ -202,7 +200,7 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>Funil de WhatsApp</DialogTitle>
           <DialogDescription>
-            Variáveis: [segmento] [cidade/região] [empresa] [nome] ou {"{saudacao} {empresa} {problema} {site}"}. Nada é enviado sozinho — você sempre aperta Enter.
+            Variáveis: [segmento] [cidade/região] [empresa] [nome] ou {"{saudacao} {empresa} {problema} {site}"}. Áudio e vídeo: suba o arquivo uma vez; a extensão anexa na conversa e você clica em enviar.
           </DialogDescription>
         </DialogHeader>
         <ol className="grid gap-3">
@@ -252,9 +250,9 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
                 value={s.template}
                 onChange={(e) => patch(i, { template: e.target.value })}
                 rows={s.kind === "texto" ? 4 : 2}
-                placeholder={s.kind === "texto" ? "Mensagem" : "Texto que vai junto (opcional, ex.: link do vídeo)"}
+                placeholder={s.kind === "texto" ? "Mensagem" : "Texto que vai junto (opcional)"}
               />
-              {s.kind !== "texto" && <Textarea value={s.script ?? ""} onChange={(e) => patch(i, { script: e.target.value })} rows={4} placeholder={`Roteiro para gravar o ${s.kind === "audio" ? "áudio" : "vídeo"}`} />}
+              {s.kind !== "texto" && <MediaPicker step={s} onChange={(media) => patch(i, { media })} />}
             </li>
           ))}
         </ol>
@@ -285,5 +283,48 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Arquivo do passo de áudio/vídeo: sobe uma vez, a extensão anexa em cada conversa. */
+function MediaPicker({ step, onChange }: { step: FunnelStep; onChange: (m: FunnelStep["media"]) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
+  const accept = step.kind === "audio" ? "audio/*" : "video/*"
+  async function pick(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith(step.kind === "audio" ? "audio/" : "video/")) return toast.error(`Escolha um arquivo de ${step.kind === "audio" ? "áudio" : "vídeo"}`)
+    if (file.size > FUNNEL_MEDIA_MAX) return toast.error(`Arquivo com ${(file.size / 1024 / 1024).toFixed(0)} MB — o limite é 50 MB (o WhatsApp também recusa arquivos grandes demais).`)
+    setBusy(true)
+    try {
+      const path = await uploadFunnelMedia(step.id, file)
+      onChange({ path, name: file.name, mime: file.type, size: file.size })
+      setPreview(URL.createObjectURL(file))
+      toast.success("Arquivo carregado — clique em Salvar")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não subiu")
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="grid gap-2 rounded-lg border border-dashed p-2.5 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <PaperclipIcon className="size-3.5 text-muted-foreground" />
+        <span className={cn("min-w-0 flex-1 truncate", !step.media && "text-warning")}>
+          {step.media ? `${step.media.name} · ${(step.media.size / 1024 / 1024).toFixed(1)} MB` : `Falta o arquivo do ${step.kind === "audio" ? "áudio" : "vídeo"}`}
+        </span>
+        {step.media && !preview && (
+          <Button size="xs" variant="ghost" onClick={async () => setPreview(await signedContentUrl(step.media!.path))}>
+            Ouvir/ver
+          </Button>
+        )}
+        <label className={cn("inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border px-2 font-medium hover:bg-accent", busy && "pointer-events-none opacity-50")}>
+          {busy ? "Enviando…" : step.media ? "Trocar" : "Escolher arquivo"}
+          <input type="file" accept={accept} className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
+        </label>
+      </div>
+      {preview && (step.kind === "audio" ? <audio src={preview} controls className="w-full" /> : <video src={preview} controls className="max-h-48 w-full rounded" />)}
+    </div>
   )
 }

@@ -66,8 +66,15 @@ async function log(l: Lead, actorId: string, text: string, type: BusinessEventTy
   if (error) console.warn("[funil] evento não gravou", error.message)
 }
 
+/** Link temporário (15 min) do áudio/vídeo do passo, para a extensão anexar na conversa. */
+async function mediaLink(step: FunnelStep | undefined) {
+  if (!step?.media) return null
+  const { data } = await supabaseAdmin().storage.from("conteudos").createSignedUrl(step.media.path, 15 * 60)
+  return data ? { url: data.signedUrl, name: step.media.name, mime: step.media.mime, size: step.media.size } : null
+}
+
 /** O que a extensão mostra para o lead da conversa aberta. */
-function view(l: Lead, steps: FunnelStep[], now: Date) {
+async function view(l: Lead, steps: FunnelStep[], now: Date) {
   const f = funnelOf(l)
   const n = nextStep(l, steps, now)
   return {
@@ -84,7 +91,8 @@ function view(l: Lead, steps: FunnelStep[], now: Date) {
           waitingReply: n.waitingReply,
           dueAt: n.dueAt ? n.dueAt.toISOString() : null,
           text: n.step.template ? renderTemplate(n.step.template, l, now) : "",
-          script: n.step.script ? renderTemplate(n.step.script, l, now) : "",
+          media: await mediaLink(n.step),
+          missingMedia: n.step.kind !== "texto" && !n.step.media,
         }
       : null,
   }
@@ -95,7 +103,7 @@ export async function lookupByPhone(phone: string) {
   if (digits.length < 10 || digits.length > 15) throw new FunnelError("número inválido")
   const [steps, leads] = await Promise.all([loadFunnel(), allLeads()])
   const l = findLeadByPhone(leads, digits)
-  return l ? { found: true as const, ...view(l, steps, new Date()) } : { found: false as const }
+  return l ? { found: true as const, ...(await view(l, steps, new Date())) } : { found: false as const }
 }
 
 export async function markSent(leadId: string, index: number, text: string, actorId: string) {
@@ -103,7 +111,7 @@ export async function markSent(leadId: string, index: number, text: string, acto
   if (!Number.isInteger(index) || index < 0 || index >= steps.length) throw new FunnelError("passo inválido")
   const at = new Date().toISOString()
   const step = steps[index]
-  const body = text.trim() || (step.kind === "texto" ? renderTemplate(step.template, l, new Date()) : `(${step.kind === "audio" ? "áudio" : "vídeo"} enviado)`)
+  const body = text.trim() || (step.kind === "texto" ? renderTemplate(step.template, l, new Date()) : `(${step.kind === "audio" ? "áudio" : "vídeo"} enviado${step.media ? `: ${step.media.name}` : ""})`)
   const next: Lead = {
     ...l,
     ...(index === 0 && l.contactStatus !== "contacted" ? contactedPatch(l, body, at, "whatsapp") : {}),

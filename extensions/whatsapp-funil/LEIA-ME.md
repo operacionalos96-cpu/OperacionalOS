@@ -12,7 +12,7 @@ Mostra, ao lado da conversa aberta no WhatsApp Web, o lead do Operacional OS e o
 ## Como funciona
 - Abriu uma conversa → acha o lead pelo número e mostra o passo do funil.
 - **Escrever no WhatsApp** → coloca o texto na caixa. Quando você aperta Enter, o envio é registrado sozinho.
-- Áudio/vídeo → mostra o roteiro; grave, envie e clique em **Enviei o áudio/vídeo**.
+- Áudio/vídeo → suba o arquivo uma vez em **Prospecção › Funil › Editar funil**. Na conversa, **Anexar áudio/vídeo** abre a prévia do WhatsApp com o arquivo; você clica em enviar e o passo é registrado sozinho.
 - Quando o lead responde, a extensão percebe e libera o próximo passo (ou clique em **Ele respondeu**).
 - Aba **Hoje**: quem precisa do próximo passo hoje.
 

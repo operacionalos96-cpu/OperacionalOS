@@ -70,6 +70,62 @@
     return true
   }
 
+  /** Baixa o áudio/vídeo do funil (link temporário assinado). */
+  async function fetchMedia(media) {
+    let blob = null
+    try {
+      const r = await fetch(media.url)
+      if (r.ok) blob = await r.blob()
+    } catch {}
+    if (!blob) {
+      // Plano B: baixa pelo service worker da extensão.
+      const r = await chrome.runtime.sendMessage({ type: "media", url: media.url }).catch(() => null)
+      if (!r?.ok) throw new Error(r?.erro || "Não consegui baixar o arquivo.")
+      blob = await (await fetch(r.dataUrl)).blob()
+    }
+    return new File([blob], media.name, { type: media.mime })
+  }
+
+  const previewOpen = () =>
+    !!document.querySelector("[data-animate-media-viewer], [data-animate-modal-body]") ||
+    [...document.querySelectorAll('[data-icon="send"], [data-icon="wds-ic-send-filled"]')].some((el) => !el.closest("footer"))
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const waitPreview = async () => {
+    for (let i = 0; i < 10 && !previewOpen(); i++) await sleep(200)
+    return previewOpen()
+  }
+
+  /** Coloca o arquivo na conversa (abre a prévia do WhatsApp). NÃO clica em enviar. */
+  async function attachFile(file) {
+    const target = main()
+    if (!target) return false
+    const dt = () => {
+      const d = new DataTransfer()
+      d.items.add(file)
+      return d
+    }
+    // 1) Arrastar e soltar na conversa (como você faria com o mouse).
+    const drop = target.querySelector('[role="application"]') || target
+    for (const type of ["dragenter", "dragover", "drop"]) drop.dispatchEvent(new DragEvent(type, { dataTransfer: dt(), bubbles: true, cancelable: true }))
+    if (await waitPreview()) return true
+    // 2) Colar na caixa de mensagem.
+    const box = target.querySelector('footer div[contenteditable="true"]')
+    if (box) {
+      box.focus()
+      box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt(), bubbles: true, cancelable: true }))
+      if (await waitPreview()) return true
+    }
+    // 3) Campo de arquivo do menu "Anexar".
+    const inputs = [...document.querySelectorAll('input[type="file"]')]
+    const input = inputs.find((x) => (x.accept || "").includes(file.type.split("/")[0])) || inputs.find((x) => !x.accept || x.accept === "*") || inputs[0]
+    if (input) {
+      input.files = dt().files
+      input.dispatchEvent(new Event("change", { bubbles: true }))
+      if (await waitPreview()) return true
+    }
+    return false
+  }
+
   // ---------- painel (shadow DOM: o CSS do WhatsApp não interfere) ----------
   const host = document.createElement("div")
   host.id = "oos-funil"
@@ -213,10 +269,14 @@
         <button class="b" data-a="replied">Ele respondeu</button>`
     } else {
       html += `<p><b>Passo ${next.index + 1}: ${esc(next.label)}</b> · ${KIND[next.kind]}${!next.due ? ` <span class="muted">(vence ${when(next.dueAt)})</span>` : ""}</p>`
-      if (next.script) html += `<div class="muted">Roteiro para gravar:</div><pre>${esc(next.script)}</pre>`
-      if (next.text) html += `<pre>${esc(next.text)}</pre><button class="b main" data-a="write">Escrever no WhatsApp</button>`
-      if (next.kind !== "texto") html += `<div class="muted" style="margin-top:6px">Grave e envie o ${next.kind === "audio" ? "áudio" : "vídeo"} nesta conversa.</div>`
-      if (pendingSend) html += `<div class="ok">Escrito na caixa. Confira e aperte <b>Enter</b> — eu registro sozinho quando sair.</div>`
+      const noun = next.kind === "audio" ? "áudio" : "vídeo"
+      if (next.kind !== "texto") {
+        if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
+        else html += `<div class="warn">Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.</div>`
+      }
+      if (next.text) html += `<pre>${esc(next.text)}</pre><button class="b ${next.kind === "texto" ? "main" : ""}" data-a="write">Escrever no WhatsApp</button>`
+      if (pendingSend)
+        html += `<div class="ok">${pendingSend.media ? `Arquivo anexado. Confira a prévia e clique em <b>enviar</b>` : "Escrito na caixa. Confira e aperte <b>Enter</b>"} — eu registro sozinho quando sair.</div>`
       html += `<button class="b" data-a="sent">${next.kind === "texto" ? "Já enviei" : `Enviei o ${next.kind === "audio" ? "áudio" : "vídeo"}`}</button>`
     }
     if (next) html += `<button class="b ghost" data-a="stop">Tirar do funil</button>`
@@ -228,6 +288,31 @@
       pendingSend = { leadId: lead.id, step: next.index, text: next.text, title: s.title }
       baselineLast = lastMessage()?.id ?? null
       render()
+    })
+    on("attach", async () => {
+      const btn = body.querySelector('[data-a="attach"]')
+      btn.disabled = true
+      btn.textContent = "Baixando…"
+      try {
+        const file = await fetchMedia(next.media)
+        btn.textContent = "Anexando…"
+        if (!(await attachFile(file))) {
+          // Último recurso: baixa o arquivo para você arrastar.
+          const a = document.createElement("a")
+          a.href = URL.createObjectURL(file)
+          a.download = file.name
+          a.click()
+          state.note = "⚠ O WhatsApp não aceitou o anexo automático. Baixei o arquivo: arraste-o para a conversa."
+          return render()
+        }
+        pendingSend = { leadId: lead.id, step: next.index, text: "", title: s.title, media: true }
+        baselineLast = lastMessage()?.id ?? null
+        state.note = ""
+        render()
+      } catch (e) {
+        state.note = `⚠ ${e.message}`
+        render()
+      }
     })
     on("sent", () => {
       pendingSend = null

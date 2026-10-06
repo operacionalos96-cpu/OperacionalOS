@@ -102,7 +102,7 @@ describe("saudação no horário de Brasília (servidor em UTC)", () => {
   })
 })
 
-describe("passos de áudio e vídeo", () => {
+describe("passos de áudio e vídeo (arquivo)", () => {
   it("roteiro de vocês tem 4 passos: 2 textos, áudio e vídeo, todos depois da resposta", () => {
     expect(DEFAULT_FUNNEL.map((s) => [s.kind, s.trigger])).toEqual([
       ["texto", "dias"],
@@ -110,18 +110,20 @@ describe("passos de áudio e vídeo", () => {
       ["audio", "resposta"],
       ["video", "resposta"],
     ])
-    expect(renderTemplate(DEFAULT_FUNNEL[2].script!, lead({ company: "Costa Lion", analysis: { problems: ["Sem versão para celular"] } }), new Date())).toContain("sem versão para celular")
-    expect(renderTemplate(DEFAULT_FUNNEL[3].template, lead({ company: "Costa Lion" }), new Date())).toContain("[link do vídeo]") // você cola o link
   })
-  it("passo de mídia pode ser só roteiro (sem texto)", () => {
-    expect(mergeFunnel([{ label: "A", template: "{saudacao}" }, { label: "Áudio", kind: "audio", trigger: "resposta", template: "", script: "fale X" }])[1]).toEqual({
-      id: "s2",
-      label: "Áudio",
-      trigger: "resposta",
-      kind: "audio",
-      script: "fale X",
-      delayDays: 0,
-      template: "",
-    })
+  it("passo de mídia guarda o arquivo (e pode ficar sem arquivo até você subir)", () => {
+    const media = { path: "funil/m3/abc-audio.ogg", name: "audio.ogg", mime: "audio/ogg", size: 12345 }
+    const f = mergeFunnel([{ label: "A", template: "{saudacao}" }, { label: "Áudio", kind: "audio", trigger: "resposta", template: "", media }, { label: "Vídeo", kind: "video", trigger: "resposta" }])
+    expect(f[1]).toEqual({ id: "s2", label: "Áudio", trigger: "resposta", kind: "audio", media, delayDays: 0, template: "" })
+    expect(f[2]).toMatchObject({ kind: "video", template: "" })
+    expect(f[2].media).toBeUndefined()
+  })
+  it("arquivo fora da pasta do funil ou de outro tipo é ignorado", () => {
+    const bad = [
+      { path: "itens/x/a.mp3", name: "a", mime: "audio/mpeg", size: 1 },
+      { path: "funil/../itens/a.mp3", name: "a", mime: "audio/mpeg", size: 1 },
+      { path: "funil/a.exe", name: "a", mime: "application/x-msdownload", size: 1 },
+    ]
+    for (const media of bad) expect(mergeFunnel([{ template: "x" }, { kind: "audio", media }])[1].media).toBeUndefined()
   })
 })

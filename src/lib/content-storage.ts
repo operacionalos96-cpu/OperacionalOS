@@ -49,3 +49,11 @@ export async function uploadAttachment(entityType: string, entityId: string, fil
   if (error) throw uploadError(error)
   return path
 }
+
+/** Áudio/vídeo de um passo do funil de WhatsApp (mesmo bucket privado, pasta funil/). */
+export async function uploadFunnelMedia(stepId: string, file: File) {
+  const path = `funil/${stepId.replace(/[^A-Za-z0-9-]/g, "_")}/${uid()}-${safeFileName(file.name)}`
+  const { error } = await supabaseBrowser().storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw uploadError(error)
+  return path
+}

@@ -12,13 +12,22 @@ export interface FunnelStep {
   trigger: "dias" | "resposta"
   /** Dias depois do passo anterior (só para trigger "dias"; o 1º passo usa 0). */
   delayDays: number
-  /** texto: mensagem pronta. audio/video: você grava/anexa; o sistema mostra o roteiro (e o texto de acompanhamento, se houver). */
+  /** texto: mensagem pronta. audio/video: arquivo salvo no funil, anexado na conversa (você clica em enviar). */
   kind: "texto" | "audio" | "video"
   /** Variáveis: {saudacao} {nome} {empresa} {segmento} {cidade} {problema} {oportunidade} {site} ou [segmento] [cidade/região]… */
   template: string
-  /** Roteiro para gravar o áudio/vídeo (mesmas variáveis). */
-  script?: string
+  /** Arquivo do áudio/vídeo (bucket privado "conteudos", pasta funil/). */
+  media?: FunnelMedia
 }
+
+export interface FunnelMedia {
+  path: string
+  name: string
+  mime: string
+  size: number
+}
+
+export const FUNNEL_MEDIA_MAX = 50 * 1024 * 1024
 
 export interface LeadFunnel {
   /** Próximo passo a enviar (0 = ainda não mandou a 1ª). */
@@ -58,17 +67,14 @@ export const DEFAULT_FUNNEL: FunnelStep[] = [
     trigger: "resposta",
     delayDays: 0,
     template: "",
-    script:
-      "Roteiro (até 1 min):\n1) Quem é você e por que está falando com a {empresa}.\n2) O detalhe da recomendação da IA: {problema}.\n3) O que isso faz perder (clientes que pesquisam pelo celular/IA e não fecham).\n4) Convite: “Posso te mandar um vídeo curtinho mostrando exatamente isso no site de vocês?”",
   },
   {
     id: "m4",
-    label: "Vídeo mostrando o site",
+    label: "Vídeo",
     kind: "video",
     trigger: "resposta",
     delayDays: 0,
-    template: "Gravei esse vídeo rápido mostrando o que vi no site da {empresa}: [link do vídeo]",
-    script: "Roteiro (2–3 min): abra o site {site} no celular, mostre {problema}, compare com como ficaria e feche com o próximo passo (uma conversa de 15 min).",
+    template: "",
   },
 ]
 
@@ -77,18 +83,18 @@ export function mergeFunnel(raw: unknown): FunnelStep[] {
   const steps = raw.flatMap((s, i) => {
     const o = (s && typeof s === "object" ? s : {}) as Record<string, unknown>
     const template = typeof o.template === "string" ? o.template.trim().slice(0, 2000) : ""
-    const hasScript = typeof o.script === "string" && o.script.trim()
-    if (!template && !hasScript) return []
-    const trigger = i > 0 && o.trigger === "resposta" ? "resposta" : "dias"
     const kind = o.kind === "audio" || o.kind === "video" ? o.kind : "texto"
-    const script = typeof o.script === "string" && o.script.trim() ? o.script.trim().slice(0, 3000) : undefined
+    // Texto precisa de mensagem; áudio/vídeo podem estar sem arquivo ainda (aparece "falta o arquivo").
+    if (kind === "texto" && !template) return []
+    const trigger = i > 0 && o.trigger === "resposta" ? "resposta" : "dias"
+    const media = kind === "texto" ? undefined : cleanMedia(o.media)
     return [
       {
         id: typeof o.id === "string" && o.id ? o.id.slice(0, 20) : `s${i + 1}`,
         label: typeof o.label === "string" && o.label.trim() ? o.label.trim().slice(0, 60) : `Passo ${i + 1}`,
         trigger: trigger as FunnelStep["trigger"],
         kind: kind as FunnelStep["kind"],
-        ...(script ? { script } : {}),
+        ...(media ? { media } : {}),
         delayDays: i === 0 || trigger === "resposta" ? 0 : typeof o.delayDays === "number" && o.delayDays >= 0 ? Math.min(60, Math.round(o.delayDays)) : 2,
         template,
       },
@@ -99,6 +105,16 @@ export function mergeFunnel(raw: unknown): FunnelStep[] {
 
 /** Hora em Brasília (o servidor roda em UTC; a saudação tem que ser a do lead). */
 const hourBR = (now: Date) => Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(now))
+function cleanMedia(raw: unknown): FunnelMedia | undefined {
+  const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const path = typeof m.path === "string" ? m.path : ""
+  const mime = typeof m.mime === "string" ? m.mime : ""
+  if (!/^funil\/[A-Za-z0-9._\/-]{1,200}$/.test(path) || path.includes("..") || !/^(audio|video)\/[\w.+-]+$/.test(mime)) return undefined
+  const size = typeof m.size === "number" && m.size > 0 ? Math.min(m.size, FUNNEL_MEDIA_MAX) : 0
+  const name = typeof m.name === "string" && m.name.trim() ? m.name.trim().slice(0, 120) : path.split("/").pop()!
+  return { path, name, mime, size }
+}
+
 export const greetingFor = (now: Date) => (hourBR(now) < 12 ? "Bom dia, tudo bem?" : "Boa tarde, tudo bem?")
 
 /** Preenche as variáveis. O que não existir some sem deixar "{...}" na mensagem. */
