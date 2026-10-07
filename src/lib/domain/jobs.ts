@@ -57,6 +57,16 @@ export interface ProspectVideoResult {
   findings: { kind: string; text: string; short: string }[]
 }
 
+/** Análise com julgamento (Claude) dos 3 pontos do vídeo. anchor = texto visível na página que marca onde está o ponto. */
+export interface VideoAnalysisResult {
+  points: { text: string; short: string; impacto: string; anchor?: string; kind?: string }[]
+  diferencial?: string
+  especialidade?: string
+  segmento?: string
+  cidade?: string
+  resumo?: string
+}
+
 export interface JobTypeDef<T = unknown> {
   label: string
   agentId: string
@@ -149,6 +159,34 @@ function validateProspectVideo(raw: unknown): ValidationResult<ProspectVideoResu
   return { ok: true, value: { video_path: video_path!, ...(video2_path ? { video2_path } : {}), duration_sec: duration_sec!, findings } }
 }
 
+function validateVideoAnalysis(raw: unknown): ValidationResult<VideoAnalysisResult> {
+  const o = obj(raw)
+  if (!o) return { ok: false, errors: ["resultado precisa ser um objeto"] }
+  const errors: string[] = []
+  const points = Array.isArray(o.points)
+    ? o.points.flatMap((x, i) => {
+        const p = obj(x)
+        const t = text(p?.text, 220)
+        const short = text(p?.short, 48)
+        const impacto = text(p?.impacto, 180)
+        if (!t || !short || !impacto) {
+          errors.push(`points[${i}]: precisa de text, short e impacto`)
+          return []
+        }
+        const anchor = text(p?.anchor, 140)
+        const kind = text(p?.kind, 40)
+        return [{ text: t, short, impacto, ...(anchor ? { anchor } : {}), ...(kind ? { kind } : {}) }]
+      })
+    : []
+  if (points.length !== 3) errors.push("points: exatamente 3 pontos fortes")
+  if (errors.length) return { ok: false, errors }
+  const opt = (k: string, max: number) => {
+    const v = text(o[k], max)
+    return v ? { [k]: v } : {}
+  }
+  return { ok: true, value: { points, ...opt("diferencial", 48), ...opt("especialidade", 60), ...opt("segmento", 60), ...opt("cidade", 60), ...opt("resumo", 600) } }
+}
+
 export const JOB_TYPES: Record<string, JobTypeDef> = {
   analyze_website: {
     label: "Analisar site",
@@ -165,6 +203,14 @@ export const JOB_TYPES: Record<string, JobTypeDef> = {
     maxAttempts: 3,
     priority: 20,
     validate: validateFeedback,
+  },
+  analyze_for_video: {
+    label: "Analisar site para o vídeo",
+    agentId: "web-analyst",
+    requiredCapabilities: ["reasoning"],
+    maxAttempts: 3,
+    priority: 65,
+    validate: validateVideoAnalysis,
   },
   render_prospect_video: {
     label: "Gerar vídeo de análise",

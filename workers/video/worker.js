@@ -8,7 +8,7 @@ const path = require('path');
 const puppeteer = require('puppeteer-core');
 const { analisarSite } = require('./analisar');
 const { montarFicha, renderizar } = require('./render');
-const { MINIMO } = require('./selecionar');
+const { MINIMO, foco } = require('./selecionar');
 
 for (const linha of (fs.existsSync(path.join(__dirname, '.env')) ? fs.readFileSync(path.join(__dirname, '.env'), 'utf8') : '').split(/\r?\n/)) {
   const m = /^\s*([A-Z_]+)\s*=\s*(.*)\s*$/.exec(linha);
@@ -53,7 +53,22 @@ async function executar(browser, job, lease) {
   try {
     console.log(`▸ ${lead.name} — ${lead.website}`);
     await tool('report_progress', { ...ids, message: 'abrindo o site e tirando os prints', percent: 5 });
-    const analise = await analisarSite(browser, lead.website, dir, { nome: lead.name, segmento: lead.segment || lead.siteInfo?.segment, cidade: lead.city || lead.siteInfo?.city });
+    // Os 3 pontos vêm da análise do Claude (job anterior); sem ela, usa os detectores automáticos.
+    const pontos = job.payload?.analysis?.points || null;
+    const extra = job.payload?.analysis || {};
+    const analise = await analisarSite(browser, lead.website, dir, {
+      nome: lead.name,
+      segmento: extra.segmento || lead.segment || lead.siteInfo?.segment,
+      cidade: extra.cidade || lead.city || lead.siteInfo?.city,
+      ancoras: pontos ? pontos.map((p) => p.anchor || '') : [],
+    });
+    if (pontos) {
+      analise.escolhidos = pontos.map((p, i) => {
+        const area = analise.ancoras[i];
+        return { kind: p.kind || 'analise', text: p.text, short: p.short, impacto: p.impacto, print: area ? 'pagina.png' : 'home.png', foco: foco(area), evidencia: p.anchor || '' };
+      });
+      if (extra.diferencial) analise.diferencial = extra.diferencial;
+    }
     fs.writeFileSync(path.join(dir, 'analise.json'), JSON.stringify(analise, null, 2));
     if (analise.escolhidos.length < MINIMO) {
       const vistos = analise.escolhidos.map((a) => a.short).join(', ') || 'nenhum';
@@ -61,7 +76,8 @@ async function executar(browser, job, lease) {
     }
     console.log('  achados:', analise.escolhidos.map((a) => a.short).join(' | '));
 
-    const ficha = montarFicha(lead, analise);
+    const ficha = montarFicha({ ...lead, segment: extra.segmento || lead.segment, city: extra.cidade || lead.city }, analise);
+    if (extra.especialidade) ficha.especialidade = extra.especialidade;
     await tool('report_progress', { ...ids, message: `achados: ${analise.escolhidos.map((a) => a.short).join(', ')} — renderizando`, percent: 20 });
     let ultimo = 0;
     const progresso = (de, ate, msg) => async (p) => {

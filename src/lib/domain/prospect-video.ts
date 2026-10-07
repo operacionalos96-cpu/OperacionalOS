@@ -18,7 +18,7 @@ export const VIDEO_AGENT_ID = "video-studio"
 export const VIDEO_CAPABILITY = "video_render"
 
 /** gerando → pronto (esperando revisão) → aprovado | descartado. erro = job falhou de vez. */
-export type LeadVideoStatus = "gerando" | "pronto" | "aprovado" | "descartado" | "erro"
+export type LeadVideoStatus = "analisando" | "gerando" | "pronto" | "aprovado" | "descartado" | "erro"
 
 /** Um ponto observado no site real (o worker só devolve o que conseguiu medir na página). */
 export interface VideoFinding {
@@ -46,6 +46,10 @@ export interface LeadVideo {
   approvedAt?: string
   approvedBy?: string
   error?: string
+  /** Job da análise (Claude) que antecede o render. */
+  analysisJobId?: string
+  /** Os 3 pontos escritos pela análise (Claude), antes do render. */
+  analysis?: import("./jobs").VideoAnalysisResult
 }
 
 const CLOSED = ["ganho", "perdido"]
@@ -112,6 +116,7 @@ export function stepMediaFor(lead: Pick<Lead, "video" | "name">, steps: StepLike
   const v = lead.video
   const path = src === "diagnostico" ? v?.path : v?.path2
   if (v?.status === "aprovado" && path) return { media: { path, name: `${src === "visao" ? "visao" : "analise"}-${slug(lead.name)}.mp4`, mime: "video/mp4", size: 0 } }
+  if (v?.status === "analisando") return { media: null, note: "O site deste lead está sendo analisado para o vídeo personalizado." }
   if (v?.status === "gerando") return { media: null, note: "O vídeo personalizado deste lead está sendo gerado. Volte em alguns minutos." }
   if (v?.status === "pronto") return { media: null, note: "Vídeo personalizado pronto — aprove na página do lead (Pipeline) para liberar aqui." }
   return { media: step.media ?? null }
@@ -121,6 +126,7 @@ const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "empresa"
 
 export const VIDEO_STATUS_LABEL: Record<LeadVideoStatus, string> = {
+  analisando: "Analisando o site",
   gerando: "Gerando",
   pronto: "Pronto para revisar",
   aprovado: "Aprovado",

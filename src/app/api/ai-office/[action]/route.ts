@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { createWebhook, rotateWebhookSecret } from "@/lib/server/webhooks"
 import { saveFunnel } from "@/lib/server/whatsapp-funnel"
 import { createWorker, rotateWorkerToken, type Scope } from "@/lib/server/workers"
-import { VIDEO_AGENT_ID, VIDEO_JOB_TYPE, type LeadVideo } from "@/lib/domain/prospect-video"
+import type { LeadVideo } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
 
 /**
@@ -123,17 +123,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         }
         // gerar (ou gerar de novo): pedido humano, fora da regra automática do funil
         if (!/^https?:\/\//i.test(l.website ?? "")) return bad("o lead não tem site")
-        if (v?.status === "gerando") return bad("já está gerando", 409)
+        if (v?.status === "gerando" || v?.status === "analisando") return bad("já está em andamento", 409)
         const version = (v?.version ?? 0) + 1
-        const def = JOB_TYPES[VIDEO_JOB_TYPE]
+        // começa pela análise (Claude); ao concluir, o banco pede o render
+        const def = JOB_TYPES.analyze_for_video
         const { data: q, error } = await db.rpc("enqueue_job", {
-          p_job_type: VIDEO_JOB_TYPE, p_agent_id: VIDEO_AGENT_ID, p_entity_type: "lead", p_entity_id: id,
-          p_payload: { website: l.website, name: l.name, version, manual: true }, p_idempotency_key: idempotencyKey(VIDEO_JOB_TYPE, id, version), p_created_by: member.teamId,
+          p_job_type: "analyze_for_video", p_agent_id: def.agentId, p_entity_type: "lead", p_entity_id: id,
+          p_payload: { website: l.website, name: l.name, version, manual: true }, p_idempotency_key: idempotencyKey("analyze_for_video", id, version), p_created_by: member.teamId,
           p_priority: def.priority + 10, p_max_attempts: def.maxAttempts, p_required_capabilities: def.requiredCapabilities, p_correlation_id: `lead:${id}`,
         })
         if (error) return bad("falhou ao pedir o vídeo", 500)
         const job = (q as { job: { public_id: string } }[] | null)?.[0]?.job
-        return save({ status: "gerando", jobId: job?.public_id, version, requestedAt: new Date().toISOString() })
+        return save({ status: "analisando", analysisJobId: job?.public_id, version, requestedAt: new Date().toISOString() })
       }
       default:
         return bad("ação desconhecida", 404)

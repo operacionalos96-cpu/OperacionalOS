@@ -188,6 +188,17 @@ function medir(ctx, maxAltura) {
     achados.push({ kind: 'sem_autoridade', prioridade: 78, area: null, evidencia: 'sem anos de mercado, formação, registro, equipe ou "quem somos" no texto' });
   }
 
+  // Trechos indicados pela análise (Claude): acha o bloco onde cada um aparece
+  const ancoras = (ctx.ancoras || []).map((t) => {
+    const alvo = norm(t).replace(/\s+/g, ' ').trim();
+    if (alvo.length < 3) return null;
+    const els = [...document.querySelectorAll('body *')].filter((e) => visivel(e) && norm(e.innerText).replace(/\s+/g, ' ').includes(alvo));
+    const menor = els.sort((a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
+    if (!menor) return null;
+    const area = doc(bloco(menor, 120, 640).getBoundingClientRect());
+    return dentro(area) ? area : null;
+  });
+
   // Dados para personalizar (tirados do site, nunca inventados)
   const dif =
     /\b(h[áa] mais de \d{1,3} anos|mais de \d{1,3} anos de (?:experi[eê]ncia|mercado|atua[cç][aã]o|hist[oó]ria)|desde (?:19|20)\d{2}|\d{1,3} anos de (?:experi[eê]ncia|mercado|tradi[cç][aã]o)|atendimento 24 ?h(?:oras)?|hora marcada[^.;,]{0,30})/i.exec(texto)?.[1] || null;
@@ -212,7 +223,8 @@ function medir(ctx, maxAltura) {
     return [...peso.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   })();
 
-  return { achados, altura, titulo: document.title, diferencial: dif, cor, https: location.protocol === 'https:' };
+  const descricao = (document.querySelector('meta[name="description"]')?.getAttribute('content') || '').trim();
+  return { achados, ancoras, altura, titulo: document.title, descricao, texto: texto.slice(0, 7000), diferencial: dif, cor, https: location.protocol === 'https:' };
 }
 
 /** Analisa o site e salva home.png, pagina.png e mobile.png em `dir`. ctx = { segmento, cidade } do lead. */
@@ -229,7 +241,7 @@ async function analisarSite(browser, url, dir, ctx = {}) {
   await limparSobreposicoes(page);
   await carregarTudo(page);
   await limparSobreposicoes(page);
-  const medida = await page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '' }, MAX_ALTURA);
+  const medida = await page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '', ancoras: ctx.ancoras || [] }, MAX_ALTURA);
   await page.screenshot({ path: path.join(dir, 'home.png') });
   await page.screenshot({ path: path.join(dir, 'pagina.png'), clip: { x: 0, y: 0, width: VIEW.width, height: medida.altura }, captureBeyondViewport: true });
   const urlFinal = page.url();

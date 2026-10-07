@@ -62,6 +62,11 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
 
       {!v && <p className="text-xs text-muted-foreground">Gera sozinho quando o lead chegar na parte do vídeo do funil (aceitou o áudio). Se quiser antes, gere agora.</p>}
 
+      {v?.status === "analisando" && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2Icon className="size-3.5 animate-spin" /> O Claude está analisando o site para escrever os 3 pontos{v.requestedAt ? ` · pedido ${relative(v.requestedAt)}` : ""}. Roda na tarefa agendada do PC.
+        </p>
+      )}
       {v?.status === "gerando" && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2Icon className="size-3.5 animate-spin" /> Abrindo o site, tirando os prints e renderizando{v.requestedAt ? ` · pedido ${relative(v.requestedAt)}` : ""}. Precisa do worker de vídeo ligado.
@@ -102,7 +107,7 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
             <CheckIcon /> Aprovar
           </Button>
         )}
-        {v && v.status !== "gerando" && (
+        {v && v.status !== "gerando" && v.status !== "analisando" && (
           <Button size="xs" variant="ghost" onClick={() => run("video.generate", "Pedido de novo vídeo enviado")} disabled={!!busy}>
             <RefreshCwIcon /> Gerar de novo
           </Button>

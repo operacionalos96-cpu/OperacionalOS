@@ -29,6 +29,7 @@ beforeAll(async () => {
   await db.exec(mig("0013_video_prospeccao.sql")) // rodar de novo não quebra
   await db.exec(mig("0014_video_2.sql"))
   await db.exec(mig("0015_funil_video_editavel.sql"))
+  await db.exec(mig("0016_analise_claude.sql"))
 }, 60_000)
 
 const clear = () => db.exec(`delete from public.webhook_deliveries; delete from public.events; delete from public.ai_jobs; delete from public.leads; delete from public.ai_settings;`)
@@ -37,7 +38,7 @@ const addLead = (id: string, extra: Record<string, unknown>) =>
   db.query(`insert into public.leads (id, data) values ($1, $2)`, [id, { id, name: "Odonto Vitta", stage: "contato", website: "https://odontovitta.com.br", ...extra }])
 const event = (lead: string, type = "lead.replied") =>
   db.query(`insert into public.events (id, event_type, entity_type, entity_id, actor_type, actor_id, metadata) values (private.ulid('evt'), $1, 'lead', $2, 'human', 'u1', '{}')`, [type, lead])
-const videoJobs = () => sql<{ public_id: string; idempotency_key: string; status: string }>(`select public_id, idempotency_key, status from public.ai_jobs where job_type = 'render_prospect_video' order by created_at`)
+const videoJobs = () => sql<{ public_id: string; idempotency_key: string; status: string }>(`select public_id, idempotency_key, status from public.ai_jobs where job_type = 'analyze_for_video' order by created_at`)
 const video = async (lead: string) => (await one<{ v: Record<string, unknown> | null }>(`select data->'video' as v from public.leads where id = $1`, [lead]))?.v
 
 describe("vídeo de prospecção no Postgres", () => {
@@ -48,8 +49,8 @@ describe("vídeo de prospecção no Postgres", () => {
     await addLead("L3", { funnel: funnel(2, "2026-10-03T10:00:00Z", "2026-10-03T10:20:00Z") }) // aceitou o áudio
     for (const l of ["L1", "L2", "L3"]) await event(l)
     const jobs = await videoJobs()
-    expect(jobs.map((j) => j.idempotency_key)).toEqual(["render_prospect_video:L3:v1"])
-    expect(await video("L3")).toMatchObject({ status: "gerando", jobId: jobs[0].public_id, version: 1 })
+    expect(jobs.map((j) => j.idempotency_key)).toEqual(["analyze_for_video:L3:v1"])
+    expect(await video("L3")).toMatchObject({ status: "analisando", analysisJobId: jobs[0].public_id, version: 1 })
     expect(await video("L1")).toBeNull()
   })
 
@@ -83,7 +84,7 @@ describe("vídeo de prospecção no Postgres", () => {
     await addLead("E2", { funnel: funnel(3, "2026-10-03T11:00:00Z") }) // áudio enviado
     await addLead("E3", { funnel: funnel(6, "2026-10-05T11:00:00Z") }) // já passou dos personalizados (só falta a proposta)
     for (const l of ["E1", "E2", "E3"]) await event(l)
-    expect((await videoJobs()).map((j) => j.idempotency_key)).toEqual(["render_prospect_video:E2:v1"])
+    expect((await videoJobs()).map((j) => j.idempotency_key)).toEqual(["analyze_for_video:E2:v1"])
     // só vídeos de arquivo → nunca gera
     await db.query(`update public.ai_settings set data = $1 where id = 'whatsapp_funnel'`, [{ steps: steps.map((s) => (s.kind === "video" ? { ...s, source: "arquivo" } : s)) }])
     await addLead("E4", { funnel: funnel(4, "2026-10-04T11:00:00Z") })
@@ -95,11 +96,16 @@ describe("vídeo de prospecção no Postgres", () => {
     await clear()
     await addLead("L5", { funnel: funnel(3, "2026-10-03T11:00:00Z") })
     await event("L5", "lead.followup_sent")
-    const c = await one<{ public_id: string; lease_id: string }>(`select * from public.claim_next_job('wrk_V', array['video_render'], 'video-studio', 600)`)
+    const a = await one<{ public_id: string; lease_id: string }>(`select * from public.claim_next_job('wrk_A', array['reasoning'], 'web-analyst', 600)`)
+    const analysis = { points: [1, 2, 3].map((i) => ({ text: `ponto ${i}`, short: `P${i}`, impacto: "por quê" })) }
+    await db.query(`select public.complete_job($1, $2, $3)`, [a.public_id, a.lease_id, analysis])
+    expect(await video("L5")).toMatchObject({ status: "gerando", analysis })
+    const c = await one<{ public_id: string; lease_id: string; payload: { analysis: unknown } }>(`select * from public.claim_next_job('wrk_V', array['video_render'], 'video-studio', 600)`)
+    expect(c.payload.analysis).toEqual(analysis)
     expect(c?.public_id).toBeTruthy()
     const result = { video_path: `funil/leads/L5/${c.public_id}/video.mp4`, video2_path: `funil/leads/L5/${c.public_id}/video-2.mp4`, duration_sec: 92, findings: [{ kind: "copyright_antigo", text: "o rodapé ainda mostra © 2019", short: "Rodapé com © 2019" }] }
     await db.query(`select public.complete_job($1, $2, $3)`, [c.public_id, c.lease_id, result])
-    expect(await video("L5")).toMatchObject({ status: "pronto", path: result.video_path, path2: result.video2_path, durationSec: 92, jobId: c.public_id })
+    expect(await video("L5")).toMatchObject({ status: "pronto", path: result.video_path, path2: result.video2_path, durationSec: 92, jobId: c.public_id, analysis })
   })
 
   it("lead salvo depois do evento: a mudança do funil já basta (sem corrida)", async () => {
@@ -109,7 +115,7 @@ describe("vídeo de prospecção no Postgres", () => {
     expect((await videoJobs()).length).toBe(0)
     await db.query(`update public.leads set data = jsonb_set(data, '{funnel,repliedAt}', '"2026-10-03T10:30:00Z"') where id = 'L7'`)
     expect((await videoJobs()).length).toBe(1)
-    expect(await video("L7")).toMatchObject({ status: "gerando" })
+    expect(await video("L7")).toMatchObject({ status: "analisando" })
   })
 
   it("o navegador não consegue mudar lead.video (cópia antiga não volta o status)", async () => {
@@ -134,7 +140,7 @@ describe("vídeo de prospecção no Postgres", () => {
     expect(await video("L6")).toMatchObject({ status: "erro" })
     await event("L6")
     const jobs = await videoJobs()
-    expect(jobs.map((x) => x.idempotency_key)).toEqual(["render_prospect_video:L6:v1", "render_prospect_video:L6:v2"])
-    expect(await video("L6")).toMatchObject({ status: "gerando", version: 2, jobId: jobs[1].public_id })
+    expect(jobs.map((x) => x.idempotency_key)).toEqual(["analyze_for_video:L6:v1", "analyze_for_video:L6:v2"])
+    expect(await video("L6")).toMatchObject({ status: "analisando", version: 2, analysisJobId: jobs[1].public_id })
   })
 })

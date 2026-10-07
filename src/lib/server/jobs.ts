@@ -111,6 +111,8 @@ export async function jobContext(w: Worker, publicId: string) {
 const JOB_INSTRUCTIONS: Record<string, string> = {
   analyze_website:
     "Abra o site do lead e avalie: experiência no celular, velocidade, visual/atualidade, clareza da oferta, CTA/WhatsApp, confiança. Devolva problemas concretos, oportunidades de venda de um site novo e notas. Não invente o que não viu.",
+  analyze_for_video:
+    "Analise o site REAL do lead como um consultor (veja workers/video/ANALISTA.md): prints de desktop e celular, texto e fatos medidos. Escolha os 3 pontos MAIS FORTES que fazem a empresa parecer menos do que é para quem chega agora. Nada fraco (ano do rodapé, detalhe técnico). Cada ponto: text (completa 'Um exemplo: …', factual, sem acusar), short (2–4 palavras), impacto (1 frase, sem prometer), anchor (trecho EXATO de texto visível onde o ponto aparece, se houver). Sem 3 pontos fortes: fail_job retryable=false.",
   render_prospect_video:
     "Gere o vídeo de análise do lead: abra o site REAL, tire os prints, detecte só problemas que dá para provar na página (com a área exata) e renderize o modelo. Suba o MP4 com create_upload_urls e conclua com video_path, duration_sec e findings. Sem ponto comprovável: fail_job com retryable=false (não invente).",
   analyze_human_feedback:
@@ -128,6 +130,18 @@ export const RESULT_SCHEMAS: Record<string, unknown> = {
       qualification_score: { type: "number", minimum: 0, maximum: 10 },
       site_score: { type: "number", minimum: 0, maximum: 10 },
       confidence: { type: "number", minimum: 0, maximum: 1 },
+    },
+  },
+  analyze_for_video: {
+    type: "object",
+    required: ["points"],
+    properties: {
+      points: { type: "array", minItems: 3, maxItems: 3, items: { type: "object", required: ["text", "short", "impacto"], properties: { text: { type: "string" }, short: { type: "string" }, impacto: { type: "string" }, anchor: { type: "string" }, kind: { type: "string" } } } },
+      diferencial: { type: "string", description: "diferencial real tirado do site (até 48 caracteres)" },
+      especialidade: { type: "string" },
+      segmento: { type: "string" },
+      cidade: { type: "string" },
+      resumo: { type: "string" },
     },
   },
   render_prospect_video: {
