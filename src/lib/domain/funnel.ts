@@ -20,6 +20,33 @@ export interface FunnelStep {
   template: string
   /** Arquivo do áudio/vídeo (bucket privado "conteudos", pasta funil/). */
   media?: FunnelMedia
+  /**
+   * Só vídeo: de onde vem o vídeo deste passo. "arquivo" = o arquivo acima (igual para todos);
+   * "diagnostico"/"visao" = o vídeo personalizado do lead (o arquivo vira reserva).
+   * Sem valor (funis antigos): 1º vídeo = diagnóstico, 2º = visão, demais = arquivo.
+   */
+  source?: VideoSource
+}
+
+export type VideoSource = "arquivo" | "diagnostico" | "visao"
+export const VIDEO_SOURCES: { id: VideoSource; label: string }[] = [
+  { id: "arquivo", label: "Arquivo (igual para todos)" },
+  { id: "diagnostico", label: "Personalizado: diagnóstico" },
+  { id: "visao", label: "Personalizado: visão" },
+]
+
+/** Quando começar a gerar os vídeos personalizados do lead (editável no funil). */
+export interface VideoPlan {
+  /** Passo de referência (id). Sem valor: 2 passos antes do 1º vídeo personalizado. */
+  startStepId?: string
+  /** "enviado": quando esse passo for enviado. "respondeu": quando ele responder depois desse passo. */
+  when: "enviado" | "respondeu"
+}
+
+export function mergeVideoPlan(raw: unknown, steps: FunnelStep[]): VideoPlan {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const id = typeof o.startStepId === "string" && steps.some((s) => s.id === o.startStepId) ? o.startStepId : undefined
+  return { ...(id ? { startStepId: id } : {}), when: o.when === "enviado" ? "enviado" : "respondeu" }
 }
 
 export interface FunnelMedia {
@@ -99,8 +126,10 @@ export function mergeFunnel(raw: unknown): FunnelStep[] {
     if (kind === "texto" && !template) return []
     const trigger = i > 0 && o.trigger === "resposta" ? "resposta" : "dias"
     const media = kind === "texto" ? undefined : cleanMedia(o.media)
+    const source = kind === "video" && (o.source === "arquivo" || o.source === "diagnostico" || o.source === "visao") ? (o.source as VideoSource) : undefined
     return [
       {
+        ...(source ? { source } : {}),
         id: typeof o.id === "string" && o.id ? o.id.slice(0, 20) : `s${i + 1}`,
         label: typeof o.label === "string" && o.label.trim() ? o.label.trim().slice(0, 60) : `Passo ${i + 1}`,
         trigger: trigger as FunnelStep["trigger"],

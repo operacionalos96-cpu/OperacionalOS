@@ -87,7 +87,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         return NextResponse.json({ ok: true, data }, { headers: noStore })
       }
       case "funnel.update":
-        return NextResponse.json({ ok: true, steps: await saveFunnel(b.steps, member.teamId) }, { headers: noStore })
+        return NextResponse.json({ ok: true, ...(await saveFunnel(b.steps, member.teamId, b.video)) }, { headers: noStore })
       case "ext.connect": {
         // Token da extensão do WhatsApp: só o escopo do funil; aparece UMA vez.
         const r = await createWorker({ name: `Extensão WhatsApp (${member.email.split("@")[0] || member.teamId})`, engine: "chrome-extension", capabilities: [], scopes: ["whatsapp:funnel"], createdBy: member.teamId })

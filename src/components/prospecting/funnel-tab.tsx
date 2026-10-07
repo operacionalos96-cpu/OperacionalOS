@@ -5,7 +5,8 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, DownloadIcon, MessageCircleIcon, PaperclipIcon, MicIcon, PlugIcon, PlusIcon, ReplyIcon, SettingsIcon, Trash2Icon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
 import type { WhatsappTarget } from "@/lib/domain/contact"
-import { FUNNEL_MEDIA_MAX, followupsDue, nextStep, renderTemplate, type FunnelStep } from "@/lib/domain/funnel"
+import { FUNNEL_MEDIA_MAX, VIDEO_SOURCES, followupsDue, nextStep, renderTemplate, type FunnelStep, type VideoPlan } from "@/lib/domain/funnel"
+import { personalizedIndexes, videoSourceAt, videoStart } from "@/lib/domain/prospect-video"
 import { signedContentUrl, uploadFunnelMedia } from "@/lib/content-storage"
 import { wasContacted } from "@/lib/domain/prospecting"
 import type { Lead } from "@/lib/domain/types"
@@ -181,10 +182,15 @@ function FunnelEditorButton() {
 
 function FunnelEditor({ onClose }: { onClose: () => void }) {
   const saved = useFunnel((s) => s.steps)
+  const savedPlan = useFunnel((s) => s.video)
   const save = useFunnel((s) => s.save)
   const [steps, setSteps] = useState<FunnelStep[]>(saved)
+  const [plan, setPlan] = useState<VideoPlan>(savedPlan)
   const [busy, setBusy] = useState(false)
   useEffect(() => setSteps(saved), [saved])
+  useEffect(() => setPlan(savedPlan), [savedPlan])
+  const hasPersonalized = personalizedIndexes(steps).length > 0
+  const start = videoStart(steps, plan)
   const patch = (i: number, p: Partial<FunnelStep>) => setSteps((s) => s.map((x, j) => (j === i ? { ...x, ...p } : x)))
   const move = (i: number, d: number) =>
     setSteps((s) => {
@@ -253,13 +259,58 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
                 rows={s.kind === "texto" ? 4 : 2}
                 placeholder={s.kind === "texto" ? "Mensagem" : "Texto que vai junto (opcional)"}
               />
-              {s.kind !== "texto" && <MediaPicker step={s} onChange={(media) => patch(i, { media })} />}
+              {s.kind === "video" && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Vídeo:</span>
+                  {VIDEO_SOURCES.map((o) => (
+                    <button key={o.id} type="button" onClick={() => patch(i, { source: o.id })} className={cn("rounded-md border px-2 py-1", videoSourceAt(steps, i) === o.id && "border-brand bg-accent font-medium")}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {s.kind !== "texto" && (
+                <>
+                  {s.kind === "video" && videoSourceAt(steps, i) !== "arquivo" && (
+                    <p className="text-[11px] text-muted-foreground">Vai o vídeo deste lead (gerado com o site dele e aprovado por vocês). O arquivo abaixo é reserva, para quem não tiver vídeo.</p>
+                  )}
+                  <MediaPicker step={s} onChange={(media) => patch(i, { media })} />
+                </>
+              )}
             </li>
           ))}
         </ol>
         <Button variant="outline" onClick={() => setSteps((s) => [...s, { id: `s${Date.now().toString(36)}`, label: `Passo ${s.length + 1}`, kind: "texto", trigger: "resposta", delayDays: 0, template: "" }])}>
           <PlusIcon /> Adicionar passo
         </Button>
+        {hasPersonalized && (
+          <div className="grid gap-2 rounded-xl border border-dashed p-3 text-xs">
+            <p className="t-label">Vídeos personalizados</p>
+            <p className="text-muted-foreground">Gerados só para quem chega nesta parte do funil (os 2 vídeos saem juntos, ~8 min por lead, com o site real dele).</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Começar a gerar quando o lead</span>
+              <select
+                value={start.when}
+                onChange={(e) => setPlan((p) => ({ ...p, startStepId: steps[start.index]?.id, when: e.target.value as VideoPlan["when"] }))}
+                className="h-7 rounded-md border bg-background px-2"
+              >
+                <option value="respondeu">responder depois do passo</option>
+                <option value="enviado">receber o passo</option>
+              </select>
+              <select
+                value={steps[start.index]?.id ?? ""}
+                onChange={(e) => setPlan((p) => ({ ...p, when: start.when, startStepId: e.target.value }))}
+                className="h-7 rounded-md border bg-background px-2"
+              >
+                {steps.map((x, j) => (
+                  <option key={x.id + j} value={x.id}>
+                    {j + 1}. {x.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             Cancelar
@@ -269,7 +320,7 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
             onClick={async () => {
               setBusy(true)
               try {
-                await save(steps)
+                await save(steps, plan)
                 toast.success("Funil salvo")
                 onClose()
               } catch (e) {

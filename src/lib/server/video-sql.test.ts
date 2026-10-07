@@ -28,6 +28,7 @@ beforeAll(async () => {
   await db.exec(mig("0013_video_prospeccao.sql"))
   await db.exec(mig("0013_video_prospeccao.sql")) // rodar de novo não quebra
   await db.exec(mig("0014_video_2.sql"))
+  await db.exec(mig("0015_funil_video_editavel.sql"))
 }, 60_000)
 
 const clear = () => db.exec(`delete from public.webhook_deliveries; delete from public.events; delete from public.ai_jobs; delete from public.leads; delete from public.ai_settings;`)
@@ -72,6 +73,22 @@ describe("vídeo de prospecção no Postgres", () => {
     await addLead("S4", { funnel: funnel(3, "2026-10-03T11:00:00Z") })
     await event("S4")
     expect((await videoJobs()).length).toBe(0)
+  })
+
+  it("funil editável de 7 passos: gera quando o lead RECEBE o passo escolhido; vídeo de arquivo não conta", async () => {
+    await clear()
+    const steps = [{ id: "a", kind: "texto" }, { id: "b", kind: "texto" }, { id: "c", kind: "audio" }, { id: "d", kind: "video", source: "diagnostico" }, { id: "e", kind: "texto" }, { id: "f", kind: "video", source: "visao" }, { id: "g", kind: "video", source: "arquivo" }]
+    await db.query(`insert into public.ai_settings (id, data) values ('whatsapp_funnel', $1)`, [{ steps, video: { startStepId: "c", when: "enviado" } }])
+    await addLead("E1", { funnel: funnel(2, "2026-10-03T10:00:00Z", "2026-10-03T10:30:00Z") }) // aceitou, mas o áudio ainda não foi
+    await addLead("E2", { funnel: funnel(3, "2026-10-03T11:00:00Z") }) // áudio enviado
+    await addLead("E3", { funnel: funnel(6, "2026-10-05T11:00:00Z") }) // já passou dos personalizados (só falta a proposta)
+    for (const l of ["E1", "E2", "E3"]) await event(l)
+    expect((await videoJobs()).map((j) => j.idempotency_key)).toEqual(["render_prospect_video:E2:v1"])
+    // só vídeos de arquivo → nunca gera
+    await db.query(`update public.ai_settings set data = $1 where id = 'whatsapp_funnel'`, [{ steps: steps.map((s) => (s.kind === "video" ? { ...s, source: "arquivo" } : s)) }])
+    await addLead("E4", { funnel: funnel(4, "2026-10-04T11:00:00Z") })
+    await event("E4")
+    expect((await videoJobs()).length).toBe(1)
   })
 
   it("worker conclui → lead.video vira 'pronto' com caminho e achados", async () => {
