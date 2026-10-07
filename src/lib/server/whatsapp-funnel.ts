@@ -4,7 +4,7 @@ import { publicId } from "@/lib/domain/jobs"
 import { makeEvent, type BusinessEventType } from "@/lib/domain/ai-office"
 import { findLeadByName, findLeadByPhone, followupsDue, funnelOf, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
 import { contactedPatch } from "@/lib/domain/prospecting"
-import { stepMediaFor } from "@/lib/domain/prospect-video"
+import { stepMediaFor, videoOrdinal } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
 import { supabaseAdmin } from "./supabase-admin"
 
@@ -79,7 +79,7 @@ async function view(l: Lead, steps: FunnelStep[], now: Date) {
   const f = funnelOf(l)
   const n = nextStep(l, steps, now)
   // Vídeo: o personalizado do lead (aprovado) tem prioridade sobre o arquivo padrão do funil.
-  const m = n ? stepMediaFor(l, n.step) : null
+  const m = n ? stepMediaFor(l, n.step, videoOrdinal(steps, n.index)) : null
   return {
     lead: { id: l.id, name: l.name, company: l.company ?? null, segment: l.segment ?? null, city: l.city ?? null, stage: l.stage, website: l.website ?? null, problems: l.analysis?.problems?.slice(0, 3) ?? [] },
     funnel: { step: f.step, total: steps.length, lastSentAt: f.lastSentAt ?? null, repliedAt: f.repliedAt ?? null, stopped: !!f.stopped },

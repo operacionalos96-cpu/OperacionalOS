@@ -1,6 +1,7 @@
 // Testa o vídeo de UM site sem passar pela fila (nada é enviado ao sistema).
 //   node testar.js https://site-da-empresa.com.br --nome "Empresa X" --segmento odontologia --cidade Campinas
 //   node testar.js <url> ... --stills 3,15,30   → só imagens de conferência
+//   node testar.js <url> ... --video 2          → o 2º vídeo do funil (visão/transformação)
 // Sai em .trabalho/teste-<data>/ (prints, analise.json e video.mp4).
 const fs = require('fs');
 const path = require('path');
@@ -31,7 +32,8 @@ const EXE = [process.env.BROWSER, 'C:/Program Files (x86)/Microsoft/Edge/Applica
     if (!analise.escolhidos.length) return;
     const lead = { name: opt('nome') || new URL(url).host, website: url, segment: opt('segmento'), city: opt('cidade') };
     const stills = opt('stills')?.split(',').map(Number);
-    const { arquivo, duracao } = await renderizar(browser, dir, montarFicha(lead, analise), { stills, onProgress: (p) => process.stdout.write(`\r  renderizando ${Math.round(p * 100)}%`) });
+    const modelo = Number(opt('video') || 1);
+    const { arquivo, duracao } = await renderizar(browser, dir, montarFicha(lead, analise), { stills, modelo, onProgress: (p) => process.stdout.write(`\r  renderizando ${Math.round(p * 100)}%`) });
     console.log(`\n${arquivo ? `vídeo: ${arquivo}` : `stills em ${dir}`} (${duracao.toFixed(1)} s)`);
   } finally {
     await browser.close();

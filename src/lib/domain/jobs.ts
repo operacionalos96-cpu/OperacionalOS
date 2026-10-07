@@ -51,6 +51,8 @@ export interface FeedbackAnalysisResult {
 
 export interface ProspectVideoResult {
   video_path: string
+  /** 2º vídeo do funil (visão), opcional. */
+  video2_path?: string
   duration_sec: number
   findings: { kind: string; text: string; short: string }[]
 }
@@ -121,6 +123,7 @@ function validateFeedback(raw: unknown): ValidationResult<FeedbackAnalysisResult
 
 /** Caminho do vídeo: sempre dentro de funil/leads/ (o worker só consegue subir para lá). */
 export const PROSPECT_VIDEO_PATH = /^funil\/leads\/[A-Za-z0-9_-]{1,64}\/job_[0-9A-HJKMNP-TV-Z]{26}\/video\.mp4$/
+export const PROSPECT_VIDEO2_PATH = /^funil\/leads\/[A-Za-z0-9_-]{1,64}\/job_[0-9A-HJKMNP-TV-Z]{26}\/video-2\.mp4$/
 
 function validateProspectVideo(raw: unknown): ValidationResult<ProspectVideoResult> {
   const o = obj(raw)
@@ -128,6 +131,7 @@ function validateProspectVideo(raw: unknown): ValidationResult<ProspectVideoResu
   const errors: string[] = []
   const video_path = typeof o.video_path === "string" && PROSPECT_VIDEO_PATH.test(o.video_path) ? o.video_path : null
   const duration_sec = num(o.duration_sec, 5, 600)
+  const video2_path = o.video2_path === undefined || o.video2_path === null ? undefined : typeof o.video2_path === "string" && PROSPECT_VIDEO2_PATH.test(o.video2_path) ? o.video2_path : null
   const findings = Array.isArray(o.findings)
     ? o.findings.slice(0, 6).flatMap((x) => {
         const f = obj(x)
@@ -139,9 +143,10 @@ function validateProspectVideo(raw: unknown): ValidationResult<ProspectVideoResu
     : []
   if (!video_path) errors.push("video_path: funil/leads/<lead>/<job>/video.mp4 (use create_upload_urls)")
   if (duration_sec === null) errors.push("duration_sec: número de 5 a 600")
+  if (video2_path === null) errors.push("video2_path: funil/leads/<lead>/<job>/video-2.mp4 (opcional)")
   if (!findings.length) errors.push("findings: ao menos 1 ponto observado no site ({kind, text, short})")
   if (errors.length) return { ok: false, errors }
-  return { ok: true, value: { video_path: video_path!, duration_sec: duration_sec!, findings } }
+  return { ok: true, value: { video_path: video_path!, ...(video2_path ? { video2_path } : {}), duration_sec: duration_sec!, findings } }
 }
 
 export const JOB_TYPES: Record<string, JobTypeDef> = {

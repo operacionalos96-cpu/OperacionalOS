@@ -36,8 +36,10 @@ export interface LeadVideo {
   /** Versão do pedido (sobe a cada "gerar de novo"). */
   version?: number
   requestedAt?: string
-  /** Arquivo no bucket privado "conteudos" (funil/leads/<lead>/<job>/video.mp4). */
+  /** Arquivo no bucket privado "conteudos" (funil/leads/<lead>/<job>/video.mp4). 1º vídeo: diagnóstico. */
   path?: string
+  /** 2º vídeo do funil (visão/transformação), mesmo job: …/video-2.mp4. */
+  path2?: string
   durationSec?: number
   findings?: VideoFinding[]
   generatedAt?: string
@@ -76,11 +78,18 @@ export function videoEligibility(
   return { eligible: false, reason: "ainda não chegou nessa parte do funil" }
 }
 
-/** Mídia do passo para ESTE lead: o vídeo personalizado aprovado tem prioridade sobre o arquivo padrão. */
-export function stepMediaFor(lead: Pick<Lead, "video" | "name">, step: Pick<FunnelStep, "kind" | "media">): { media: FunnelMedia | null; note?: string } {
+/** Qual vídeo é este passo: 0 = 1º passo de vídeo do funil (diagnóstico), 1 = 2º (visão). */
+export const videoOrdinal = (steps: Pick<FunnelStep, "kind">[], index: number) => steps.slice(0, index).filter((s) => s.kind === "video").length
+
+/**
+ * Mídia do passo para ESTE lead: o vídeo personalizado aprovado tem prioridade sobre o arquivo padrão.
+ * `ordinal` diz se é o 1º passo de vídeo (diagnóstico) ou o 2º (visão).
+ */
+export function stepMediaFor(lead: Pick<Lead, "video" | "name">, step: Pick<FunnelStep, "kind" | "media">, ordinal = 0): { media: FunnelMedia | null; note?: string } {
   if (step.kind !== "video") return { media: step.media ?? null }
   const v = lead.video
-  if (v?.status === "aprovado" && v.path) return { media: { path: v.path, name: `analise-${slug(lead.name)}.mp4`, mime: "video/mp4", size: 0 } }
+  const path = ordinal === 0 ? v?.path : ordinal === 1 ? v?.path2 : undefined
+  if (v?.status === "aprovado" && path) return { media: { path, name: `${ordinal ? "visao" : "analise"}-${slug(lead.name)}.mp4`, mime: "video/mp4", size: 0 } }
   if (v?.status === "gerando") return { media: null, note: "O vídeo personalizado deste lead está sendo gerado. Volte em alguns minutos." }
   if (v?.status === "pronto") return { media: null, note: "Vídeo personalizado pronto — aprove na página do lead (Pipeline) para liberar aqui." }
   return { media: step.media ?? null }

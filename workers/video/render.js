@@ -4,8 +4,14 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 
-const TEMPLATE = path.join(__dirname, 'template');
-const ROTEIRO = JSON.parse(fs.readFileSync(path.join(TEMPLATE, 'roteiro.json'), 'utf8'));
+// 1 = vídeo de diagnóstico (1º do funil) · 2 = vídeo de visão/transformação (2º do funil)
+const MODELOS = {
+  1: path.join(__dirname, 'template'),
+  2: path.join(__dirname, 'template-2'),
+};
+const roteiro = (n) => JSON.parse(fs.readFileSync(path.join(MODELOS[n], 'roteiro.json'), 'utf8'));
+const TEMPLATE = MODELOS[1];
+const ROTEIRO = roteiro(1);
 const FPS = 30;
 
 const frase = (s) => { s = String(s).trim().replace(/[.\s]+$/, ''); return s[0].toUpperCase() + s.slice(1) + '.'; };
@@ -40,6 +46,7 @@ function montarFicha(lead, analise) {
     url: host,
     especialidade: capital(segmento) || analise.titulo?.split(/[|\-–]/)[0].trim().slice(0, 50) || '',
     diferencial: analise.diferencial ? capital(analise.diferencial.trim()).slice(0, 48) : '',
+    cor: analise.cor || null,
     problema1: p1,
     problema2: p2 || null,
   };
@@ -60,14 +67,34 @@ function escreverDados(dir, ficha) {
   return path.relative(TEMPLATE, dir).split(path.sep).join('/');
 }
 
-/** Renderiza o vídeo. onProgress(0..1) para o heartbeat. Devolve { arquivo, duracao }. */
-async function renderizar(browser, dir, ficha, { onProgress, stills } = {}) {
-  const d = escreverDados(dir, ficha);
+/** Dados do vídeo 2 (visão): o roteiro fixo + o que é deste lead. */
+function escreverDados2(dir, ficha) {
+  const base = MODELOS[2];
+  const v = { EMPRESA: ficha.empresa };
+  const textos = {};
+  for (const [k, s] of Object.entries(roteiro(2))) textos[k] = s.replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '');
+  const dados = {
+    empresa: ficha.empresa, segmento: ficha.segmento, cidade: ficha.cidade, url: ficha.url,
+    home: path.relative(base, path.join(dir, 'home.png')).split(path.sep).join('/'),
+    problema: ficha.problema1?.short || '',
+    servico: [capital(ficha.segmento), ficha.cidade && `em ${ficha.cidade}`].filter(Boolean).join(' ') || ficha.especialidade || ficha.empresa,
+    diferencial: ficha.diferencial, cor: ficha.cor, textos,
+  };
+  fs.writeFileSync(path.join(dir, 'dados.js'), `window.FICHA = ${JSON.stringify(dados)};
+window.CONFIG = ${JSON.stringify({ assinatura_logo: '../template/assets/hzk-logo.png' })};
+`);
+  return path.relative(base, dir).split(path.sep).join('/');
+}
+
+/** Renderiza o vídeo (modelo 1 ou 2). onProgress(0..1) para o heartbeat. Devolve { arquivo, duracao }. */
+async function renderizar(browser, dir, ficha, { onProgress, stills, modelo = 1 } = {}) {
+  const d = modelo === 2 ? escreverDados2(dir, ficha) : escreverDados(dir, ficha);
+  const base = MODELOS[modelo];
   const page = await browser.newPage();
   await page.setViewport({ width: 1080, height: 1920, deviceScaleFactor: 1 });
   const erros = [];
   page.on('pageerror', (e) => erros.push(e.message));
-  await page.goto(pathToFileURL(path.join(TEMPLATE, 'index.html')).href + `?render=1&d=${encodeURIComponent(d)}`, { waitUntil: 'networkidle0', timeout: 60000 });
+  await page.goto(pathToFileURL(path.join(base, 'index.html')).href + `?render=1&d=${encodeURIComponent(d)}`, { waitUntil: 'networkidle0', timeout: 60000 });
   await page.waitForFunction('window.__ready === true', { timeout: 30000 }).catch(() => { throw new Error(`o modelo não carregou: ${erros.join('; ') || 'tempo esgotado'}`); });
   const duracao = await page.evaluate('window.__duration');
 
@@ -80,7 +107,7 @@ async function renderizar(browser, dir, ficha, { onProgress, stills } = {}) {
     return { arquivo: null, duracao };
   }
 
-  const arquivo = path.join(dir, 'video.mp4');
+  const arquivo = path.join(dir, modelo === 2 ? 'video-2.mp4' : 'video.mp4');
   const total = Math.ceil(duracao * FPS);
   const ff = spawn(process.env.FFMPEG || 'ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-framerate', String(FPS), '-i', '-',
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', arquivo], { stdio: ['pipe', 'ignore', 'inherit'] });

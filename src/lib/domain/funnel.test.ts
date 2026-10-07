@@ -112,11 +112,12 @@ describe("segmento e região de cada empresa", () => {
 })
 
 describe("passos de áudio e vídeo (arquivo)", () => {
-  it("roteiro de vocês tem 4 passos: 2 textos, áudio e vídeo, todos depois da resposta", () => {
+  it("roteiro de vocês tem 5 passos: 2 textos, áudio e os 2 vídeos, todos depois da resposta", () => {
     expect(DEFAULT_FUNNEL.map((s) => [s.kind, s.trigger])).toEqual([
       ["texto", "dias"],
       ["texto", "resposta"],
       ["audio", "resposta"],
+      ["video", "resposta"],
       ["video", "resposta"],
     ])
   })

@@ -135,6 +135,7 @@ export const RESULT_SCHEMAS: Record<string, unknown> = {
     required: ["video_path", "duration_sec", "findings"],
     properties: {
       video_path: { type: "string", description: "o path devolvido por create_upload_urls" },
+      video2_path: { type: "string", description: "opcional: o path de video2 devolvido por create_upload_urls (2º vídeo, visão)" },
       duration_sec: { type: "number", minimum: 5, maximum: 600 },
       findings: { type: "array", minItems: 1, items: { type: "object", required: ["kind", "text", "short"], properties: { kind: { type: "string" }, text: { type: "string" }, short: { type: "string" } } } },
     },
@@ -176,10 +177,15 @@ export async function videoUploadUrl(w: Worker, id: string, lease: string) {
   if (data.lease_id !== lease || !["claimed", "running"].includes(data.status) || !data.lease_expires_at || new Date(data.lease_expires_at).getTime() < Date.now())
     throw new JobError("lease_lost: este job não é mais seu", 409)
   if (data.job_type !== "render_prospect_video" || data.entity_type !== "lead") throw new JobError("só jobs de vídeo sobem arquivo", 400)
-  const path = `funil/leads/${data.entity_id}/${data.public_id}/video.mp4`
-  const up = await supabaseAdmin().storage.from("conteudos").createSignedUploadUrl(path, { upsert: true })
-  if (up.error || !up.data) throw new JobError("não consegui criar o link de upload", 500)
-  return { path, signed_url: up.data.signedUrl, token: up.data.token, method: "PUT", content_type: "video/mp4" }
+  const link = async (name: string) => {
+    const path = `funil/leads/${data.entity_id}/${data.public_id}/${name}`
+    const up = await supabaseAdmin().storage.from("conteudos").createSignedUploadUrl(path, { upsert: true })
+    if (up.error || !up.data) throw new JobError("não consegui criar o link de upload", 500)
+    return { path, signed_url: up.data.signedUrl, token: up.data.token }
+  }
+  const [v1, v2] = await Promise.all([link("video.mp4"), link("video-2.mp4")])
+  // video = 1º vídeo (diagnóstico); video2 = 2º vídeo (visão)
+  return { ...v1, video2: v2, method: "PUT", content_type: "video/mp4" }
 }
 
 /** Concluir: valida o schema do tipo ANTES; inválido não conclui (o worker corrige ou falha). */
@@ -188,8 +194,12 @@ export async function completeJob(w: Worker, id: string, lease: string, raw: unk
   const v = validateJobResult(job.job_type, raw)
   if (!v.ok) throw new JobError("resultado inválido para o tipo do job", 422, { errors: v.errors, schema: RESULT_SCHEMAS[job.job_type] })
   // Vídeo: o arquivo tem que ser o DESTE lead e DESTE job (o que create_upload_urls devolveu).
-  if (job.job_type === "render_prospect_video" && (v.value as { video_path: string }).video_path !== `funil/leads/${job.entity_id}/${job.public_id}/video.mp4`)
-    throw new JobError("resultado inválido para o tipo do job", 422, { errors: ["video_path não é o deste job (use o path de create_upload_urls)"] })
+  if (job.job_type === "render_prospect_video") {
+    const r = v.value as { video_path: string; video2_path?: string }
+    const base = `funil/leads/${job.entity_id}/${job.public_id}/`
+    if (r.video_path !== `${base}video.mp4` || (r.video2_path && r.video2_path !== `${base}video-2.mp4`))
+      throw new JobError("resultado inválido para o tipo do job", 422, { errors: ["video_path/video2_path não são os deste job (use os paths de create_upload_urls)"] })
+  }
   return rpc<JobRow>("complete_job", { p_public_id: id, p_lease_id: lease, p_result: v.value, p_raw_result: raw ?? null })
 }
 

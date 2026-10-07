@@ -9,8 +9,8 @@ import { relative } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-async function videoAction<T = Record<string, unknown>>(action: string, id: string): Promise<T> {
-  const res = await fetch(`/api/ai-office/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }), cache: "no-store" })
+async function videoAction<T = Record<string, unknown>>(action: string, id: string, extra: Record<string, unknown> = {}): Promise<T> {
+  const res = await fetch(`/api/ai-office/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, ...extra }), cache: "no-store" })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.erro ?? "falhou")
   return data as T
@@ -23,7 +23,7 @@ async function videoAction<T = Record<string, unknown>>(action: string, id: stri
  */
 export function LeadVideoCard({ lead }: { lead: Lead }) {
   const v = lead.video
-  const [url, setUrl] = useState<string | null>(null)
+  const [url, setUrl] = useState<{ n: number; src: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   if (!v && !lead.website) return null
 
@@ -39,10 +39,10 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
       setBusy(null)
     }
   }
-  const watch = async () => {
+  const watch = async (n: number) => {
     setBusy("video.url")
     try {
-      setUrl((await videoAction<{ url: string }>("video.url", lead.id)).url)
+      setUrl({ n, src: (await videoAction<{ url: string }>("video.url", lead.id, { n })).url })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "falhou")
     } finally {
@@ -79,16 +79,26 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
         </ul>
       )}
 
-      {url && <video src={url} controls playsInline className="mb-3 aspect-[9/16] max-h-[420px] w-full rounded-lg bg-black object-contain" />}
+      {url && (
+        <>
+          <p className="mb-1 text-[11px] font-medium text-muted-foreground">{url.n === 2 ? "Vídeo 2 — visão (2º passo de vídeo)" : "Vídeo 1 — diagnóstico (1º passo de vídeo)"}</p>
+          <video key={url.src} src={url.src} controls playsInline className="mb-3 aspect-[9/16] max-h-[420px] w-full rounded-lg bg-black object-contain" />
+        </>
+      )}
 
       <div className="flex flex-wrap gap-2">
-        {v?.path && !url && (
-          <Button size="xs" variant="outline" onClick={watch} disabled={!!busy}>
-            {busy === "video.url" ? <Loader2Icon className="animate-spin" /> : <VideoIcon />} Assistir
+        {v?.path && url?.n !== 1 && (
+          <Button size="xs" variant="outline" onClick={() => watch(1)} disabled={!!busy}>
+            {busy === "video.url" ? <Loader2Icon className="animate-spin" /> : <VideoIcon />} Vídeo 1
+          </Button>
+        )}
+        {v?.path2 && url?.n !== 2 && (
+          <Button size="xs" variant="outline" onClick={() => watch(2)} disabled={!!busy}>
+            <VideoIcon /> Vídeo 2
           </Button>
         )}
         {v?.status === "pronto" && (
-          <Button size="xs" onClick={() => run("video.approve", "Aprovado — a extensão já anexa este vídeo no passo do funil")} disabled={!!busy}>
+          <Button size="xs" onClick={() => run("video.approve", "Aprovado — a extensão já anexa os vídeos deste lead nos passos do funil")} disabled={!!busy}>
             <CheckIcon /> Aprovar
           </Button>
         )}

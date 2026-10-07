@@ -27,6 +27,7 @@ beforeAll(async () => {
   await db.exec(mig("0011_job_queue.sql"))
   await db.exec(mig("0013_video_prospeccao.sql"))
   await db.exec(mig("0013_video_prospeccao.sql")) // rodar de novo não quebra
+  await db.exec(mig("0014_video_2.sql"))
 }, 60_000)
 
 const clear = () => db.exec(`delete from public.webhook_deliveries; delete from public.events; delete from public.ai_jobs; delete from public.leads; delete from public.ai_settings;`)
@@ -79,9 +80,9 @@ describe("vídeo de prospecção no Postgres", () => {
     await event("L5", "lead.followup_sent")
     const c = await one<{ public_id: string; lease_id: string }>(`select * from public.claim_next_job('wrk_V', array['video_render'], 'video-studio', 600)`)
     expect(c?.public_id).toBeTruthy()
-    const result = { video_path: `funil/leads/L5/${c.public_id}/video.mp4`, duration_sec: 92, findings: [{ kind: "copyright_antigo", text: "o rodapé ainda mostra © 2019", short: "Rodapé com © 2019" }] }
+    const result = { video_path: `funil/leads/L5/${c.public_id}/video.mp4`, video2_path: `funil/leads/L5/${c.public_id}/video-2.mp4`, duration_sec: 92, findings: [{ kind: "copyright_antigo", text: "o rodapé ainda mostra © 2019", short: "Rodapé com © 2019" }] }
     await db.query(`select public.complete_job($1, $2, $3)`, [c.public_id, c.lease_id, result])
-    expect(await video("L5")).toMatchObject({ status: "pronto", path: result.video_path, durationSec: 92, jobId: c.public_id })
+    expect(await video("L5")).toMatchObject({ status: "pronto", path: result.video_path, path2: result.video2_path, durationSec: 92, jobId: c.public_id })
   })
 
   it("lead salvo depois do evento: a mudança do funil já basta (sem corrida)", async () => {

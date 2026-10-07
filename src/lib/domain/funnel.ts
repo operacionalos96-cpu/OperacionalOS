@@ -78,6 +78,15 @@ export const DEFAULT_FUNNEL: FunnelStep[] = [
     delayDays: 0,
     template: "",
   },
+  {
+    // 2º vídeo personalizado (visão/transformação): vai quando ele responder ao 1º.
+    id: "m5",
+    label: "Vídeo 2 — visão",
+    kind: "video",
+    trigger: "resposta",
+    delayDays: 0,
+    template: "",
+  },
 ]
 
 export function mergeFunnel(raw: unknown): FunnelStep[] {

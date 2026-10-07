@@ -150,7 +150,28 @@ function medir(anoAtual, maxAltura) {
   // Dados para personalizar (tirados do site, nunca inventados)
   const dif =
     /\b(h[áa] mais de \d{1,3} anos|mais de \d{1,3} anos de (?:experi[eê]ncia|mercado|atua[cç][aã]o|hist[oó]ria)|desde (?:19|20)\d{2}|\d{1,3} anos de (?:experi[eê]ncia|mercado|tradi[cç][aã]o)|atendimento 24 ?h(?:oras)?|hora marcada[^.;,]{0,30})/i.exec(texto)?.[1] || null;
-  return { achados, altura, titulo: document.title, diferencial: dif, https: location.protocol === 'https:' };
+  // Cor principal da marca: a cor saturada que mais ocupa área em botões, cabeçalho e links de destaque.
+  const cor = (() => {
+    const peso = new Map();
+    const rgb = (s) => (/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(s) || []).slice(1).map(Number);
+    const els = [...document.querySelectorAll('header, nav, header *, button, a, [class*="btn"], [class*="button"], h1, h2')].filter(visivel).slice(0, 600);
+    for (const e of els) {
+      const cs = getComputedStyle(e);
+      const r = e.getBoundingClientRect();
+      for (const [prop, w] of [['backgroundColor', r.width * r.height], ['color', Math.min(4000, r.width * 20)]]) {
+        const [R, G, B, A = 1] = rgb(cs[prop]);
+        if (R === undefined || A < 0.6) continue;
+        const max = Math.max(R, G, B) / 255, min = Math.min(R, G, B) / 255, l = (max + min) / 2;
+        const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+        if (s < 0.35 || l < 0.18 || l > 0.75) continue;
+        const k = '#' + [R, G, B].map((x) => (Math.round(x / 8) * 8).toString(16).padStart(2, '0').slice(-2)).join('');
+        peso.set(k, (peso.get(k) || 0) + w);
+      }
+    }
+    return [...peso.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  })();
+
+  return { achados, altura, titulo: document.title, diferencial: dif, cor, https: location.protocol === 'https:' };
 }
 
 /** Analisa o site e salva home.png, pagina.png e mobile.png em `dir`. */

@@ -60,22 +60,38 @@ async function executar(browser, job, lease) {
     const ficha = montarFicha(lead, analise);
     await tool('report_progress', { ...ids, message: `achados: ${analise.escolhidos.map((a) => a.short).join(', ')} — renderizando`, percent: 20 });
     let ultimo = 0;
-    const { arquivo, duracao } = await renderizar(browser, dir, ficha, {
-      onProgress: async (p) => {
-        const pct = Math.round(20 + p * 70);
-        if (pct - ultimo >= 15) { ultimo = pct; await tool('report_progress', { ...ids, message: 'renderizando', percent: pct }).catch(() => {}); }
-      },
-    });
+    const progresso = (de, ate, msg) => async (p) => {
+      const pct = Math.round(de + p * (ate - de));
+      if (pct - ultimo >= 10) { ultimo = pct; await tool('report_progress', { ...ids, message: msg, percent: pct }).catch(() => {}); }
+    };
+    // 1º vídeo (diagnóstico) e 2º vídeo (visão/transformação), com a mesma análise do site real
+    const v1 = await renderizar(browser, dir, ficha, { modelo: 1, onProgress: progresso(20, 55, 'renderizando o vídeo 1 (diagnóstico)') });
+    let v2 = null;
+    try {
+      v2 = await renderizar(browser, dir, ficha, { modelo: 2, onProgress: progresso(55, 90, 'renderizando o vídeo 2 (visão)') });
+    } catch (e) {
+      console.warn('  vídeo 2 falhou (segue só com o 1):', e.message);
+    }
 
     const up = await tool('create_upload_urls', ids);
-    const res = await fetch(up.signed_url, { method: 'PUT', headers: { 'content-type': 'video/mp4', 'x-upsert': 'true' }, body: fs.readFileSync(arquivo) });
-    if (!res.ok) throw new Error(`upload falhou: ${res.status} ${await res.text().catch(() => '')}`);
+    const subir = async (url, arquivo) => {
+      const res = await fetch(url, { method: 'PUT', headers: { 'content-type': 'video/mp4', 'x-upsert': 'true' }, body: fs.readFileSync(arquivo) });
+      if (!res.ok) throw new Error(`upload falhou: ${res.status} ${await res.text().catch(() => '')}`);
+    };
+    await subir(up.signed_url, v1.arquivo);
+    if (v2) await subir(up.video2.signed_url, v2.arquivo);
 
     await tool('complete_job', {
       ...ids,
-      result: { video_path: up.path, duration_sec: Math.round(duracao), findings: analise.escolhidos.map(({ kind, text, short }) => ({ kind, text, short })) },
+      result: {
+        video_path: up.path,
+        ...(v2 ? { video2_path: up.video2.path } : {}),
+        duration_sec: Math.round(v1.duracao),
+        findings: analise.escolhidos.map(({ kind, text, short }) => ({ kind, text, short })),
+      },
     });
-    console.log(`  ✓ pronto (${Math.round(duracao)} s) — aguardando aprovação no sistema`);
+    const duracao = v1.duracao;
+    console.log(`  ✓ pronto (${Math.round(duracao)} s${v2 ? ` + vídeo 2 de ${Math.round(v2.duracao)} s` : ''}) — aguardando aprovação no sistema`);
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {
     console.error('  ✗', e.message);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_FUNNEL } from "./funnel"
-import { stepMediaFor, videoEligibility, videoStepIndex } from "./prospect-video"
+import { stepMediaFor, videoEligibility, videoOrdinal, videoStepIndex } from "./prospect-video"
 import type { Lead } from "./types"
 
 const lead = (p: Partial<Lead>): Lead => ({
@@ -44,9 +44,18 @@ describe("vídeo de análise personalizado", () => {
     expect(videoEligibility(lead({ ...ok, stage: "ganho" }), DEFAULT_FUNNEL).eligible).toBe(false)
     expect(videoEligibility(lead({ funnel: f(3, "2026-10-03T11:00:00Z", undefined, { stopped: true }) }), DEFAULT_FUNNEL).eligible).toBe(false)
     expect(videoEligibility(lead({ funnel: f(4, "2026-10-04T11:00:00Z") }), DEFAULT_FUNNEL).eligible).toBe(false)
+    expect(videoEligibility(lead({ funnel: f(5, "2026-10-04T11:00:00Z") }), DEFAULT_FUNNEL).eligible).toBe(false)
     expect(videoEligibility(lead({ ...ok, video: { status: "pronto" } }), DEFAULT_FUNNEL).eligible).toBe(false)
     // falhou: pode pedir de novo
     expect(videoEligibility(lead({ ...ok, video: { status: "erro" } }), DEFAULT_FUNNEL).eligible).toBe(true)
+  })
+
+  it("o 2º passo de vídeo recebe o vídeo 2 (visão) do mesmo lead", () => {
+    const v = { status: "aprovado" as const, path: "funil/leads/l1/j/video.mp4", path2: "funil/leads/l1/j/video-2.mp4" }
+    expect(videoOrdinal(DEFAULT_FUNNEL, 3)).toBe(0)
+    expect(videoOrdinal(DEFAULT_FUNNEL, 4)).toBe(1)
+    expect(stepMediaFor(lead({ video: v }), DEFAULT_FUNNEL[4], 1).media?.path).toBe(v.path2)
+    expect(stepMediaFor(lead({ video: { ...v, path2: undefined } }), DEFAULT_FUNNEL[4], 1).media).toBeNull()
   })
 
   it("a extensão só recebe o vídeo personalizado depois de aprovado", () => {

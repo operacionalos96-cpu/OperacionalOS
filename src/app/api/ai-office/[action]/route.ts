@@ -108,8 +108,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
           return NextResponse.json({ ok: true, video }, { headers: noStore })
         }
         if (action === "video.url") {
-          if (!v?.path) return bad("o vídeo ainda não existe", 404)
-          const { data } = await db.storage.from("conteudos").createSignedUrl(v.path, 60 * 60)
+          const p = b.n === 2 ? v?.path2 : v?.path
+          if (!p) return bad("o vídeo ainda não existe", 404)
+          const { data } = await db.storage.from("conteudos").createSignedUrl(p, 60 * 60)
           return data ? NextResponse.json({ url: data.signedUrl }, { headers: noStore }) : bad("falhou", 500)
         }
         if (action === "video.approve") {
