@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 import { defaultAgents, describeEvent, makeEvent, moveHypothesis, type Hypothesis } from "./ai-office"
 
 describe("AI Office", () => {
-  it("4 agentes com ids fixos e campos obrigatórios, sem amarrar a um modelo", () => {
+  it("5 agentes com ids fixos e campos obrigatórios, sem amarrar a um modelo", () => {
     const agents = defaultAgents("2026-10-03T00:00:00Z")
-    expect(agents.map((a) => a.id)).toEqual(["prospector", "web-analyst", "intelligence", "knowledge-manager"])
+    expect(agents.map((a) => a.id)).toEqual(["prospector", "web-analyst", "intelligence", "video-studio", "knowledge-manager"])
     for (const a of agents) {
       expect(a.status).toBe("idle")
       expect(a.capabilities.length).toBeGreaterThan(0)

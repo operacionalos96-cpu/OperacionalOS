@@ -94,7 +94,7 @@ export async function jobContext(w: Worker, publicId: string) {
     const { data } = await supabaseAdmin().from("leads").select("data").eq("id", job.entity_id).maybeSingle()
     const l = (data?.data ?? {}) as Record<string, unknown>
     // Só o necessário para o trabalho (sem telefone/WhatsApp).
-    entity = { id: job.entity_id, name: l.name, website: l.website, segment: l.segment, city: l.city, stage: l.stage, analysis: l.analysis, review: l.review }
+    entity = { id: job.entity_id, name: l.name, company: l.company, website: l.website, segment: l.segment, city: l.city, siteInfo: l.siteInfo, stage: l.stage, analysis: l.analysis, review: l.review }
   }
   const def = JOB_TYPES[job.job_type]
   return {
@@ -111,6 +111,8 @@ export async function jobContext(w: Worker, publicId: string) {
 const JOB_INSTRUCTIONS: Record<string, string> = {
   analyze_website:
     "Abra o site do lead e avalie: experiência no celular, velocidade, visual/atualidade, clareza da oferta, CTA/WhatsApp, confiança. Devolva problemas concretos, oportunidades de venda de um site novo e notas. Não invente o que não viu.",
+  render_prospect_video:
+    "Gere o vídeo de análise do lead: abra o site REAL, tire os prints, detecte só problemas que dá para provar na página (com a área exata) e renderize o modelo. Suba o MP4 com create_upload_urls e conclua com video_path, duration_sec e findings. Sem ponto comprovável: fail_job com retryable=false (não invente).",
   analyze_human_feedback:
     "Compare o que a análise previu com a decisão humana (motivo, comentário) e com outros leads (search_knowledge / get_feedback). Proponha padrões e, só com evidência, hipóteses testáveis. Nada muda regra sem aprovação humana.",
 }
@@ -126,6 +128,15 @@ export const RESULT_SCHEMAS: Record<string, unknown> = {
       qualification_score: { type: "number", minimum: 0, maximum: 10 },
       site_score: { type: "number", minimum: 0, maximum: 10 },
       confidence: { type: "number", minimum: 0, maximum: 1 },
+    },
+  },
+  render_prospect_video: {
+    type: "object",
+    required: ["video_path", "duration_sec", "findings"],
+    properties: {
+      video_path: { type: "string", description: "o path devolvido por create_upload_urls" },
+      duration_sec: { type: "number", minimum: 5, maximum: 600 },
+      findings: { type: "array", minItems: 1, items: { type: "object", required: ["kind", "text", "short"], properties: { kind: { type: "string" }, text: { type: "string" }, short: { type: "string" } } } },
     },
   },
   analyze_human_feedback: {
@@ -155,11 +166,30 @@ export const reportProgress = (id: string, lease: string, message: string, perce
   rpc<null>("report_progress", { p_public_id: id, p_lease_id: lease, p_message: String(message ?? "").slice(0, 500), p_percent: typeof percent === "number" ? Math.round(percent) : null })
 export const releaseJob = (id: string, lease: string) => rpc<JobRow>("release_job", { p_public_id: id, p_lease_id: lease })
 
+/**
+ * Link de upload (2 h) do vídeo de um job de vídeo: só para o worker que tem o lease válido,
+ * e só para o caminho daquele lead/job (funil/leads/<lead>/<job>/video.mp4).
+ */
+export async function videoUploadUrl(w: Worker, id: string, lease: string) {
+  const { data } = await supabaseAdmin().from("ai_jobs").select("public_id, job_type, entity_type, entity_id, status, claimed_by, lease_id, lease_expires_at").eq("public_id", id).maybeSingle()
+  if (!data || data.claimed_by !== w.id) throw new JobError("job não encontrado", 404)
+  if (data.lease_id !== lease || !["claimed", "running"].includes(data.status) || !data.lease_expires_at || new Date(data.lease_expires_at).getTime() < Date.now())
+    throw new JobError("lease_lost: este job não é mais seu", 409)
+  if (data.job_type !== "render_prospect_video" || data.entity_type !== "lead") throw new JobError("só jobs de vídeo sobem arquivo", 400)
+  const path = `funil/leads/${data.entity_id}/${data.public_id}/video.mp4`
+  const up = await supabaseAdmin().storage.from("conteudos").createSignedUploadUrl(path, { upsert: true })
+  if (up.error || !up.data) throw new JobError("não consegui criar o link de upload", 500)
+  return { path, signed_url: up.data.signedUrl, token: up.data.token, method: "PUT", content_type: "video/mp4" }
+}
+
 /** Concluir: valida o schema do tipo ANTES; inválido não conclui (o worker corrige ou falha). */
 export async function completeJob(w: Worker, id: string, lease: string, raw: unknown) {
   const job = await ownJob(w, id)
   const v = validateJobResult(job.job_type, raw)
   if (!v.ok) throw new JobError("resultado inválido para o tipo do job", 422, { errors: v.errors, schema: RESULT_SCHEMAS[job.job_type] })
+  // Vídeo: o arquivo tem que ser o DESTE lead e DESTE job (o que create_upload_urls devolveu).
+  if (job.job_type === "render_prospect_video" && (v.value as { video_path: string }).video_path !== `funil/leads/${job.entity_id}/${job.public_id}/video.mp4`)
+    throw new JobError("resultado inválido para o tipo do job", 422, { errors: ["video_path não é o deste job (use o path de create_upload_urls)"] })
   return rpc<JobRow>("complete_job", { p_public_id: id, p_lease_id: lease, p_result: v.value, p_raw_result: raw ?? null })
 }
 

@@ -65,5 +65,6 @@ EVENTO (events) ──gatilho no banco──► JOB (ai_jobs, idempotency_key ú
 | --- | --- | --- | --- | --- |
 | `analyze_website` | Web Analyst | `web`, `mcp_write` | `lead.created` com site e sem análise | summary, problems[], opportunities[], qualification_score 0–10, confidence 0–1, site_score? → vira a análise do lead + `lead.analyzed` |
 | `analyze_human_feedback` | Intelligence | `reasoning`, `mcp_read` | `lead.rejected` | patterns[], hypotheses[] (com proposed_test) → hipóteses "proposta" para aprovação humana |
+| `render_prospect_video` | Video Studio (worker local, `workers/video`) | `video_render` | lead chegou na parte do vídeo do funil (`lead.replied`/`lead.followup_sent` ou mudança do funil; SQL 0013) | video_path, duration_sec, findings[] → `lead.video` "pronto"; humano aprova antes da extensão anexar |
 
 Tipo novo = entrada em `JOB_TYPES` (`src/lib/domain/jobs.ts`) + regra no gatilho `private.on_event_inserted` + (se mexer no domínio) caso em `private.apply_job_result`.

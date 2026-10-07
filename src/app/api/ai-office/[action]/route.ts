@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { createWebhook, rotateWebhookSecret } from "@/lib/server/webhooks"
 import { saveFunnel } from "@/lib/server/whatsapp-funnel"
 import { createWorker, rotateWorkerToken, type Scope } from "@/lib/server/workers"
+import { VIDEO_AGENT_ID, VIDEO_JOB_TYPE, type LeadVideo } from "@/lib/domain/prospect-video"
+import type { Lead } from "@/lib/domain/types"
 
 /**
  * Ações HUMANAS do AI Office (só membros logados). Tokens e segredos voltam UMA vez,
@@ -90,6 +92,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         // Token da extensão do WhatsApp: só o escopo do funil; aparece UMA vez.
         const r = await createWorker({ name: `Extensão WhatsApp (${member.email.split("@")[0] || member.teamId})`, engine: "chrome-extension", capabilities: [], scopes: ["whatsapp:funnel"], createdBy: member.teamId })
         return NextResponse.json(r, { headers: noStore })
+      }
+      // ---------- vídeo de análise do lead (revisão humana) ----------
+      case "video.url":
+      case "video.approve":
+      case "video.discard":
+      case "video.generate": {
+        const { data: row } = await db.from("leads").select("data").eq("id", id).maybeSingle()
+        if (!row) return bad("lead não encontrado", 404)
+        const l = row.data as Lead
+        const v = l.video
+        const save = async (video: LeadVideo) => {
+          const { error } = await db.from("leads").update({ data: { ...l, video }, updated_at: new Date().toISOString() }).eq("id", id)
+          if (error) throw error
+          return NextResponse.json({ ok: true, video }, { headers: noStore })
+        }
+        if (action === "video.url") {
+          if (!v?.path) return bad("o vídeo ainda não existe", 404)
+          const { data } = await db.storage.from("conteudos").createSignedUrl(v.path, 60 * 60)
+          return data ? NextResponse.json({ url: data.signedUrl }, { headers: noStore }) : bad("falhou", 500)
+        }
+        if (action === "video.approve") {
+          if (v?.status !== "pronto" || !v.path) return bad("só dá para aprovar um vídeo pronto", 409)
+          return save({ ...v, status: "aprovado", approvedAt: new Date().toISOString(), approvedBy: member.teamId })
+        }
+        if (action === "video.discard") {
+          if (!v) return bad("não há vídeo", 404)
+          return save({ ...v, status: "descartado" })
+        }
+        // gerar (ou gerar de novo): pedido humano, fora da regra automática do funil
+        if (!/^https?:\/\//i.test(l.website ?? "")) return bad("o lead não tem site")
+        if (v?.status === "gerando") return bad("já está gerando", 409)
+        const version = (v?.version ?? 0) + 1
+        const def = JOB_TYPES[VIDEO_JOB_TYPE]
+        const { data: q, error } = await db.rpc("enqueue_job", {
+          p_job_type: VIDEO_JOB_TYPE, p_agent_id: VIDEO_AGENT_ID, p_entity_type: "lead", p_entity_id: id,
+          p_payload: { website: l.website, name: l.name, version, manual: true }, p_idempotency_key: idempotencyKey(VIDEO_JOB_TYPE, id, version), p_created_by: member.teamId,
+          p_priority: def.priority + 10, p_max_attempts: def.maxAttempts, p_required_capabilities: def.requiredCapabilities, p_correlation_id: `lead:${id}`,
+        })
+        if (error) return bad("falhou ao pedir o vídeo", 500)
+        const job = (q as { job: { public_id: string } }[] | null)?.[0]?.job
+        return save({ status: "gerando", jobId: job?.public_id, version, requestedAt: new Date().toISOString() })
       }
       default:
         return bad("ação desconhecida", 404)

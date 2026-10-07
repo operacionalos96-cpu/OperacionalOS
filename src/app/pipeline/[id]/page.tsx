@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } from "@/components/shared/fields"
 import { InlineText } from "@/components/shared/inline-edit"
 import { ReviewPanel } from "@/components/prospecting/review-panel"
+import { LeadVideoCard } from "@/components/prospecting/lead-video-card"
 import { EmptyState } from "@/components/shared/layout"
 import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
@@ -117,6 +118,7 @@ function LeadDetail({ lead }: { lead: Lead }) {
         </div>
         <aside className="flex flex-col gap-4">
           <ReviewPanel lead={lead} />
+          <LeadVideoCard lead={lead} />
           <Properties lead={lead} />
           <LinkedTasks lead={lead} />
           <LinkedMoney lead={lead} />

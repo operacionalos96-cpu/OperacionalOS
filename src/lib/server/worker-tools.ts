@@ -1,5 +1,5 @@
 import "server-only"
-import { claimNext, completeJob, failJob, getJob, jobContext, peekNext, queueStatus, releaseJob, renewLease, reportProgress, searchKnowledge, startJob, JobError } from "./jobs"
+import { claimNext, completeJob, failJob, getJob, jobContext, peekNext, queueStatus, releaseJob, renewLease, reportProgress, searchKnowledge, startJob, videoUploadUrl, JobError } from "./jobs"
 import { queueConfig } from "./jobs"
 import { SCOPES, requireScope, type Scope, type Worker } from "./workers"
 
@@ -96,6 +96,12 @@ export const TOOLS: Record<string, Tool> = {
     scope: "jobs:execute",
     input: { ...req("job_id", "lease_id"), properties: jobArgs },
     run: (_w, a) => releaseJob(str(a, "job_id"), str(a, "lease_id")),
+  },
+  create_upload_urls: {
+    description: "Job de vídeo: link para subir o MP4 (PUT no signed_url, Content-Type video/mp4). Devolve o path para usar em complete_job.video_path. Exige lease válido.",
+    scope: "jobs:execute",
+    input: { ...req("job_id", "lease_id"), properties: jobArgs },
+    run: (w, a) => videoUploadUrl(w, str(a, "job_id"), str(a, "lease_id")),
   },
   search_knowledge: {
     description: "Busca aprendizados e hipóteses aprovadas/validadas.",

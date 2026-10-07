@@ -19,7 +19,7 @@ export const SCOPES = {
 } as const
 export type Scope = keyof typeof SCOPES
 
-export const CAPABILITIES = ["reasoning", "web", "filesystem", "mcp_read", "mcp_write"] as const
+export const CAPABILITIES = ["reasoning", "web", "filesystem", "mcp_read", "mcp_write", "video_render"] as const
 
 export interface Worker {
   id: string

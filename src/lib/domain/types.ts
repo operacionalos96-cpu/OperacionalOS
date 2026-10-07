@@ -51,6 +51,8 @@ export interface Lead {
   siteInfo?: SiteInfo
   /** Funil de WhatsApp (1ª mensagem + follow-ups). Ver src/lib/domain/funnel.ts. */
   funnel?: { step: number; lastSentAt?: string; history: { step: number; at: string; by?: string }[]; repliedAt?: string; stopped?: boolean }
+  /** Vídeo de análise personalizado (gerado só quando o lead chega nessa parte do funil). Ver src/lib/domain/prospect-video.ts. */
+  video?: import("./prospect-video").LeadVideo
 }
 
 export interface SiteInfo {

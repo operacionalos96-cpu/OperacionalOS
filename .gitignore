@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# worker de vídeo (roda na máquina local)
+/workers/video/node_modules
+/workers/video/.trabalho

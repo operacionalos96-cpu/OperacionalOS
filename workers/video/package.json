@@ -1,0 +1,15 @@
+{
+  "name": "oos-video-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Worker Video Studio do Operacional OS: gera o vídeo de análise de cada lead que chega nessa parte do funil.",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js",
+    "uma-vez": "node worker.js --uma-vez",
+    "testar": "node testar.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

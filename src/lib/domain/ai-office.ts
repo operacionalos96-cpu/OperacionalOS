@@ -70,6 +70,16 @@ export function defaultAgents(now: string): Agent[] {
     },
     {
       ...base,
+      id: "video-studio",
+      name: "Video Studio",
+      role: "Gerar o vídeo de análise de cada lead que chega nessa parte do funil",
+      description: "Abre o site real do lead, tira os prints, mede problemas que dá para provar na página e renderiza o vídeo personalizado. Uma pessoa aprova antes de enviar.",
+      capabilities: ["print do site", "detectar problemas visíveis", "renderizar vídeo"],
+      permissions: ["get_job_context", "create_upload_urls", "complete_job"],
+      preferredModel: "Worker local (sem IA)",
+    },
+    {
+      ...base,
       id: "knowledge-manager",
       name: "Knowledge Manager",
       role: "Transformar aprendizados em conhecimento",

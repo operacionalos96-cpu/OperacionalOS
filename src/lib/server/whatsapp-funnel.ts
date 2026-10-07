@@ -4,6 +4,7 @@ import { publicId } from "@/lib/domain/jobs"
 import { makeEvent, type BusinessEventType } from "@/lib/domain/ai-office"
 import { findLeadByName, findLeadByPhone, followupsDue, funnelOf, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
 import { contactedPatch } from "@/lib/domain/prospecting"
+import { stepMediaFor } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
 import { supabaseAdmin } from "./supabase-admin"
 
@@ -66,17 +67,19 @@ async function log(l: Lead, actorId: string, text: string, type: BusinessEventTy
   if (error) console.warn("[funil] evento não gravou", error.message)
 }
 
-/** Link temporário (15 min) do áudio/vídeo do passo, para a extensão anexar na conversa. */
-async function mediaLink(step: FunnelStep | undefined) {
-  if (!step?.media) return null
-  const { data } = await supabaseAdmin().storage.from("conteudos").createSignedUrl(step.media.path, 15 * 60)
-  return data ? { url: data.signedUrl, name: step.media.name, mime: step.media.mime, size: step.media.size } : null
+/** Link temporário (15 min) do áudio/vídeo, para a extensão anexar na conversa. */
+async function mediaLink(media: FunnelStep["media"] | null) {
+  if (!media) return null
+  const { data } = await supabaseAdmin().storage.from("conteudos").createSignedUrl(media.path, 15 * 60)
+  return data ? { url: data.signedUrl, name: media.name, mime: media.mime, size: media.size } : null
 }
 
 /** O que a extensão mostra para o lead da conversa aberta. */
 async function view(l: Lead, steps: FunnelStep[], now: Date) {
   const f = funnelOf(l)
   const n = nextStep(l, steps, now)
+  // Vídeo: o personalizado do lead (aprovado) tem prioridade sobre o arquivo padrão do funil.
+  const m = n ? stepMediaFor(l, n.step) : null
   return {
     lead: { id: l.id, name: l.name, company: l.company ?? null, segment: l.segment ?? null, city: l.city ?? null, stage: l.stage, website: l.website ?? null, problems: l.analysis?.problems?.slice(0, 3) ?? [] },
     funnel: { step: f.step, total: steps.length, lastSentAt: f.lastSentAt ?? null, repliedAt: f.repliedAt ?? null, stopped: !!f.stopped },
@@ -92,8 +95,9 @@ async function view(l: Lead, steps: FunnelStep[], now: Date) {
           waitingReply: n.waitingReply,
           dueAt: n.dueAt ? n.dueAt.toISOString() : null,
           text: n.step.template ? renderTemplate(n.step.template, l, now) : "",
-          media: await mediaLink(n.step),
-          missingMedia: n.step.kind !== "texto" && !n.step.media,
+          media: await mediaLink(m?.media ?? null),
+          missingMedia: n.step.kind !== "texto" && !m?.media,
+          mediaNote: m?.note ?? null,
         }
       : null,
   }

@@ -465,7 +465,7 @@
           else html += `<div class="warn">Não consegui usar este arquivo como áudio de voz${voice.reason ? ` (${esc(voice.reason)})` : ""}. Use “Anexar como arquivo”.</div><button class="b ghost" data-a="diag">Copiar diagnóstico</button>`
           html += `<button class="b ghost" data-a="attach">Anexar como arquivo</button>`
         } else if (next.media) html += `<div class="muted">📎 ${esc(next.media.name)}</div><button class="b main" data-a="attach">Anexar ${noun} na conversa</button>`
-        else html += `<div class="warn">Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.</div>`
+        else html += `<div class="warn">${next.mediaNote ? esc(next.mediaNote) : `Falta o arquivo do ${noun}. Suba em Prospecção › Funil › Editar funil.`}</div>`
       }
       if (next.text && !pendingSend && composerHas(next.text)) {
         // O sistema já abriu a conversa com a mensagem: só falta o Enter.
