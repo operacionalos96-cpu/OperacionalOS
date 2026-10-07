@@ -8,6 +8,7 @@ const path = require('path');
 const puppeteer = require('puppeteer-core');
 const { analisarSite } = require('./analisar');
 const { montarFicha, renderizar } = require('./render');
+const { MINIMO } = require('./selecionar');
 
 for (const linha of (fs.existsSync(path.join(__dirname, '.env')) ? fs.readFileSync(path.join(__dirname, '.env'), 'utf8') : '').split(/\r?\n/)) {
   const m = /^\s*([A-Z_]+)\s*=\s*(.*)\s*$/.exec(linha);
@@ -52,9 +53,12 @@ async function executar(browser, job, lease) {
   try {
     console.log(`▸ ${lead.name} — ${lead.website}`);
     await tool('report_progress', { ...ids, message: 'abrindo o site e tirando os prints', percent: 5 });
-    const analise = await analisarSite(browser, lead.website, dir);
+    const analise = await analisarSite(browser, lead.website, dir, { nome: lead.name, segmento: lead.segment || lead.siteInfo?.segment, cidade: lead.city || lead.siteInfo?.city });
     fs.writeFileSync(path.join(dir, 'analise.json'), JSON.stringify(analise, null, 2));
-    if (!analise.escolhidos.length) return await tool('fail_job', { ...ids, error: 'nenhum problema comprovável no site — sem vídeo (não inventamos)', retryable: false });
+    if (analise.escolhidos.length < MINIMO) {
+      const vistos = analise.escolhidos.map((a) => a.short).join(', ') || 'nenhum';
+      return await tool('fail_job', { ...ids, error: `o site não tem ${MINIMO} pontos fortes comprováveis (achados: ${vistos}) — sem vídeo, não forçamos argumento fraco`, retryable: false });
+    }
     console.log('  achados:', analise.escolhidos.map((a) => a.short).join(' | '));
 
     const ficha = montarFicha(lead, analise);

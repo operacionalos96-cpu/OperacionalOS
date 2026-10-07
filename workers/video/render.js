@@ -28,14 +28,18 @@ function montarTextos(f) {
   };
   const t = {};
   for (const [k, s] of Object.entries(ROTEIRO)) t[k] = s.replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '').replace(/\s{2,}/g, ' ').trim();
-  t.s3_b = frase(f.problema1.text);
-  if (f.problema2) t.s4_b = frase(f.problema2.text);
+  // os 3 pontos: o que vimos + o impacto daquele ponto
+  [['s3', f.problema1], ['s4', f.problema2], ['s4c', f.problema3]].forEach(([k, p]) => {
+    if (!p) return;
+    t[`${k}_b`] = frase(p.text);
+    if (p.impacto) t[`${k}_c`] = p.impacto;
+  });
   return t;
 }
 
 /** Ficha do vídeo a partir do lead + análise do site. */
 function montarFicha(lead, analise) {
-  const [p1, p2] = analise.escolhidos;
+  const [p1, p2, p3] = analise.escolhidos;
   let host = '';
   try { host = new URL(analise.urlFinal || lead.website).host.replace(/^www\./, ''); } catch {}
   const segmento = (lead.segment || lead.siteInfo?.segment || '').trim().toLowerCase();
@@ -49,6 +53,7 @@ function montarFicha(lead, analise) {
     cor: analise.cor || null,
     problema1: p1,
     problema2: p2 || null,
+    problema3: p3 || null,
   };
 }
 
@@ -60,7 +65,7 @@ function escreverDados(dir, ficha) {
     empresa: ficha.empresa, cidade: ficha.cidade, url: ficha.url,
     diferencial: ficha.diferencial, especialidade: ficha.especialidade,
     logo: null, home: rel('home.png'),
-    problema1: prob(ficha.problema1), problema2: prob(ficha.problema2),
+    problema1: prob(ficha.problema1), problema2: prob(ficha.problema2), problema3: prob(ficha.problema3),
     textos: montarTextos(ficha),
   };
   fs.writeFileSync(path.join(dir, 'dados.js'), `window.FICHA = ${JSON.stringify(dados)};\nwindow.CONFIG = ${JSON.stringify({ assinatura: 'HZK Company', assinatura_logo: 'assets/hzk-logo.png' })};\n`);

@@ -34,7 +34,7 @@ async function carregarTudo(page) {
 }
 
 // Roda DENTRO da página: mede tudo e devolve candidatos com evidência e área.
-function medir(anoAtual, maxAltura) {
+function medir(ctx, maxAltura) {
   const W = document.documentElement.clientWidth;
   const doc = (r) => ({ x: Math.max(0, Math.round(r.left + scrollX)), y: Math.max(0, Math.round(r.top + scrollY)), w: Math.round(r.width), h: Math.round(r.height) });
   const visivel = (el) => {
@@ -65,22 +65,6 @@ function medir(anoAtual, maxAltura) {
   const altura = Math.min(document.documentElement.scrollHeight, maxAltura);
   const dentro = (a) => a.y + a.h <= altura;
 
-  // 1) Rodapé com ano antigo: "© 2019", "Copyright 2018", "2017 - Todos os direitos reservados"
-  {
-    const re = /(?:©|&copy;|copyright|todos os direitos reservados)[^0-9]{0,40}((?:19|20)\d{2})(?:\s*[-–]\s*((?:19|20)\d{2}))?|((?:19|20)\d{2})(?:\s*[-–]\s*((?:19|20)\d{2}))?[^0-9]{0,30}(?:todos os direitos reservados)/i;
-    const nos = [...document.querySelectorAll('footer, footer *, body *')].filter((e) => e.children.length === 0 && visivel(e) && re.test(e.textContent || ''));
-    const el = nos.sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
-    if (el) {
-      const m = re.exec(el.textContent);
-      const anos = [m[1], m[2], m[3], m[4]].filter(Boolean).map(Number);
-      const ano = Math.max(...anos);
-      if (ano <= anoAtual - 2) {
-        const area = doc(bloco(el, 60, 260).getBoundingClientRect());
-        if (dentro(area)) achados.push({ kind: 'copyright_antigo', prioridade: 90, ano, area, evidencia: el.textContent.trim().slice(0, 120) });
-      }
-    }
-  }
-
   // 2) / 3) Contato: WhatsApp/telefone só lá embaixo, ou nenhum botão de WhatsApp
   {
     const links = [...document.querySelectorAll('a[href]')].filter(visivel);
@@ -93,6 +77,20 @@ function medir(anoAtual, maxAltura) {
     if (!flutuante && primeiro && primeiro.top > innerHeight * 2.2) {
       const area = doc(bloco(primeiro.e, 100, 420).getBoundingClientRect());
       if (dentro(area)) achados.push({ kind: 'contato_no_fim', prioridade: 85, area, topo: Math.round(primeiro.top), evidencia: (primeiro.e.textContent || primeiro.e.href || '').trim().slice(0, 80) });
+    }
+    // Chamada para contato visível na 1ª tela (botão/link de WhatsApp, telefone, agendar, orçamento, contato)
+    const cta = [...document.querySelectorAll('a, button')].filter((e) => {
+      const r = e.getBoundingClientRect();
+      const t = ((e.innerText || '') + ' ' + (e.getAttribute('href') || '') + ' ' + (e.getAttribute('aria-label') || '')).toLowerCase();
+      if (!(visivel(e) && r.top >= 0 && r.top < innerHeight)) return false;
+      if (/whats|wa\.me|tel:/.test(t)) return true;
+      // botão de verdade (com fundo ou borda), fora do menu — o link "Contato" do menu não conta
+      const cs = getComputedStyle(e);
+      const botao = e.tagName === 'BUTTON' || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) || parseFloat(cs.borderTopWidth) > 0;
+      return botao && !e.closest('nav, [role="navigation"]') && /agend|or[cç]amento|fale|contato|ligue|marcar|consulta|reserv|solicit|chamar/.test(t);
+    });
+    if (!cta.length && !flutuante) {
+      achados.push({ kind: 'sem_cta_topo', prioridade: 80, area: { x: 0, y: 0, w: W, h: Math.min(innerHeight, 900) }, evidencia: 'nenhum botão/link de contato visível na primeira tela' });
     }
     if (!links.some(ehWhats)) {
       const header = document.querySelector('header') || document.querySelector('nav');
@@ -136,8 +134,12 @@ function medir(anoAtual, maxAltura) {
     if (maior) {
       const t = maior.innerText.trim().replace(/\s+/g, ' ');
       const nPal = t.split(' ').length;
-      if (/^(seja )?bem[- ]vind[oa]s?/i.test(t) || nPal <= 2) {
-        achados.push({ kind: 'topo_sem_proposta', prioridade: 75, titulo: t.slice(0, 60), area: { x: 0, y: 0, w: W, h: Math.min(innerHeight, Math.max(400, Math.round(maior.getBoundingClientRect().bottom + scrollY + 80))) }, evidencia: t.slice(0, 80) });
+      // só o nome da empresa? (as palavras do maior texto estão todas no nome do lead)
+      const nz = (x) => (x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+      const nomeW = nz(ctx.nome);
+      const soNome = nomeW.length > 0 && nPal <= 5 && nz(t).length > 0 && nz(t).every((w) => nomeW.some((n) => n.startsWith(w) || w.startsWith(n)));
+      if (/^(seja )?bem[- ]vind[oa]s?/i.test(t) || nPal <= 2 || soNome) {
+        achados.push({ kind: 'topo_sem_proposta', prioridade: 84, titulo: t.slice(0, 60), area: { x: 0, y: 0, w: W, h: Math.min(innerHeight, Math.max(400, Math.round(maior.getBoundingClientRect().bottom + scrollY + 80))) }, evidencia: t.slice(0, 80) });
       }
     }
   }
@@ -145,6 +147,45 @@ function medir(anoAtual, maxAltura) {
   // 6) Sem depoimentos/avaliações de clientes
   if (!/depoimento|avalia[cç][aãõ]|o que (nossos |os )?(clientes|pacientes)|(clientes|pacientes) (dizem|falam)|google reviews?|★★★/i.test(texto)) {
     achados.push({ kind: 'sem_prova_social', prioridade: 50, area: null, evidencia: 'nenhuma menção a depoimentos/avaliações no texto da página' });
+  }
+
+  // 7) Topo não diz o que a empresa faz (o segmento não aparece na 1ª tela)
+  const norm = (x) => (x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const primeiraTela = norm([...document.querySelectorAll('h1,h2,h3,p,span,a,li,div')].filter((e) => { const r = e.getBoundingClientRect(); return visivel(e) && r.top >= 0 && r.top < innerHeight && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()); }).map((e) => e.innerText).join(' '));
+  const raizes = norm(ctx.segmento).split(/[^a-z]+/).filter((w) => w.length >= 5).map((w) => w.slice(0, Math.max(5, w.length - 3)));
+  if (raizes.length && !raizes.some((r) => primeiraTela.includes(r)) && !achados.some((a) => a.kind === 'topo_sem_proposta')) {
+    achados.push({ kind: 'topo_sem_proposta', prioridade: 88, titulo: '', area: { x: 0, y: 0, w: W, h: Math.min(innerHeight, 900) }, evidencia: `"${ctx.segmento}" não aparece na primeira tela` });
+  }
+
+  // 8) Sem localização clara (cidade, endereço ou CEP em lugar nenhum da página)
+  const temCidade = ctx.cidade && norm(texto).includes(norm(ctx.cidade));
+  const temEndereco = /\b\d{5}-?\d{3}\b|\b(rua|av\.|avenida|alameda|rodovia|estrada)\s+[A-ZÀ-Ý]/i.test(texto);
+  if (!temCidade && !temEndereco) achados.push({ kind: 'sem_localizacao', prioridade: 76, area: null, evidencia: 'sem cidade, endereço ou CEP no texto da página' });
+
+  // 9) Pouco conteúdo para apresentar a empresa
+  const palavras = texto.split(' ').filter((w) => /[a-zà-ÿ]{3,}/i.test(w)).length;
+  if (palavras < 350) achados.push({ kind: 'pouco_conteudo', prioridade: 74, palavras, area: null, evidencia: `${palavras} palavras na página` });
+
+  // 10) Título genérico (é o que aparece na busca do Google)
+  const titulo = (document.title || '').trim();
+  if (!titulo || /^(home|in[ií]cio|p[aá]gina inicial|index|untitled|sem t[ií]tulo|meu site|site|bem[- ]vindo)\b/i.test(titulo)) {
+    achados.push({ kind: 'titulo_generico', prioridade: 70, titulo: titulo || '(sem título)', area: null, evidencia: `title: "${titulo}"` });
+  }
+  // 10b) Título do Google só com o nome da empresa (não diz o que fazem)
+  {
+    const nz = (x) => norm(x).split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    const tw = nz(titulo), nw = nz(ctx.nome);
+    if (titulo && tw.length && nw.length && tw.every((w) => nw.some((n) => n.startsWith(w) || w.startsWith(n))) && !achados.some((a) => a.kind === 'titulo_generico')) {
+      achados.push({ kind: 'titulo_so_nome', prioridade: 72, titulo, area: null, evidencia: `title: "${titulo}"` });
+    }
+  }
+  // 10c) Sem descrição para a busca (o resumo que aparece no Google)
+  const desc = (document.querySelector('meta[name="description"]')?.getAttribute('content') || '').trim();
+  if (desc.length < 50) achados.push({ kind: 'sem_descricao', prioridade: 69, area: null, evidencia: desc ? `description curta: "${desc}"` : 'sem meta description' });
+
+  // 11) Experiência/autoridade não aparece (anos, formação, registro, equipe, quem somos)
+  if (!/anos de|h[aá] mais de \d|desde (19|20)\d{2}|experi[eê]ncia|forma[cç][aã]o|especializa|p[oó]s[- ]gradua|mestr[ae]|doutor|\b(crp|crm|cro|oab|crc|crea|cau|coren|crefito|crn)\b|certifica|nossa equipe|quem somos|sobre (n[oó]s|mim|a empresa)|nossa hist[oó]ria|trajet[oó]ria/i.test(texto)) {
+    achados.push({ kind: 'sem_autoridade', prioridade: 78, area: null, evidencia: 'sem anos de mercado, formação, registro, equipe ou "quem somos" no texto' });
   }
 
   // Dados para personalizar (tirados do site, nunca inventados)
@@ -174,18 +215,21 @@ function medir(anoAtual, maxAltura) {
   return { achados, altura, titulo: document.title, diferencial: dif, cor, https: location.protocol === 'https:' };
 }
 
-/** Analisa o site e salva home.png, pagina.png e mobile.png em `dir`. */
-async function analisarSite(browser, url, dir) {
+/** Analisa o site e salva home.png, pagina.png e mobile.png em `dir`. ctx = { segmento, cidade } do lead. */
+async function analisarSite(browser, url, dir, ctx = {}) {
   const page = await browser.newPage();
   await page.setViewport({ ...VIEW, deviceScaleFactor: 1 });
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36');
-  const resp = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  const t0 = Date.now();
+  const resp = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+  const carregou = (Date.now() - t0) / 1000;
+  await page.waitForNetworkIdle({ idleTime: 800, timeout: 20000 }).catch(() => {});
   if (!resp || resp.status() >= 400) throw Object.assign(new Error(`site respondeu ${resp ? resp.status() : 'sem resposta'}`), { retryable: true });
   await new Promise((r) => setTimeout(r, 1500));
   await limparSobreposicoes(page);
   await carregarTudo(page);
   await limparSobreposicoes(page);
-  const medida = await page.evaluate(medir, new Date().getFullYear(), MAX_ALTURA);
+  const medida = await page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '' }, MAX_ALTURA);
   await page.screenshot({ path: path.join(dir, 'home.png') });
   await page.screenshot({ path: path.join(dir, 'pagina.png'), clip: { x: 0, y: 0, width: VIEW.width, height: medida.altura }, captureBeyondViewport: true });
   const urlFinal = page.url();
@@ -203,6 +247,13 @@ async function analisarSite(browser, url, dir) {
   await mob.close();
   if (larguraMobile > 420) medida.achados.push({ kind: 'nao_responsivo', prioridade: 88, area: null, larguraMobile, evidencia: `no celular (390 px) a página tem ${larguraMobile} px de largura` });
   if (!medida.https) medida.achados.push({ kind: 'sem_https', prioridade: 60, area: { x: 0, y: 0, w: VIEW.width, h: 300 }, evidencia: 'abre em http://' });
+  // endereço em subdomínio gratuito (sem domínio próprio)
+  let host = '';
+  try { host = new URL(urlFinal).host.replace(/^www\./, ''); } catch {}
+  if (/\.(wixsite\.com|wordpress\.com|blogspot\.com|webnode\.(page|com|com\.br)|negocio\.site|business\.site|weebly\.com|squarespace\.com|vercel\.app|netlify\.app|github\.io|godaddysites\.com|site123\.me|jimdosite\.com|carrd\.co|lojaintegrada\.com\.br)$/i.test(host) || /^sites\.google\.com$/i.test(host)) {
+    medida.achados.push({ kind: 'subdominio_gratuito', prioridade: 92, host, area: null, evidencia: host });
+  }
+  if (carregou > 6) medida.achados.push({ kind: 'lento', prioridade: 66, segundos: Math.round(carregou), area: null, evidencia: `carregou em ${carregou.toFixed(1)} s no teste` });
 
   return { ...medida, urlFinal, escolhidos: escolherAchados(medida.achados) };
 }

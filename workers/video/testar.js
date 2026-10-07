@@ -25,7 +25,7 @@ const EXE = [process.env.BROWSER, 'C:/Program Files (x86)/Microsoft/Edge/Applica
   fs.mkdirSync(dir, { recursive: true });
   const browser = await puppeteer.launch({ executablePath: EXE, headless: 'new', args: ['--allow-file-access-from-files', '--hide-scrollbars'] });
   try {
-    const analise = await analisarSite(browser, url, dir);
+    const analise = await analisarSite(browser, url, dir, { nome: opt('nome'), segmento: opt('segmento'), cidade: opt('cidade') });
     fs.writeFileSync(path.join(dir, 'analise.json'), JSON.stringify(analise, null, 2));
     console.log('medido:', analise.achados.map((a) => `${a.kind}(${a.prioridade})`).join(', ') || 'nada');
     console.log('no vídeo:', analise.escolhidos.map((a) => `${a.short} — ${a.evidencia}`).join(' | ') || 'nada (sem vídeo)');

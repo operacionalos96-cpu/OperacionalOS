@@ -145,6 +145,7 @@ body.render #ctrl{display:none}
       <div class="cc" id="s2B"><h4 data-t="s2_B"></h4>
         <div class="tg"><span class="ic bad"><i data-i="alert"></i></span><span data-f="problema1.curto"></span></div>
         <div class="tg" id="s2p2"><span class="ic bad"><i data-i="alert"></i></span><span data-f="problema2.curto"></span></div>
+        <div class="tg" id="s2p3"><span class="ic bad"><i data-i="alert"></i></span><span data-f="problema3.curto"></span></div>
       </div>
     </div>
   </section>
@@ -167,6 +168,15 @@ body.render #ctrl{display:none}
     </div>
     <div class="browser"><div class="bbar"><i></i><i></i><i></i><span data-f="url"></span></div>
       <div class="view" style="height:700px"><div class="canvas"><img data-src="problema2.print"><div class="hl"></div></div></div></div>
+  </section>
+  <section class="scene" id="s4c">
+    <p class="lbl"><span data-t="s3_label"></span> · 03</p>
+    <div class="hwrap">
+      <div class="h sm" id="s4cg1"><span class="l" data-t="s4c_b"></span></div>
+      <div class="h sm" id="s4cg2"><span class="l" data-t="s4c_c"></span></div>
+    </div>
+    <div class="browser"><div class="bbar"><i></i><i></i><i></i><span data-f="url"></span></div>
+      <div class="view" style="height:700px"><div class="canvas"><img data-src="problema3.print"><div class="hl"></div></div></div></div>
   </section>
 
   <!-- 05 Comparação -->
@@ -262,6 +272,7 @@ $$('[data-t]').forEach(e => e.innerHTML = rich(TX[e.dataset.t] || ''));
 // campos opcionais: sem diferencial / sem 2º problema / sem cidade, a cena se adapta
 if (!F.diferencial) { $('#s2dif').remove(); $('#s8dif').remove(); }
 if (!F.problema2) { $('#s2p2').remove(); $('#s4').remove(); }
+if (!F.problema3) { $('#s2p3').remove(); $('#s4c').remove(); }
 if (!F.cidade) $$('[data-f="cidade"]').forEach(e => e.remove());
 $$('[data-src]').forEach(e => e.src = get(e.dataset.src));
 $('#s6chips').innerHTML = TX.s6_chips.split('|').map(c => `<div class="chip">${esc(c)}</div>`).join('');
@@ -305,7 +316,7 @@ function typeT(el, text, at, dur) { const p = { n: 0 }; typers.push({ el, text, 
 function sync() { for (const t of typers) { const s = t.text.slice(0, Math.round(t.p.n)); if (t.el.textContent !== s) t.el.textContent = s; } }
 const el = x => typeof x === 'string' ? $(x) : x;
 // tempo de leitura do texto que está na tela
-const rd = x => { const n = el(x).textContent.trim().split(/\s+/).length; return Math.min(3.8, Math.max(1.7, .8 + n * .2)); };
+const rd = x => { const n = el(x).textContent.trim().split(/\s+/).length; return Math.min(3.6, Math.max(1.6, .7 + n * .18)); };
 function reveal(x, at, o = {}) {
   const w = el(x).querySelectorAll('.wi');
   tl.fromTo(w, { yPercent: 115, opacity: 0 }, { yPercent: 0, opacity: 1, duration: o.d || .8, ease: 'power3.out', stagger: o.s ?? .05 }, at);
@@ -340,7 +351,7 @@ function shot(scene, foco) {
 function build() {
   fitLine($('#s1name'));
   $$('#s9mark .nameL, #s10mark .nameL').forEach(e => fitLine(e));
-  ['#s3g1', '#s4g1'].filter(s => $(s)).forEach(s => fitBox($(s), 340));
+  ['#s3g1', '#s4g1', '#s4cg1'].filter(s => $(s)).forEach(s => fitBox($(s), 340));
   fitBox($('#s8esp'), 140, 40);
   $$('.h .l').forEach(split);
   let t = 0, e;
@@ -376,7 +387,7 @@ function build() {
   t = sceneOut('#s2', e + rd('#s2g2'));
 
   // 03 / 04 Evidências reais
-  ['s3', 's4'].filter((id, n) => F['problema' + (n + 1)]).forEach((id, n) => {
+  ['s3', 's4', 's4c'].filter((id, n) => F['problema' + (n + 1)]).forEach((id, n) => {
     const sh = shot('#' + id, F['problema' + (n + 1)].foco); gsap.set(sh.cv, sh.a);
     sceneIn('#' + id, t);
     pop(`#${id} .lbl`, t + .15, { y: 10 });
