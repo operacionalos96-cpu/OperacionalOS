@@ -7,6 +7,7 @@ import type { EntityContext, Relation } from "@/lib/entities/types"
 import type { MapEdgeRow, MapNodeRow } from "@/lib/domain/map-rows"
 import type { Goal } from "@/lib/domain/insights"
 import type { Agent, Hypothesis, Learning } from "@/lib/domain/ai-office"
+import type { MemberRole, OrgRole } from "@/lib/domain/org"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -31,3 +32,7 @@ export const useGoals = createCollection<Goal>("goals")
 export const useAgents = createCollection<Agent>("agents")
 export const useLearnings = createCollection<Learning>("learnings")
 export const useHypotheses = createCollection<Hypothesis>("hypotheses")
+
+// Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
+export const useOrgRoles = createCollection<OrgRole>("org_roles")
+export const useMemberRoles = createCollection<MemberRole>("member_roles")

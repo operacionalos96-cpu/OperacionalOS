@@ -2,9 +2,10 @@
 
 import { create } from "zustand"
 import { toast } from "sonner"
-import { TEAM } from "@/config/team"
+import { TEAM, syncTeamMembers } from "@/config/team"
 import { isOpenStage, stageLabel } from "@/lib/domain/constants"
 import { nextOccurrence } from "@/lib/domain/rules"
+import type { OrgMember, RoleLevel } from "@/lib/domain/org"
 import type {
   Activity,
   ActivityKind,
@@ -80,6 +81,8 @@ interface State {
   /** Vem do login (tabela members), nunca de escolha na tela. */
   meId: string
   meEmail: string
+  meRoleLevel: RoleLevel
+  orgMembers: OrgMember[]
   leads: Lead[]
   activities: Activity[]
   tasks: Task[]
@@ -89,6 +92,7 @@ interface State {
   financeSettings: FinanceSettings
 
   hydrate(): Promise<void>
+  refreshOrgMembers(): Promise<void>
   signOut(): Promise<void>
 
   createLead(input: NewLeadInput): Lead
@@ -155,6 +159,8 @@ export const useStore = create<State>((set, get) => {
     access: "verificando",
     meId: TEAM[0].id,
     meEmail: "",
+    meRoleLevel: "owner",
+    orgMembers: [],
     leads: [],
     activities: [],
     tasks: [],
@@ -162,6 +168,24 @@ export const useStore = create<State>((set, get) => {
     transactions: [],
     mindMaps: [],
     financeSettings: { openingBalanceCents: 0, monthlyGoals: {} },
+
+    async refreshOrgMembers() {
+      const sb = supabaseBrowser()
+      const { data: rawMembers } = await sb.from("members").select("*")
+      if (rawMembers) {
+        const orgMembers: OrgMember[] = rawMembers.map((m: Record<string, unknown>) => ({
+          email: String(m.email ?? ""),
+          teamId: String(m.team_id ?? ""),
+          displayName: m.display_name ? String(m.display_name) : undefined,
+          avatarUrl: m.avatar_url ? String(m.avatar_url) : undefined,
+          roleLevel: (m.role_level as RoleLevel) || "operator",
+          active: m.active !== false,
+          joinedAt: String(m.joined_at ?? m.created_at ?? nowIso()),
+        }))
+        syncTeamMembers(orgMembers)
+        set({ orgMembers })
+      }
+    },
 
     async hydrate() {
       if (get().hydrated) return
@@ -177,16 +201,38 @@ export const useStore = create<State>((set, get) => {
         return
       }
       // O banco só devolve a linha se o e-mail estiver autorizado (RLS).
-      const { data: member, error: memberError } = await sb.from("members").select("team_id").maybeSingle()
+      const { data: member, error: memberError } = await sb.from("members").select("*").maybeSingle()
       if (memberError) {
         set({ access: "erro" })
         return
       }
-      if (!member || !TEAM.some((u) => u.id === member.team_id)) {
+      if (!member || member.active === false) {
         set({ access: "negado", meEmail: auth.user.email ?? "" })
         await sb.auth.signOut()
         return
       }
+
+      // Buscar todos os membros visíveis da equipe
+      let orgMembers: OrgMember[] = []
+      const { data: rawMembers } = await sb.from("members").select("*")
+      if (rawMembers && rawMembers.length > 0) {
+        orgMembers = rawMembers.map((m: Record<string, unknown>) => ({
+          email: String(m.email ?? ""),
+          teamId: String(m.team_id ?? ""),
+          displayName: m.display_name ? String(m.display_name) : undefined,
+          avatarUrl: m.avatar_url ? String(m.avatar_url) : undefined,
+          roleLevel: (m.role_level as RoleLevel) || "operator",
+          active: m.active !== false,
+          joinedAt: String(m.joined_at ?? m.created_at ?? nowIso()),
+        }))
+        syncTeamMembers(orgMembers)
+      } else {
+        // Fallback para os membros locais
+        syncTeamMembers([
+          { teamId: member.team_id, displayName: member.display_name, email: member.email },
+        ])
+      }
+
       try {
         const r = repos()
         const [leads, activities, tasks, notes, transactions, mindMaps, financeSettings] = await Promise.all([
@@ -209,6 +255,8 @@ export const useStore = create<State>((set, get) => {
           access: "ok",
           meId: member.team_id,
           meEmail: auth.user.email ?? "",
+          meRoleLevel: (member.role_level as RoleLevel) || "owner",
+          orgMembers,
           leads,
           activities,
           tasks,
@@ -512,6 +560,11 @@ function startRealtime() {
       if (payload.new && "data" in payload.new) useStore.setState({ financeSettings: payload.new.data as FinanceSettings })
       return
     }
+    if (table === "members") {
+      // Quando um membro é adicionado, editado ou removido, atualiza a lista de membros
+      useStore.getState().refreshOrgMembers()
+      return
+    }
     const key = TABLE_TO_KEY[table]
     if (!key) return
     useStore.setState((s) => {
@@ -531,4 +584,9 @@ function startRealtime() {
 /** Atalho para o usuário atual. */
 export function useMe() {
   return useStore((s) => s.meId)
+}
+
+/** Atalho para o nível de acesso do usuário atual. */
+export function useMeRoleLevel() {
+  return useStore((s) => s.meRoleLevel)
 }

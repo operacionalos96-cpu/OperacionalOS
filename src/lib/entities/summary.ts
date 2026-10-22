@@ -21,6 +21,7 @@ export interface EntitySnapshot {
   contents: ContentItem[]
   relations: Relation[]
   goals: Pick<Goal, "id" | "title" | "end">[]
+  members?: { teamId: string; displayName?: string; email: string }[]
 }
 
 export interface EntitySummary {
@@ -42,6 +43,7 @@ export const ENTITY_LABEL: Record<EntityType, { one: string; many: string }> = {
   map: { one: "Mapa", many: "Mapas" },
   mapNode: { one: "Item de mapa", many: "Itens de mapa" },
   goal: { one: "Meta", many: "Metas" },
+  member: { one: "Membro", many: "Membros" },
 }
 
 export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | null {
@@ -85,6 +87,10 @@ export function summaryOf(ref: EntityRef, s: EntitySnapshot): EntitySummary | nu
       const g = s.goals.find((x) => x.id === ref.id)
       return g ? { title: g.title, subtitle: `até ${g.end.slice(8, 10)}/${g.end.slice(5, 7)}`, done: false } : null
     }
+    case "member": {
+      const m = s.members?.find((x) => x.teamId === ref.id)
+      return m ? { title: m.displayName || m.email, subtitle: m.email, done: false } : { title: `Membro ${ref.id}`, done: false }
+    }
   }
 }
 
@@ -99,6 +105,7 @@ export function searchableEntities(s: EntitySnapshot): (EntityRef & EntitySummar
     ...s.mindMaps.map((x) => ({ type: "map" as const, id: x.id })),
     ...s.transactions.map((x) => ({ type: "transaction" as const, id: x.id })),
     ...s.goals.map((x) => ({ type: "goal" as const, id: x.id })),
+    ...(s.members ?? []).map((x) => ({ type: "member" as const, id: x.teamId })),
   ]
   return refs.flatMap((r) => {
     const sum = summaryOf(r, s)

@@ -10,6 +10,7 @@ import {
   PackageIcon,
   TargetIcon,
   UserIcon,
+  UsersIcon,
   WalletIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -35,6 +36,7 @@ export const ENTITY_ICON: Record<EntityType, LucideIcon> = {
   map: NetworkIcon,
   mapNode: CircleDotIcon,
   goal: TargetIcon,
+  member: UsersIcon,
 }
 
 /** Endereço da página da entidade (tarefa abre em painel, então não tem rota própria). */
@@ -56,6 +58,8 @@ export function entityHref(ref: EntityRef): string | null {
       return `/mapas/${ref.id.split("/")[0]}`
     case "goal":
       return `/metas/${ref.id}`
+    case "member":
+      return "/equipe"
     case "task":
       return null
   }
@@ -74,13 +78,25 @@ export function useEntitySnapshot(): EntitySnapshot {
   const tasks = useStore((s) => s.tasks)
   const notes = useStore((s) => s.notes)
   const transactions = useStore((s) => s.transactions)
+  const orgMembers = useStore((s) => s.orgMembers)
   const mindMaps = useMindMaps()
   const products = useProducts((s) => s.items)
   const contents = useContentItems((s) => s.items)
   const relations = useRelations((s) => s.items)
   const goals = useGoals((s) => s.items)
   return useMemo(
-    () => ({ leads, tasks, notes, transactions, mindMaps, products, contents, relations, goals }),
-    [leads, tasks, notes, transactions, mindMaps, products, contents, relations, goals],
+    () => ({
+      leads,
+      tasks,
+      notes,
+      transactions,
+      mindMaps,
+      products,
+      contents,
+      relations,
+      goals,
+      members: orgMembers.map((m) => ({ teamId: m.teamId, displayName: m.displayName, email: m.email })),
+    }),
+    [leads, tasks, notes, transactions, mindMaps, products, contents, relations, goals, orgMembers],
   )
 }

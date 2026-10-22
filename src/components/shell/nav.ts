@@ -1,4 +1,19 @@
-import { BotIcon, RadarIcon, CheckSquareIcon, ClapperboardIcon, HandshakeIcon, HomeIcon, KanbanIcon, KeyRoundIcon, NetworkIcon, PackageIcon, TargetIcon, WalletIcon, type LucideIcon } from "lucide-react"
+import {
+  BotIcon,
+  RadarIcon,
+  CheckSquareIcon,
+  ClapperboardIcon,
+  HandshakeIcon,
+  HomeIcon,
+  KanbanIcon,
+  KeyRoundIcon,
+  NetworkIcon,
+  PackageIcon,
+  TargetIcon,
+  UsersIcon,
+  WalletIcon,
+  type LucideIcon,
+} from "lucide-react"
 
 export interface NavItem {
   href: string
@@ -41,10 +56,10 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
       { href: "/tarefas", label: "Tarefas & Notas", short: "Tarefas", icon: CheckSquareIcon },
       { href: "/mapas", label: "Mapas", icon: NetworkIcon },
       { href: "/metas", label: "Metas", icon: TargetIcon },
+      { href: "/equipe", label: "Equipe", icon: UsersIcon },
       { href: "/cofre", label: "Cofre", icon: KeyRoundIcon },
     ],
   },
-
 ]
 
 /** Lista plana (barra do celular e busca). */

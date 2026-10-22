@@ -1,18 +1,18 @@
 /**
  * Base "fractal" do Operacional OS: tudo é uma Entidade (lead, tarefa, produto,
- * conteúdo, lançamento, nota, mapa, balão do mapa, meta). Toda entidade tem as
+ * conteúdo, lançamento, nota, mapa, balão do mapa, meta, membro). Toda entidade tem as
  * mesmas capacidades — contexto, estado, relações e presença — em qualquer tela.
  * Módulo novo = um tipo aqui + um descritor no registro (src/lib/entities/registry.tsx).
  * Arquivo puro (sem React), usado também pelos testes.
  */
-export type EntityType = "lead" | "task" | "product" | "content" | "transaction" | "note" | "map" | "mapNode" | "goal"
+export type EntityType = "lead" | "task" | "product" | "content" | "transaction" | "note" | "map" | "mapNode" | "goal" | "member"
 
 export interface EntityRef {
   type: EntityType
   id: string
 }
 
-export const ENTITY_TYPES: EntityType[] = ["lead", "task", "product", "content", "transaction", "note", "map", "mapNode", "goal"]
+export const ENTITY_TYPES: EntityType[] = ["lead", "task", "product", "content", "transaction", "note", "map", "mapNode", "goal", "member"]
 
 /** Chave estável de uma entidade ("task:abc"). Usada como id do contexto. */
 export const refKey = (r: EntityRef) => `${r.type}:${r.id}`
