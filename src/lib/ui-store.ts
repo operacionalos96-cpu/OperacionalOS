@@ -21,6 +21,8 @@ interface UIState {
   lostFor: string | null
   /** Tarefa aberta no painel de detalhes. */
   taskDetail: string | null
+  /** Modo foco (mapas): esconde a barra lateral para dar a tela toda ao quadro. */
+  focusMode: boolean
 
   set(patch: Partial<Omit<UIState, "set">>): void
 }
@@ -34,6 +36,7 @@ export const useUI = create<UIState>((set) => ({
   wonFor: null,
   lostFor: null,
   taskDetail: null,
+  focusMode: false,
   set: (patch) => set(patch),
 }))
 

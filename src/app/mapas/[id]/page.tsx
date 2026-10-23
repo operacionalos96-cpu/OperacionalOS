@@ -3,12 +3,16 @@
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeftIcon, SearchXIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, MaximizeIcon, MinimizeIcon, SearchXIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store"
 import { deleteMapWithRows, migrateMap, restoreMapWithRows, useMindMap, useRowStorageReady } from "@/lib/maps"
 import { isRowMap } from "@/lib/domain/map-rows"
 import { kindCounts, mapProgress } from "@/lib/domain/mindmap"
+import { BOARD_MODES, boardMode, statsText } from "@/lib/domain/board"
+import { useUI } from "@/lib/ui-store"
+import { WhiteboardEditor } from "@/components/board/whiteboard-editor"
+import { BoardMenu } from "@/components/board/board-menu"
 import { Button } from "@/components/ui/button"
 import { InlineText } from "@/components/shared/inline-edit"
 import { EmptyState } from "@/components/shared/layout"
@@ -36,6 +40,10 @@ export default function MapPage() {
   const tasks = useStore((s) => s.tasks)
   const leads = useStore((s) => s.leads)
   const router = useRouter()
+  const focusMode = useUI((s) => s.focusMode)
+  const toggleFocus = () => useUI.getState().set({ focusMode: !focusMode })
+  const mode = map ? boardMode(map) : "estruturado"
+  const modeInfo = BOARD_MODES.find((m) => m.id === mode)!
 
   if (!map) {
     return (
@@ -64,36 +72,50 @@ export default function MapPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-2 border-b bg-background px-4 py-2 sm:px-6">
+      <header className="flex items-center gap-2 border-b bg-background px-3 py-1.5 sm:px-4">
         <Button asChild variant="ghost" size="icon-sm" aria-label="Voltar aos mapas">
           <Link href="/mapas">
             <ArrowLeftIcon />
           </Link>
         </Button>
+        <span className={cn("shrink-0 rounded-md border px-2 py-0.5 text-xs font-semibold", mode === "lousa" ? "border-info/50 text-info" : "border-brand/50 text-brand")} title={modeInfo.description}>
+          {modeInfo.short}
+        </span>
         <InlineText value={map.title} required onSave={(t) => renameMap(map.id, t)} className="max-w-md text-base font-semibold" />
-        <div className="flex shrink-0 rounded-lg border p-0.5 text-xs" role="tablist" aria-label="Visão">
-          {(["mapa", "lista"] as const).map((v) => (
-            <button
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              onClick={() => setView(v)}
-              className={cn("rounded-md px-2.5 py-1 font-medium capitalize transition-colors", view === v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <KindSummary counts={kindCounts(map.nodes, (leadId) => leads.find((l) => l.id === leadId)?.stage)} />
-        <MapProgress progress={mapProgress(map, tasks)} />
+        {mode === "estruturado" && (
+          <div className="flex shrink-0 rounded-lg border p-0.5 text-sm" role="tablist" aria-label="Visão">
+            {(["mapa", "lista"] as const).map((v) => (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={cn("rounded-md px-3 py-1 font-medium capitalize transition-colors", view === v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
+        {mode === "estruturado" ? (
+          <>
+            <KindSummary counts={kindCounts(map.nodes, (leadId) => leads.find((l) => l.id === leadId)?.stage)} />
+            <MapProgress progress={mapProgress(map, tasks)} />
+          </>
+        ) : (
+          <p className="ml-auto hidden min-w-0 truncate text-sm text-muted-foreground lg:block">{statsText(map) || "Lousa vazia"}</p>
+        )}
         <span className="hidden text-xs whitespace-nowrap text-muted-foreground xl:block">Salvo automaticamente</span>
-        <Button variant="ghost" size="icon-sm" onClick={remove} aria-label="Excluir mapa">
-          <Trash2Icon />
+        <Button variant="ghost" size="icon-sm" onClick={toggleFocus} aria-pressed={focusMode} aria-label={focusMode ? "Sair do modo foco" : "Modo foco: esconde o menu lateral"} title={focusMode ? "Sair do modo foco" : "Modo foco: tela toda para o quadro"}>
+          {focusMode ? <MinimizeIcon /> : <MaximizeIcon />}
         </Button>
+        <BoardMenu map={map} onDelete={remove} />
       </header>
       <div className="min-h-0 flex-1">
         {needsMigration ? (
           <p className="grid h-full place-items-center text-sm text-muted-foreground">Preparando o mapa…</p>
+        ) : mode === "lousa" ? (
+          <WhiteboardEditor key={`${map.id}-${map.storage ?? "legacy"}`} map={map} />
         ) : view === "lista" ? (
           <MapOutline map={map} />
         ) : (

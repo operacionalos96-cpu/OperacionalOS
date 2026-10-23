@@ -1,57 +1,124 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { NetworkIcon, PlusIcon } from "lucide-react"
+import { toast } from "sonner"
+import { LayoutGridIcon, NetworkIcon, PenLineIcon, UploadIcon } from "lucide-react"
 import { relative } from "@/lib/format"
 import { TEMPLATES } from "@/lib/mindmap-templates"
+import { BOARD_TEMPLATES } from "@/lib/board-templates"
 import { useStore } from "@/lib/store"
 import { useMindMaps } from "@/lib/maps"
-import { ideaNodes, mapProgress } from "@/lib/domain/mindmap"
+import { BOARD_MODES, boardColor, boardMode, parseBoard, statsText, type BoardMode } from "@/lib/domain/board"
+import { mapProgress } from "@/lib/domain/mindmap"
+import type { MindMap } from "@/lib/domain/types"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmptyState, PageHeader } from "@/components/shared/layout"
 
+type Filter = "todos" | BoardMode
+
 export default function MapsPage() {
   const maps = useMindMaps()
   const createMap = useStore((s) => s.createMap)
+  const createMapFrom = useStore((s) => s.createMapFrom)
   const router = useRouter()
-  const [picking, setPicking] = useState(false)
+  const [picking, setPicking] = useState<BoardMode | null>(null)
+  const [filter, setFilter] = useState<Filter>("todos")
   const tasks = useStore((s) => s.tasks)
+  const fileRef = useRef<HTMLInputElement>(null)
   const sorted = [...maps].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const shown = sorted.filter((m) => filter === "todos" || boardMode(m) === filter)
+  const count = (f: Filter) => (f === "todos" ? maps.length : maps.filter((m) => boardMode(m) === f).length)
 
-  const newButton = (
-    <Button onClick={() => setPicking(true)}>
-      <PlusIcon /> Novo mapa
-    </Button>
+  async function importFile(file: File) {
+    try {
+      const result = parseBoard(JSON.parse(await file.text()))
+      if (!result.ok) return toast.error("Não deu para importar", { description: result.error })
+      const { title, mode, nodes, edges } = result.board
+      const map = createMapFrom({ title, mode, nodes, edges })
+      toast.success(`“${title}” importado`, { description: result.dropped ? `${result.dropped} item(ns) inválido(s) foram ignorados.` : undefined })
+      router.push(`/mapas/${map.id}`)
+    } catch {
+      toast.error("Não deu para importar", { description: "O arquivo não é um JSON válido." })
+    }
+  }
+
+  const actions = (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ""
+          if (f) void importFile(f)
+        }}
+      />
+      <Button variant="ghost" onClick={() => fileRef.current?.click()}>
+        <UploadIcon /> Importar
+      </Button>
+      <Button variant="outline" onClick={() => setPicking("estruturado")}>
+        <NetworkIcon /> Novo mapa estruturado
+      </Button>
+      <Button onClick={() => setPicking("lousa")}>
+        <PenLineIcon /> Nova lousa
+      </Button>
+    </>
   )
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Mapas" description="Pense no visual. Transforme ideias em tarefas ou leads com um clique." actions={newButton} />
-      <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
-        {sorted.length === 0 ? (
+      <PageHeader title="Mapas" description="Lousa livre para pensar solto. Mapa estruturado para organizar ideias e fluxos. Os dois se ligam a tarefas, leads, produtos e metas." actions={actions}>
+        {maps.length > 0 && (
+          <div className="flex gap-1.5" role="tablist" aria-label="Filtrar por tipo">
+            {(["todos", "lousa", "estruturado"] as const).map((f) => (
+              <button
+                key={f}
+                role="tab"
+                aria-selected={filter === f}
+                onClick={() => setFilter(f)}
+                className={cn("rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors", filter === f ? "border-foreground/30 bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {f === "todos" ? "Todos" : f === "lousa" ? "Lousas" : "Mapas estruturados"} <span className="tabular ml-1 text-muted-foreground">{count(f)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </PageHeader>
+      <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
+        {maps.length === 0 ? (
           <EmptyState
-            icon={NetworkIcon}
-            title="Nenhum mapa ainda"
-            description="Comece por um modelo — por exemplo, a estratégia da operação — e ajuste ao seu jeito."
-            action={newButton}
+            icon={LayoutGridIcon}
+            title="Nenhuma lousa ou mapa ainda"
+            description="Comece por uma lousa em branco para soltar ideias, ou por um mapa estruturado com modelo pronto."
+            action={<div className="flex gap-2">{actions}</div>}
             className="py-20"
           />
+        ) : shown.length === 0 ? (
+          <p className="py-16 text-center text-muted-foreground">Nada deste tipo ainda.</p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sorted.map((m) => (
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {shown.map((m) => (
               <li key={m.id}>
-                <Link href={`/mapas/${m.id}`} className="block rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20">
-                  <MiniPreview nodes={ideaNodes(m.nodes)} />
-                  <p className="mt-3 truncate text-sm font-medium">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(() => {
-                      const p = mapProgress(m, tasks)
-                      return p.total ? `${p.feito} de ${p.total} feitos · ` : ""
-                    })()}
-                    editado {relative(m.updatedAt)}
+                <Link href={`/mapas/${m.id}`} className="block rounded-xl border-2 bg-card p-4 transition-colors hover:border-foreground/30">
+                  <Preview map={m} />
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-semibold", boardMode(m) === "lousa" ? "border-info/50 text-info" : "border-brand/50 text-brand")}>{BOARD_MODES.find((x) => x.id === boardMode(m))!.short}</span>
+                    <p className="truncate text-[15px] font-semibold">{m.title}</p>
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {boardMode(m) === "lousa"
+                      ? statsText(m) || "vazia"
+                      : (() => {
+                          const p = mapProgress(m, tasks)
+                          return p.total ? `${p.feito} de ${p.total} feitos` : "vazio"
+                        })()}{" "}
+                    · editado {relative(m.updatedAt)}
                   </p>
                 </Link>
               </li>
@@ -60,25 +127,25 @@ export default function MapsPage() {
         )}
       </div>
 
-      <Dialog open={picking} onOpenChange={setPicking}>
+      <Dialog open={picking !== null} onOpenChange={(o) => !o && setPicking(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Novo mapa</DialogTitle>
-            <DialogDescription>Escolha um ponto de partida.</DialogDescription>
+            <DialogTitle>{picking === "lousa" ? "Nova lousa" : "Novo mapa estruturado"}</DialogTitle>
+            <DialogDescription>{BOARD_MODES.find((m) => m.id === picking)?.description ?? ""}</DialogDescription>
           </DialogHeader>
           <div className="grid max-h-[70vh] gap-2 overflow-y-auto sm:grid-cols-2">
-            {TEMPLATES.map((t) => (
+            {(picking === "lousa" ? BOARD_TEMPLATES : TEMPLATES).map((t) => (
               <button
                 key={t.id}
                 onClick={() => {
-                  const map = createMap(t.id)
-                  setPicking(false)
+                  const map = createMap(t.id as never)
+                  setPicking(null)
                   router.push(`/mapas/${map.id}`)
                 }}
-                className="rounded-lg border p-3 text-left transition-colors hover:border-foreground/30 hover:bg-accent"
+                className="rounded-lg border-2 p-3.5 text-left transition-colors hover:border-foreground/30 hover:bg-accent"
               >
-                <p className="text-sm font-medium">{t.title}</p>
-                <p className="text-xs text-muted-foreground">{t.description}</p>
+                <p className="text-[15px] font-semibold">{t.title}</p>
+                <p className="text-sm text-muted-foreground">{t.description}</p>
               </button>
             ))}
           </div>
@@ -88,23 +155,37 @@ export default function MapsPage() {
   )
 }
 
-/** Silhueta do mapa: pontos nas posições reais dos nós. */
-function MiniPreview({ nodes }: { nodes: { x: number; y: number }[] }) {
-  if (nodes.length === 0) return <div className="h-24 rounded-lg bg-muted" />
-  const xs = nodes.map((n) => n.x)
-  const ys = nodes.map((n) => n.y)
-  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
-  const w = Math.max(maxX - minX, 1)
-  const h = Math.max(maxY - minY, 1)
+/** Miniatura do mapa: elementos nas posições e tamanhos reais, com as ligações. */
+function Preview({ map }: { map: MindMap }) {
+  const nodes = map.nodes.filter((n) => n.type !== "drawing" || n.path?.length)
+  if (nodes.length === 0) return <div className="grid h-32 place-items-center rounded-lg bg-muted/60 text-sm text-muted-foreground">vazio</div>
+  const size = (n: MindMap["nodes"][number]) => ({ w: n.width ?? (n.type === "text" ? 120 : 160), h: n.height ?? (n.type === "text" ? 32 : 44) })
+  const x1 = Math.min(...nodes.map((n) => n.x))
+  const y1 = Math.min(...nodes.map((n) => n.y))
+  const x2 = Math.max(...nodes.map((n) => n.x + size(n).w))
+  const y2 = Math.max(...nodes.map((n) => n.y + size(n).h))
+  const pad = Math.max(x2 - x1, y2 - y1) * 0.06
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const c = (n: MindMap["nodes"][number]) => ({ x: n.x + size(n).w / 2, y: n.y + size(n).h / 2 })
   return (
-    <div className="relative h-24 rounded-lg bg-muted/60">
-      {nodes.map((n, i) => (
-        <span
-          key={i}
-          className="absolute h-1.5 w-4 rounded-full bg-foreground/40"
-          style={{ left: `${8 + ((n.x - minX) / w) * 80}%`, top: `${12 + ((n.y - minY) / h) * 70}%` }}
-        />
-      ))}
-    </div>
+    <svg viewBox={`${x1 - pad} ${y1 - pad} ${x2 - x1 + pad * 2} ${y2 - y1 + pad * 2}`} className="h-32 w-full rounded-lg bg-muted/60" preserveAspectRatio="xMidYMid meet" aria-hidden>
+      {map.edges.map((e) => {
+        const a = byId.get(e.source)
+        const b = byId.get(e.target)
+        if (!a || !b) return null
+        return <line key={e.id} x1={c(a).x} y1={c(a).y} x2={c(b).x} y2={c(b).y} stroke="var(--foreground)" strokeOpacity={0.55} strokeWidth={Math.max(x2 - x1, y2 - y1) * 0.006} />
+      })}
+      {nodes.map((n) => {
+        const s = size(n)
+        if (n.type === "group") return <rect key={n.id} x={n.x} y={n.y} width={s.w} height={s.h} rx={s.w * 0.02} fill="none" stroke="var(--foreground)" strokeOpacity={0.4} strokeDasharray="8 6" strokeWidth={Math.max(x2 - x1, y2 - y1) * 0.004} />
+        if (n.type === "drawing" && n.path) {
+          const pts = n.path.reduce<string[]>((acc, v, i) => (i % 2 ? acc : [...acc, `${n.x + v},${n.y + (n.path![i + 1] ?? 0)}`]), [])
+          return <polyline key={n.id} points={pts.join(" ")} fill="none" stroke={boardColor(n.hue, "ink")} strokeWidth={Math.max(x2 - x1, y2 - y1) * 0.006} />
+        }
+        if (n.type === "text") return <rect key={n.id} x={n.x} y={n.y + s.h * 0.4} width={s.w} height={s.h * 0.2} rx={4} fill="var(--foreground)" fillOpacity={0.5} />
+        const fill = n.type === "sticky" ? boardColor(n.hue, "solid") : n.hue === undefined ? "var(--foreground)" : boardColor(n.hue, "stroke")
+        return <rect key={n.id} x={n.x} y={n.y} width={s.w} height={s.h} rx={Math.min(s.w, s.h) * (n.shape === "ellipse" ? 0.5 : 0.12)} fill={fill} fillOpacity={n.type === "sticky" ? 0.95 : n.hue === undefined ? 0.35 : 0.55} stroke={n.type === "sticky" ? "none" : "var(--foreground)"} strokeOpacity={0.6} strokeWidth={Math.max(x2 - x1, y2 - y1) * 0.003} />
+      })}
+    </svg>
   )
 }

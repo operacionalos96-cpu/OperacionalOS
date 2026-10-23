@@ -190,7 +190,15 @@ export interface MindMapNode {
    * "group" = área/grupo (retângulo com título). "text" = texto solto no fundo do quadro.
    * "drawing" = traço feito à mão (`path`). Sem valor = balão comum.
    */
-  type?: "group" | "text" | "drawing"
+  type?: "group" | "text" | "drawing" | "shape" | "sticky" | "image"
+  /** Lousa — forma do elemento `type: "shape"`. */
+  shape?: "rect" | "ellipse" | "diamond"
+  /** Lousa — imagem (`type: "image"`): data URL já reduzida ou URL do Storage. */
+  src?: string
+  /** Lousa — tamanho da letra (px) de formas e notas. */
+  fontSize?: number
+  /** Lousa — preenchimento da forma: leve (padrão), cheio ou só contorno. */
+  fill?: "soft" | "solid" | "none"
   /**
    * Ampliação do item (zoom infinito): 0.1 = dez vezes menor que o normal. Sem valor = 1.
    * Balão criado com a tela aproximada nasce pequeno, para a ideia continuar "lá dentro".
@@ -245,6 +253,12 @@ export interface MindMapEdge {
   /** Ponto escolhido em cada balão ("l", "r", "t", "b"). Sem valor = o lado mais perto. */
   sourceHandle?: string
   targetHandle?: string
+  /** Traçado da linha: curva (padrão), reta ou em ângulo (fluxogramas). */
+  route?: "curva" | "reta" | "angulo"
+  /** Linha tracejada (independente de ser "relação"). */
+  dashed?: boolean
+  /** Cor da linha (matiz 0–360). Sem valor = cor do texto do tema. */
+  hue?: number
 }
 
 export interface MindMap {
@@ -258,4 +272,9 @@ export interface MindMap {
    * ficam como backup do formato antigo. Sem valor: formato antigo (tudo aqui).
    */
   storage?: "rows"
+  /**
+   * "lousa": quadro livre (desenho, formas, notas, imagens, setas). "estruturado": mapa de ideias
+   * em árvore/fluxo com modelos. Sem valor: estruturado (mapas criados antes deste campo).
+   */
+  mode?: "lousa" | "estruturado"
 }

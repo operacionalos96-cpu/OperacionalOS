@@ -12,6 +12,7 @@ import {
   Handle,
   MarkerType,
   Panel,
+  MiniMap,
   NodeResizer,
   NodeToolbar,
   Position,
@@ -31,7 +32,7 @@ import {
   useStore as useFlowStore,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon, MousePointer2Icon, Undo2Icon, Redo2Icon, TypeIcon, PencilIcon, LayersIcon, MessageSquareIcon, MessageSquarePlusIcon, NetworkIcon, ZoomInIcon } from "lucide-react"
+import { KeyboardIcon, ChevronDownIcon, CircleDotIcon, SquareStackIcon, Loader2Icon, SparklesIcon, BoxSelectIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, CrosshairIcon, MaximizeIcon, PanelRightIcon, PresentationIcon, MinusIcon, PaletteIcon, PlusIcon, ScissorsIcon, Trash2Icon, UserPlusIcon, MousePointer2Icon, Undo2Icon, Redo2Icon, TypeIcon, PencilIcon, LayersIcon, MessageSquareIcon, MessageSquarePlusIcon, NetworkIcon, ZoomInIcon } from "lucide-react"
 import { LABEL_HUES } from "@/lib/domain/constants"
 import {
   NODE_KINDS,
@@ -81,9 +82,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean } & Pick<
+export type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string; hue?: number; description?: string; status?: "andamento" | "feito"; kind?: NodeKind; collapsed?: boolean } & Pick<
   MindMapNode,
-  "ref" | "decision" | "summaryOf" | "scale" | "z" | "path" | "stroke" | "notes"
+  "ref" | "decision" | "summaryOf" | "scale" | "z" | "path" | "stroke" | "notes" | "shape" | "src" | "fontSize" | "fill"
 > & {
   /** Tipo gravado que esta versão não conhece (de uma versão mais nova): volta igual ao gravar. */
   storedType?: string
@@ -92,11 +93,11 @@ type IdeaData = { label: string; taskId?: string; leadId?: string; tag?: string;
  * "idea" = balão; "area" = grupo (retângulo com título que leva junto o que está dentro);
  * "text" = texto solto no fundo do quadro; "drawing" = traço à mão.
  */
-type FlowKind = "idea" | "area" | "text" | "drawing"
-type IdeaNode = Node<IdeaData, FlowKind>
+export type FlowKind = "idea" | "area" | "text" | "drawing" | "shape" | "sticky" | "image"
+export type IdeaNode = Node<IdeaData, FlowKind>
 
-const FLOW_KIND: Record<NonNullable<MindMapNode["type"]> | "none", FlowKind> = { none: "idea", group: "area", text: "text", drawing: "drawing" }
-const STORED_TYPE: Record<FlowKind, MindMapNode["type"]> = { idea: undefined, area: "group", text: "text", drawing: "drawing" }
+const FLOW_KIND: Record<NonNullable<MindMapNode["type"]> | "none", FlowKind> = { none: "idea", group: "area", text: "text", drawing: "drawing", shape: "shape", sticky: "sticky", image: "image" }
+export const STORED_TYPE: Record<FlowKind, MindMapNode["type"]> = { idea: undefined, area: "group", text: "text", drawing: "drawing", shape: "shape", sticky: "sticky", image: "image" }
 
 /** Ferramenta do quadro: selecionar/mover, escrever texto solto, desenhar. */
 type Tool = "selecionar" | "texto" | "desenhar"
@@ -209,29 +210,29 @@ function flowNode(n: MindMapNode): IdeaNode {
 }
 
 type Arrow = NonNullable<MindMapEdge["arrow"]>
-type LinkData = { kind?: "relacao"; label?: string; arrow?: Arrow; bend?: { dx: number; dy: number } }
+export type LinkData = { kind?: "relacao"; label?: string; arrow?: Arrow; bend?: { dx: number; dy: number }; route?: MindMapEdge["route"]; dashed?: boolean; hue?: number }
 
 /** Seta padrão: relação aponta para o destino; hierarquia sem seta. */
 const arrowOf = (d: LinkData | undefined): Arrow => d?.arrow ?? (d?.kind === "relacao" ? "fim" : "nenhuma")
 
-const flowEdge = (e: MindMapEdge): Edge<LinkData> => ({
+export const flowEdge = (e: MindMapEdge): Edge<LinkData> => ({
   id: e.id,
   source: e.source,
   target: e.target,
   ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
   ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
-  ...(e.kind || e.label || e.arrow || e.bend ? { data: { kind: e.kind, label: e.label, arrow: e.arrow, bend: e.bend } } : {}),
+  ...(e.kind || e.label || e.arrow || e.bend || e.route || e.dashed || e.hue !== undefined ? { data: { kind: e.kind, label: e.label, arrow: e.arrow, bend: e.bend, route: e.route, dashed: e.dashed, hue: e.hue } } : {}),
 })
 
 /** Linha de hierarquia (pai → filho). Relações livres não contam como filhos. */
 const isHierarchy = (e: Edge) => (e.data as LinkData | undefined)?.kind !== "relacao"
 
-function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
+export function toFlow(map: MindMap): { nodes: IdeaNode[]; edges: Edge[] } {
   return { nodes: map.nodes.map(flowNode), edges: map.edges.map(flowEdge) }
 }
 
 /** Nó do React Flow -> balão como é gravado. */
-function toMapNode(n: IdeaNode): MindMapNode {
+export function toMapNode(n: IdeaNode): MindMapNode {
   // Balão normal: números inteiros, como sempre. Minúsculo (zoom infinito): precisão suficiente para não "pular".
   const r = scaleOf(n.data) >= 0.5 ? Math.round : (v: number) => Number(v.toPrecision(6))
   const { storedType, ...data } = n.data
@@ -250,7 +251,7 @@ function toMapNode(n: IdeaNode): MindMapNode {
   }
 }
 
-const toMapEdge = (e: Edge): MindMapEdge => {
+export const toMapEdge = (e: Edge): MindMapEdge => {
   const d = e.data as LinkData | undefined
   return {
     id: e.id,
@@ -260,6 +261,9 @@ const toMapEdge = (e: Edge): MindMapEdge => {
     label: d?.label?.trim() || undefined,
     arrow: d?.arrow,
     bend: d?.bend ? { dx: Math.round(d.bend.dx), dy: Math.round(d.bend.dy) } : undefined,
+    route: d?.route,
+    dashed: d?.dashed || undefined,
+    hue: d?.hue,
     sourceHandle: e.sourceHandle ?? undefined,
     targetHandle: e.targetHandle ?? undefined,
   }
@@ -273,7 +277,7 @@ const signatures = <T extends MindMapNode | MindMapEdge>(items: T[]) => new Map(
  *   entra balão a balão, sem desfazer o que está sendo editado aqui.
  * - Formato antigo (SQL 0005 ainda não rodado): grava o mapa inteiro, como antes.
  */
-function useMapSync(
+export function useMapSync(
   map: MindMap,
   nodes: IdeaNode[],
   edges: Edge[],
@@ -404,7 +408,7 @@ const snapshotOf = (nodes: IdeaNode[], edges: Edge[]): Snapshot => {
  * passo: arrastar, digitar, organizar, apagar… Seleção e medidas não contam.
  * Desfazer grava normalmente (o sócio vê o mapa voltar).
  */
-function useMapHistory(
+export function useMapHistory(
   nodes: IdeaNode[],
   edges: Edge[],
   setNodes: React.Dispatch<React.SetStateAction<IdeaNode[]>>,
@@ -512,7 +516,8 @@ function Editor({ map }: { map: MindMap }) {
   const [notesFor, setNotesFor] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [childDir, setChildDir] = useState<Dir>("direita")
-  const [panelOpen, setPanelOpen] = useState(true)
+  // Painel lateral só abre sozinho em tela larga (em telas menores ele cobriria o mapa).
+  const [panelOpen, setPanelOpen] = useState(() => typeof window === "undefined" || window.innerWidth >= 1400)
   const [presenting, setPresenting] = useState<number | null>(null)
 
   // Ramos: tamanho de cada um, o que está escondido (recolhido) e o que está em foco.
@@ -724,8 +729,8 @@ function Editor({ map }: { map: MindMap }) {
         // Ponto escolhido ao ligar (ou ao arrastar a ponta da linha) vence; sem escolha, o lado mais perto.
         sourceHandle: e.sourceHandle ?? (rightward ? "r" : "l"),
         targetHandle: e.targetHandle ?? (rightward ? "l" : "r"),
-        ...(["fim", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 } } : {}),
-        ...(["inicio", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerStart: { type: MarkerType.ArrowClosed, width: 14, height: 14, orient: "auto-start-reverse" } } : {}),
+        ...(["fim", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 } } : {}),
+        ...(["inicio", "ambos"].includes(arrowOf(e.data as LinkData)) ? { markerStart: { type: MarkerType.ArrowClosed, width: 20, height: 20, orient: "auto-start-reverse" } } : {}),
       }
     })
   }, [nodes, edges, hidden, focused])
@@ -1106,7 +1111,7 @@ function Editor({ map }: { map: MindMap }) {
           connectionMode={ConnectionMode.Loose}
           zoomOnDoubleClick={false}
           deleteKeyCode={editingId ? null : ["Delete", "Backspace"]}
-          defaultEdgeOptions={{ type: "default", style: { strokeWidth: 1.5 } }}
+          defaultEdgeOptions={{ type: "default", style: { strokeWidth: 2.5 } }}
           fitView
           fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
           minZoom={ZOOM_LIMITS.min}
@@ -1114,6 +1119,7 @@ function Editor({ map }: { map: MindMap }) {
           proOptions={{ hideAttribution: true }}
         >
           <InfiniteBackground />
+          <MiniMap pannable zoomable position="bottom-left" className="!m-3 !mb-14 !h-32 !w-48 overflow-hidden !rounded-xl !border-2 !border-border !bg-card" maskColor="color-mix(in oklab, var(--foreground) 14%, transparent)" nodeColor="oklch(0.6 0 0)" nodeStrokeColor="oklch(0.45 0 0)" nodeStrokeWidth={3} />
           <MapControls onPresent={() => setPresenting(0)} history={history} />
           {presenting === null && <ToolPanel tool={tool} setTool={setTool} pen={pen} setPen={setPen} ai={<AiCommand getScope={aiScope} onApply={applyPlan} />} />}
           {presenting !== null && (
@@ -1201,18 +1207,20 @@ function Editor({ map }: { map: MindMap }) {
             onClose={() => setPanelOpen(false)}
           />
         )}
-        <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden", (presenting !== null || panelNode) && "!hidden", "w-max max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-lg border bg-background/90 px-3 py-1.5 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur lg:block")}>
-          <Kbd>Duplo clique</Kbd> cria · <Kbd>Tab</Kbd> filho (lado escolhido em Filho ▾) · <Kbd>Enter</Kbd> irmão · <Kbd>Espaço</Kbd> edita · <Kbd>Del</Kbd> apaga · <Kbd>Arrastar no fundo</Kbd> seleciona vários · <Kbd>Botão direito</Kbd> move a tela · <Kbd>F</Kbd> foco · <Kbd>Rodinha</Kbd> zoom infinito · <Kbd>Z</Kbd> entra no selecionado · <Kbd>T</Kbd> texto · <Kbd>D</Kbd> desenhar ·
-          arraste as bolinhas para conectar · clique na linha e arraste o ponto do meio para moldar · clique na linha para legenda ou desvincular · ○ no canto marca o andamento
+        {/* Dica curta (uma linha) + lista completa de atalhos sob demanda: antes eram 3 linhas de texto de 11px sobre o mapa. */}
+        <div className={cn("pointer-events-none absolute bottom-3 left-1/2 hidden max-w-[calc(100%-26rem)] -translate-x-1/2 truncate rounded-full border bg-card/95 px-4 py-1.5 text-[13px] text-muted-foreground shadow-md backdrop-blur xl:block", (presenting !== null || panelNode) && "!hidden")}>
+          Duplo clique cria um balão · Tab filho · Enter irmão · arraste a bolinha para conectar
         </div>
+        {presenting === null && (
+          <div className="absolute top-3 right-3 z-10" style={panelNode ? { right: "21rem" } : undefined}>
+            <ShortcutsHelp />
+          </div>
+        )}
       </div>
     </MapCtx.Provider>
   )
 }
 
-function Kbd({ children }: { children: React.ReactNode }) {
-  return <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-foreground">{children}</kbd>
-}
 
 function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
   const map = useMap()
@@ -1310,7 +1318,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         }}
         className={cn(
           // Conteúdo sempre centralizado (horizontal e, no balão redimensionado, vertical).
-          "relative flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-card px-7 py-2 text-center text-sm shadow-xs transition-shadow",
+          "relative flex flex-col items-center gap-1 overflow-hidden rounded-lg border-2 bg-card px-7 py-2.5 text-center text-[15px] shadow-xs transition-shadow",
           sized ? "h-full w-full justify-center" : "max-w-72 min-w-28",
           selected && "ring-2 ring-foreground/15",
           done && "outline outline-1 outline-success/60",
@@ -1333,7 +1341,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
         <StatusButton status={status} onClick={cycleStatus} className="absolute top-2 right-2" />
         {data.tag && (
           <span
-            className="w-fit rounded px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase"
+            className="w-fit rounded px-1.5 py-px text-xs font-semibold tracking-wide uppercase"
             style={{ background: `oklch(0.7 0.1 ${hue} / 18%)`, color: `light-dark(oklch(0.42 0.1 ${hue}), oklch(0.82 0.08 ${hue}))` }}
           >
             {data.tag}
@@ -1366,15 +1374,15 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
           </p>
         )}
         {kind === "decisao" && (data.decision?.decidedAt || data.decision?.ownerId) && !editing && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Decidido{data.decision.decidedAt ? ` em ${data.decision.decidedAt.slice(8, 10)}/${data.decision.decidedAt.slice(5, 7)}` : ""}
             {data.decision.ownerId ? ` · ${getUser(data.decision.ownerId).name}` : ""}
           </p>
         )}
-        {kind === "resumo" && summaryArea && !editing && <p className="text-[11px] text-muted-foreground">Resume: {summaryArea}</p>}
+        {kind === "resumo" && summaryArea && !editing && <p className="text-xs text-muted-foreground">Resume: {summaryArea}</p>}
         {!!data.notes?.length && !editing && (
           <span
-            className={cn("absolute bottom-1.5 left-2 flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground", notesOpen && "text-brand")}
+            className={cn("absolute bottom-1.5 left-2 flex items-center gap-0.5 text-xs font-semibold text-muted-foreground", notesOpen && "text-brand")}
             title={`${data.notes.length} anotação(ões) — clique no balão para ver`}
           >
             <MessageSquareIcon className="size-3" /> {data.notes.length}
@@ -1384,7 +1392,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
           <div className="mt-1 flex w-full flex-col gap-0.5 border-t pt-1 text-left">
             {data.ref && (
               <LinkedRow onUnlink={() => map.setData(id, { ref: undefined })} label="Desvincular">
-                <EntityChip entity={data.ref} className="nodrag min-w-0 truncate text-[11px] text-success" showType={false} />
+                <EntityChip entity={data.ref} className="nodrag min-w-0 truncate text-xs text-success" showType={false} />
               </LinkedRow>
             )}
             {taskMissing && (
@@ -1400,7 +1408,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
               </LinkedRow>
             )}
             {linked?.recurring && (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 🔁 {task?.recurrence === "semanal" ? "Toda semana" : task?.recurrence === "mensal" ? "Todo mês" : "Todo dia"}
                 {linked.doneToday ? " · feito hoje" : ""}
                 {task && !task.done && task.dueDate ? ` · próxima: ${dueLabel(task.dueDate)}` : ""}
@@ -1426,7 +1434,7 @@ function IdeaNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
           onDoubleClick={(e) => e.stopPropagation()}
           className={cn(
             // Embaixo do balão: as linhas saem pelos lados, aqui não há nada.
-            "nodrag absolute -right-2.5 -bottom-2.5 flex h-5 min-w-6 items-center justify-center rounded-full border bg-card px-1.5 text-[11px] leading-none font-semibold text-muted-foreground shadow-xs transition-opacity hover:border-brand/60 hover:text-foreground",
+            "nodrag absolute -right-2.5 -bottom-2.5 flex h-5 min-w-6 items-center justify-center rounded-full border bg-card px-1.5 text-xs leading-none font-semibold text-muted-foreground shadow-xs transition-opacity hover:border-brand/60 hover:text-foreground",
             !data.collapsed && !selected && "opacity-0 group-hover/node:opacity-100",
             data.collapsed && "border-brand/50 text-foreground",
           )}
@@ -1521,7 +1529,7 @@ function AiMenu({ nodeId, label, description }: { nodeId: string; label: string;
               {busy === a.id ? <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-brand" /> : <SparklesIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
               <span className="grid">
                 <span className="font-medium">{busy === a.id ? "Pensando…" : a.label}</span>
-                <span className="text-[11px] text-muted-foreground">{a.hint}</span>
+                <span className="text-xs text-muted-foreground">{a.hint}</span>
               </span>
             </button>
           ))}
@@ -1583,7 +1591,7 @@ function AiMenu({ nodeId, label, description }: { nodeId: string; label: string;
             </div>
           </>
         )}
-        <p className="px-1 text-[10px] text-muted-foreground">Vai para a IA só o texto deste mapa.</p>
+        <p className="px-1 text-xs text-muted-foreground">Vai para a IA só o texto deste mapa.</p>
       </PopoverContent>
     </Popover>
   )
@@ -1724,7 +1732,7 @@ function MultiToolbar({
                   <StatusButton status={st} onClick={() => onStatus(st)} className="pointer-events-none" /> {NODE_STATUS[st].label}
                 </button>
               ))}
-              <p className="px-2 pt-1 text-[11px] text-muted-foreground">Tarefas ligadas mudam junto.</p>
+              <p className="px-2 pt-1 text-xs text-muted-foreground">Tarefas ligadas mudam junto.</p>
             </PopoverContent>
           </Popover>
         </>
@@ -1764,7 +1772,7 @@ function LayerPicker({ onMove }: { onMove: (move: LayerMove) => void }) {
         {LAYER_MOVES.map((m) => (
           <button key={m.id} type="button" onClick={() => onMove(m.id)} className="grid rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
             <span className="font-medium">{m.label}</span>
-            <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+            <span className="text-xs text-muted-foreground">{m.hint}</span>
           </button>
         ))}
       </PopoverContent>
@@ -1802,7 +1810,7 @@ function KindPicker({ nodeId, kind, chosen }: { nodeId: string; kind: NodeKind; 
               <KIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span className="grid">
                 <span className="font-medium">{k.label}</span>
-                <span className="text-[11px] text-muted-foreground">{k.hint}</span>
+                <span className="text-xs text-muted-foreground">{k.hint}</span>
               </span>
             </button>
           )
@@ -1895,7 +1903,7 @@ function StyleFields({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
             <button
               type="button"
               onClick={() => map.setData(nodeId, { hue: undefined })}
-              className={cn("flex size-6 items-center justify-center rounded-full border text-[10px] text-muted-foreground", data.hue === undefined && "ring-2 ring-foreground/40")}
+              className={cn("flex size-6 items-center justify-center rounded-full border text-xs text-muted-foreground", data.hue === undefined && "ring-2 ring-foreground/40")}
               title={data.tag ? "Usar a cor da etiqueta" : "Sem cor"}
             >
               {data.tag ? "A" : "—"}
@@ -1911,7 +1919,7 @@ function StyleFields({ nodeId, data, width }: { nodeId: string; data: IdeaData; 
               />
             ))}
           </div>
-          {data.tag && data.hue === undefined && <p className="t-desc text-[11px]">A cor segue a etiqueta: mesma etiqueta, mesma cor em todo o sistema.</p>}
+          {data.tag && data.hue === undefined && <p className="t-desc text-xs">A cor segue a etiqueta: mesma etiqueta, mesma cor em todo o sistema.</p>}
         </div>
 
         <div className="grid gap-1.5">
@@ -2000,7 +2008,7 @@ function ToolbarButton({ onClick, label, children }: { onClick: () => void; labe
 
 function LinkedRow({ children, onUnlink, label }: { children: React.ReactNode; onUnlink: () => void; label: string }) {
   return (
-    <div className="group/link flex min-w-0 items-center gap-1 text-[11px] text-success">
+    <div className="group/link flex min-w-0 items-center gap-1 text-xs text-success">
       {children}
       <button
         onClick={onUnlink}
@@ -2210,7 +2218,7 @@ function TextNodeView({ id, data, selected }: NodeProps<IdeaNode>) {
     <>
       <NodeToolbar isVisible={selected && !editing && !map.multi} position={Position.Top} className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5 shadow-md">
         <ToolbarButton onClick={() => map.setData(id, { stroke: Math.max(8, Math.round(size / 1.25)) })} label="Letra menor">
-          <span className="text-[11px] font-semibold">A−</span>
+          <span className="text-xs font-semibold">A−</span>
         </ToolbarButton>
         <ToolbarButton onClick={() => map.setData(id, { stroke: Math.min(160, Math.round(size * 1.25)) })} label="Letra maior">
           <span className="text-sm font-semibold">A+</span>
@@ -2324,7 +2332,7 @@ function LayerMenu({ ids }: { ids: string[] }) {
         {LAYER_MOVES.map((m) => (
           <button key={m.id} type="button" onClick={() => map.moveLayers(ids, m.id)} className="grid rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
             <span className="font-medium">{m.label}</span>
-            <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+            <span className="text-xs text-muted-foreground">{m.hint}</span>
           </button>
         ))}
       </PopoverContent>
@@ -2382,7 +2390,7 @@ function ToolPanel({ tool, setTool, pen, setPen, ai }: { tool: Tool; setTool: (t
               </Chip>
             ))}
           </span>
-          <span className="hidden text-[11px] text-muted-foreground sm:inline">Arraste para desenhar · V volta</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Arraste para desenhar · V volta</span>
         </div>
       )}
       {tool === "texto" && <div className="animate-enter rounded-lg border bg-card px-2.5 py-1.5 text-xs text-muted-foreground shadow-lift">Clique no quadro onde quer escrever</div>}
@@ -2391,7 +2399,7 @@ function ToolPanel({ tool, setTool, pen, setPen, ai }: { tool: Tool; setTool: (t
 }
 
 /** Grade de pontos do quadro infinito: o espaço se adapta ao zoom e o ponto tem sempre 1px na tela. */
-function InfiniteBackground() {
+export function InfiniteBackground() {
   const zoom = useFlowStore((st) => st.transform[2])
   return <Background gap={gridGap(zoom)} size={1 / zoom} />
 }
@@ -2412,7 +2420,7 @@ function ScreenResizer({ minWidth, minHeight }: { minWidth: number; minHeight: n
       // Borda nunca fica abaixo de 1px no navegador (vira faixa grossa com zoom alto): linhas invisíveis
       // (o contorno de seleção do balão já mostra), cantos sem borda.
       lineStyle={{ borderColor: "transparent" }}
-      handleStyle={{ width: px(9), height: px(9), border: "none", borderRadius: px(2), background: "var(--brand)" }}
+      handleStyle={{ width: px(12), height: px(12), border: `${px(2)}px solid var(--background)`, borderRadius: px(3), background: "var(--brand)" }}
     />
   )
 }
@@ -2481,8 +2489,9 @@ function UnlinkEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
         interactionWidth={24 * k}
         style={{
           ...style,
-          stroke: selected ? "var(--brand)" : relation ? "var(--muted-foreground)" : undefined,
-          strokeWidth: (selected ? 2.5 : 1.5) * k,
+          // Contraste: mesma cor forte (texto do tema) para os dois tipos; o tracejado diferencia a relação.
+          stroke: selected ? "var(--brand)" : "var(--edge)",
+          strokeWidth: (selected ? 3.5 : 2.5) * k,
           strokeDasharray: relation ? `${6 * k} ${4 * k}` : undefined,
         }}
       />
@@ -2524,7 +2533,7 @@ function UnlinkEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
               </button>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[11px] text-muted-foreground">Sentido</span>
+              <span className="text-xs text-muted-foreground">Sentido</span>
               {ARROWS.map((a) => (
                 <Chip key={a.id} active={arrowOf(link) === a.id} onClick={() => map.setEdgeData(id, { arrow: a.id })} title={a.hint}>
                   {a.label}
@@ -2540,7 +2549,7 @@ function UnlinkEdge({ id, source, target, sourceX, sourceY, targetX, targetY, so
         ) : (
           link.label && (
             <span
-              className="nodrag nopan pointer-events-none absolute rounded-md border bg-background px-1.5 py-0.5 text-[11px] whitespace-nowrap text-muted-foreground"
+              className="nodrag nopan pointer-events-none absolute rounded-md border bg-background px-1.5 py-0.5 text-xs whitespace-nowrap text-muted-foreground"
               style={at}
             >
               {link.label}
@@ -2579,7 +2588,7 @@ function EdgeLabelInput({ value, onSave }: { value: string; onSave: (v: string) 
               setText(l)
               onSave(l)
             }}
-            className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground hover:text-foreground"
+            className="rounded bg-muted px-1.5 py-px text-xs text-muted-foreground hover:text-foreground"
           >
             {l}
           </button>
@@ -2617,8 +2626,12 @@ function serialize(nodes: MindMap["nodes"], edges: MindMap["edges"]) {
       n.stroke ?? null,
       n.path ? n.path.join(",") : null,
       n.notes ? JSON.stringify(n.notes) : null,
+      n.shape ?? null,
+      n.src ?? null,
+      n.fontSize ?? null,
+      n.fill ?? null,
     ]),
-    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null, e.bend ? `${e.bend.dx},${e.bend.dy}` : null]),
+    edges.map((e) => [e.id, e.source, e.target, e.kind ?? null, e.label ?? null, e.sourceHandle ?? null, e.targetHandle ?? null, e.arrow ?? null, e.bend ? `${e.bend.dx},${e.bend.dy}` : null, e.route ?? null, e.dashed ?? null, e.hue ?? null]),
   ])
 }
 
@@ -2641,7 +2654,7 @@ function MapControls({ onPresent, history }: { onPresent: () => void; history: P
     <Panel position="bottom-right" className="!mb-16 flex flex-col overflow-hidden rounded-lg border bg-card shadow-lift">
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" onClick={() => zoomTo(1, { duration: 300 })} className="tabular h-7 border-b px-1 text-[10px] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground">
+          <button type="button" onClick={() => zoomTo(1, { duration: 300 })} className="tabular h-7 border-b px-1 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground">
             {zoomLabel(zoom)}
           </button>
         </TooltipTrigger>
@@ -2674,4 +2687,42 @@ function MapControls({ onPresent, history }: { onPresent: () => void; history: P
 function zoomLabel(zoom: number) {
   const pct = zoom * 100
   return `${pct >= 10 ? Math.round(pct).toLocaleString("pt-BR") : pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
+}
+
+/** Todos os atalhos do mapa estruturado, num popover (em vez de uma faixa de texto fixa sobre o mapa). */
+function ShortcutsHelp() {
+  const rows = [
+    ["Duplo clique", "Cria um balão"],
+    ["Tab · Enter", "Filho · irmão"],
+    ["Espaço / F2", "Edita o texto"],
+    ["Del", "Apaga"],
+    ["F", "Foco no ramo"],
+    ["Z", "Aproxima do selecionado"],
+    ["T · D", "Texto solto · desenhar"],
+    ["Arrastar no fundo", "Seleciona vários"],
+    ["Botão direito", "Move a tela"],
+    ["Rodinha", "Zoom infinito"],
+    ["Ctrl+Z · Y", "Desfazer · refazer"],
+    ["Bolinha do balão", "Arraste para conectar"],
+    ["Clique na linha", "Legenda, tipo, desvincular"],
+  ]
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label="Atalhos do mapa" className="flex h-10 items-center gap-2 rounded-xl border-2 bg-card px-3 text-[13px] font-medium shadow-lift hover:bg-accent">
+          <KeyboardIcon className="size-4" /> Atalhos
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 text-sm">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[13px]">
+          {rows.map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="font-semibold whitespace-nowrap">{k}</dt>
+              <dd className="text-muted-foreground">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </PopoverContent>
+    </Popover>
+  )
 }

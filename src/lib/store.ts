@@ -24,6 +24,8 @@ import type {
 } from "@/lib/domain/types"
 import { uid } from "@/lib/format"
 import { templateMap, type TemplateId } from "@/lib/mindmap-templates"
+import { boardTemplate, type BoardTemplateId } from "@/lib/board-templates"
+import type { BoardMode } from "@/lib/domain/board"
 import { getRepositories } from "@/lib/repositories"
 import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
 import { supabaseBrowser } from "@/lib/supabase/client"
@@ -121,7 +123,9 @@ interface State {
   setMonthlyGoal(monthKey: string, cents: number): void
   setOpeningBalance(cents: number): void
 
-  createMap(template: TemplateId): MindMap
+  createMap(template: TemplateId | BoardTemplateId): MindMap
+  /** Mapa novo a partir de elementos prontos (importar arquivo, duplicar). Ids dos elementos são mantidos. */
+  createMapFrom(input: { title: string; mode: BoardMode; nodes: MindMap["nodes"]; edges: MindMap["edges"] }): MindMap
   saveMap(map: MindMap): void
   renameMap(id: string, title: string): void
   deleteMap(id: string): void
@@ -498,7 +502,14 @@ export const useStore = create<State>((set, get) => {
     // ---------- mapas ----------
 
     createMap(template) {
-      const map = templateMap(template)
+      const map = template.startsWith("lousa-") ? boardTemplate(template as BoardTemplateId) : { ...templateMap(template as TemplateId), mode: "estruturado" as const }
+      set((s) => ({ mindMaps: [...s.mindMaps, map] }))
+      persist(repos().mindMaps.upsert(map))
+      return map
+    },
+
+    createMapFrom({ title, mode, nodes, edges }) {
+      const map: MindMap = { id: uid(), title, mode, nodes, edges, updatedAt: nowIso() }
       set((s) => ({ mindMaps: [...s.mindMaps, map] }))
       persist(repos().mindMaps.upsert(map))
       return map

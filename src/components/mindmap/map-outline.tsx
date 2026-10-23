@@ -94,7 +94,7 @@ export function MapOutline({ map }: { map: MindMap }) {
                 onEnter={() => addSibling(n, r.parentId)}
                 onTab={() => addChild(n)}
               />
-              {linked && <span className="hidden truncate text-[11px] text-success sm:inline">✓ {linked.task.title}</span>}
+              {linked && <span className="hidden truncate text-xs text-success sm:inline">✓ {linked.task.title}</span>}
               {editable && (
                 <span className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                   <button onClick={() => addChild(n)} className="rounded p-1 text-muted-foreground hover:text-foreground" title="Adicionar filho (Tab)" aria-label="Adicionar filho">

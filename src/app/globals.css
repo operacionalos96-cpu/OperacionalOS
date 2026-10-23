@@ -278,14 +278,60 @@
   }
 }
 
+/* Mapas e lousa: conexões legíveis. Linha e ponta de seta na cor do texto (≥ 4,5:1 nos dois temas),
+ * 2,5px de espessura (antes: cinza #b1b1b7 de 1px, quase invisível no tema escuro). */
+.react-flow {
+  --edge: color-mix(in oklab, var(--foreground) 82%, var(--background));
+  --xy-edge-stroke: var(--edge);
+  --xy-edge-stroke-width: 2.5;
+  --xy-edge-stroke-selected: var(--brand);
+  --xy-edge-label-background-color: var(--card);
+  --xy-edge-label-color: var(--foreground);
+  --xy-selection-background-color: color-mix(in oklab, var(--brand) 12%, transparent);
+  --xy-selection-border: 2px dotted var(--brand);
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3.5;
+}
+.react-flow__edge-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Mapa mental: bolinhas de conexão só aparecem no hover/seleção. */
 .react-flow .idea-handle {
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--background);
-  background: color-mix(in oklch, var(--foreground) 45%, transparent);
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--background);
+  background: color-mix(in oklch, var(--foreground) 70%, transparent);
   opacity: 0;
   transition: opacity 120ms;
+}
+.react-flow .idea-handle:hover {
+  background: var(--brand);
+}
+
+/* Lousa: pontos de ligação grandes, visíveis ao passar o mouse, selecionar, ligar ou com a ferramenta Seta. */
+.react-flow .board-handle {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--background);
+  background: var(--brand);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.react-flow__node:hover .board-handle,
+.react-flow__node.selected .board-handle,
+.react-flow.connecting .board-handle,
+.board-arrow-tool .board-handle {
+  opacity: 1;
+}
+/* Moldura: o miolo é vazado (dá para selecionar e clicar nos elementos dentro dela); só borda e título pegam o mouse. */
+.react-flow__node.board-frame-node {
+  pointer-events: none !important;
+}
+.react-flow__node.board-frame-node .react-flow__resize-control {
+  pointer-events: all;
 }
 .react-flow__node:hover .idea-handle,
 .react-flow__node.selected .idea-handle,

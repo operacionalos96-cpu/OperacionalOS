@@ -74,13 +74,18 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   useGlobalShortcuts()
   const pathname = usePathname()
+  const focusMode = useUI((s) => s.focusMode)
+  // Modo foco só vale dentro de um mapa: ao sair da página, a barra lateral volta.
+  useEffect(() => {
+    if (!pathname.startsWith("/mapas/")) useUI.getState().set({ focusMode: false })
+  }, [pathname])
 
   if (access === "negado" || access === "erro") return <AccessProblem kind={access} />
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">
+      {!focusMode && <Sidebar />}
+      <main className={cn("flex min-w-0 flex-1 flex-col overflow-y-auto", !focusMode && "pb-16 md:pb-0")}>
         {/* key por rota: cada página entra com um fade curto. */}
         {hydrated ? (
           <div key={pathname} className="flex min-h-0 flex-1 animate-enter flex-col">
@@ -90,7 +95,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
           <PageSkeleton />
         )}
       </main>
-      <MobileNav />
+      {!focusMode && <MobileNav />}
       {hydrated && (
         <>
           <CommandPalette />

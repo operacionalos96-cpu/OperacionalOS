@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
-import { SUPABASE_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supabase/env"
+import { SANDBOX, SUPABASE_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supabase/env"
 
 /** Rotas acessíveis sem login. Todo o resto exige sessão válida. */
 const PUBLIC_PATHS = [
@@ -22,6 +22,9 @@ const PUBLIC_PATHS = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+
+  // Demonstração local (NEXT_PUBLIC_SANDBOX=1, nunca em produção): sem login.
+  if (SANDBOX) return NextResponse.next()
 
   // Falha fechada: sem Supabase configurado, nada além do login abre.
   if (!supabaseConfigured) {

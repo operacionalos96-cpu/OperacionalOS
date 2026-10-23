@@ -229,7 +229,7 @@ function LinkSection({
             <ConvertItem icon={VideoIcon} label="Conteúdo" disabled={!!data.ref} onClick={convert.conteudo} />
             <ConvertItem icon={FileTextIcon} label="Nota" disabled={!!data.ref} onClick={convert.nota} />
             <ConvertItem icon={TargetIcon} label="Meta" disabled={!!data.ref} onClick={convert.meta} />
-            {!!data.ref && <p className="px-2 py-1 text-[11px] text-muted-foreground">Desvincule o item atual para converter em outro.</p>}
+            {!!data.ref && <p className="px-2 py-1 text-xs text-muted-foreground">Desvincule o item atual para converter em outro.</p>}
           </PopoverContent>
         </Popover>
         <EntityPicker
@@ -332,7 +332,7 @@ function SummaryFields({
       </select>
       {value && (
         <div className="rounded-md bg-muted/50 px-2.5 py-2">
-          <p className="text-[11px] font-medium text-muted-foreground">No grupo agora ({members.length})</p>
+          <p className="text-xs font-medium text-muted-foreground">No grupo agora ({members.length})</p>
           <ul className={cn("mt-1 grid gap-0.5 text-xs", !members.length && "text-muted-foreground")}>
             {members.length ? members.map((m, i) => <li key={i}>• {m}</li>) : <li>Nenhum item dentro do grupo.</li>}
           </ul>

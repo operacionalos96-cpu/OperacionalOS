@@ -113,7 +113,7 @@ function NoteBubble({ note, onRemove }: { note: NodeNote; onRemove: () => void }
         k.cites && "border-brand/40",
       )}
     >
-      <p className="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+      <p className="flex items-center gap-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         <Icon className="size-3" /> {k.label}
         {note.app && <span className="ml-auto truncate rounded bg-brand/10 px-1 normal-case tracking-normal text-brand">{note.app}</span>}
       </p>
@@ -126,12 +126,12 @@ function NoteBubble({ note, onRemove }: { note: NodeNote; onRemove: () => void }
               target="_blank"
               rel="noopener noreferrer nofollow"
               onClick={(e) => e.stopPropagation()}
-              className="mt-1 flex items-center gap-1 truncate text-[11px] text-brand hover:underline"
+              className="mt-1 flex items-center gap-1 truncate text-xs text-brand hover:underline"
             >
               <ExternalLinkIcon className="size-3 shrink-0" /> {note.url.replace(/^https?:\/\/(www\.)?/, "")}
             </a>
           )}
-          <p className="mt-1 text-[10px] text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground">
             {getUser(note.authorId).name} · {relative(note.createdAt)}
           </p>
         </>
@@ -165,7 +165,7 @@ function NewNoteBubble({ onAdd, onCancel, canCancel }: { onAdd: (n: NodeNote) =>
     if (note) onAdd(note)
   }
 
-  const input = "h-6 w-full min-w-0 rounded-md border bg-background px-1.5 text-[11px] outline-none focus:border-brand"
+  const input = "h-6 w-full min-w-0 rounded-md border bg-background px-1.5 text-xs outline-none focus:border-brand"
   return (
     <div className="grid w-60 gap-1.5 rounded-lg border border-dashed border-brand/60 bg-card p-2 shadow-md">
       <div className="flex gap-1" role="radiogroup" aria-label="Tipo de anotação">
@@ -180,7 +180,7 @@ function NewNoteBubble({ onAdd, onCancel, canCancel }: { onAdd: (n: NodeNote) =>
               onClick={() => setKind(x.id)}
               title={x.hint}
               className={cn(
-                "inline-flex h-5 items-center gap-0.5 rounded px-1 text-[10px] font-medium transition-colors",
+                "inline-flex h-5 items-center gap-0.5 rounded px-1 text-xs font-medium transition-colors",
                 kind === x.id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -217,9 +217,9 @@ function NewNoteBubble({ onAdd, onCancel, canCancel }: { onAdd: (n: NodeNote) =>
         className="field-sizing-content max-h-28 min-h-10 resize-none rounded-md border bg-background px-1.5 py-1 text-xs outline-none focus:border-brand"
       />
       <div className="flex items-center gap-1">
-        <span className="flex-1 text-[9px] text-muted-foreground">Enter adiciona · Shift+Enter quebra linha</span>
+        <span className="flex-1 text-xs text-muted-foreground">Enter adiciona · Shift+Enter quebra linha</span>
         {canCancel && (
-          <button type="button" onClick={onCancel} className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onCancel} className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground">
             Cancelar
           </button>
         )}
@@ -227,7 +227,7 @@ function NewNoteBubble({ onAdd, onCancel, canCancel }: { onAdd: (n: NodeNote) =>
           type="button"
           onClick={add}
           disabled={!text.trim() && !(k.cites && app.trim())}
-          className="rounded bg-foreground px-2 py-0.5 text-[11px] font-medium text-background disabled:opacity-40"
+          className="rounded bg-foreground px-2 py-0.5 text-xs font-medium text-background disabled:opacity-40"
         >
           Adicionar
         </button>

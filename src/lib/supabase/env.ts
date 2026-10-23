@@ -7,4 +7,7 @@
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
 export const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? ""
 
-export const supabaseConfigured = SUPABASE_URL.startsWith("https://") && SUPABASE_KEY.length > 20
+/** Demonstração local (só desenvolvimento): ver lib/supabase/sandbox.ts. */
+export const SANDBOX = process.env.NEXT_PUBLIC_SANDBOX === "1" && process.env.NODE_ENV !== "production"
+
+export const supabaseConfigured = SANDBOX || (SUPABASE_URL.startsWith("https://") && SUPABASE_KEY.length > 20)

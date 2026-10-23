@@ -123,7 +123,7 @@ export function AiCommand({ getScope, onApply }: { getScope: () => AiScope; onAp
           <p className="flex items-center gap-1.5 text-sm font-semibold">
             <SparklesIcon className="size-4 text-brand" /> Pedir à IA
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Sobre: <strong className="font-medium text-foreground">{scopeLabel}</strong> · selecione balões antes para pedir só sobre eles
           </p>
         </div>
@@ -156,7 +156,7 @@ export function AiCommand({ getScope, onApply }: { getScope: () => AiScope; onAp
                     setText(ex)
                     send(ex)
                   }}
-                  className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:opacity-50"
+                  className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:opacity-50"
                 >
                   {ex}
                 </button>
@@ -205,10 +205,10 @@ export function AiCommand({ getScope, onApply }: { getScope: () => AiScope; onAp
                 {result.plan.ops.length ? "Descartar" : "Novo pedido"}
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground">Ctrl+Z desfaz tudo de uma vez. Apagar nunca vem marcado.</p>
+            <p className="text-xs text-muted-foreground">Ctrl+Z desfaz tudo de uma vez. Apagar nunca vem marcado.</p>
           </>
         )}
-        <p className="text-[10px] text-muted-foreground">Vai para a IA só o texto do mapa (nada de leads, valores ou contatos).</p>
+        <p className="text-xs text-muted-foreground">Vai para a IA só o texto do mapa (nada de leads, valores ou contatos).</p>
       </PopoverContent>
     </Popover>
   )
@@ -223,7 +223,7 @@ function describeOp(o: MapOp, label: (ref?: string) => string) {
         <>
           <strong className="font-medium">+ {o.label}</strong>
           {o.parent ? <span className="text-muted-foreground"> em {q(label(o.parent))}</span> : <span className="text-muted-foreground"> (balão solto)</span>}
-          {o.description && <span className="block text-[11px] text-muted-foreground">{o.description}</span>}
+          {o.description && <span className="block text-xs text-muted-foreground">{o.description}</span>}
         </>
       )
     case "renomear":
