@@ -38,6 +38,7 @@ export default function AiOfficePage() {
   const workers = useOps((s) => s.workers)
   const opsMissing = useOps((s) => s.missing)
   const [tab, setTab] = useState<"workforce" | "jobs" | "webhooks" | "workers">("workforce")
+  const [activityFilter, setActivityFilter] = useState<"all" | "suggestions" | "executions" | "failures" | "learning">("all")
 
   useEffect(() => {
     if (agentsLoaded) ensureDefaultAgents()
@@ -51,6 +52,15 @@ export default function AiOfficePage() {
   }, [agents])
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name
   const data = useMemo(() => conversionData(leads), [leads])
+  const visibleEvents = useMemo(() => events.filter((e) => {
+    if (activityFilter === "all") return true
+    const type = String(e.event_type)
+    if (activityFilter === "suggestions") return type === "hypothesis.created"
+    if (activityFilter === "learning") return type === "learning.created"
+    if (activityFilter === "failures") return type === "agent.failed" || type === "job.failed" || type === "job.dead_letter" || type.includes("dead_letter")
+    if (activityFilter === "executions") return (type.startsWith("agent.") || type.startsWith("job.")) && type !== "agent.failed" && type !== "job.failed" && !type.includes("dead_letter")
+    return true
+  }), [events, activityFilter])
 
   return (
     <div className="flex flex-col">
@@ -93,26 +103,40 @@ export default function AiOfficePage() {
                 <ActivityIcon className="size-4 text-muted-foreground" /> Atividade
               </span>
             }
-            description="Tudo que acontece vira evento (base para os agentes aprenderem)."
+            description="Histórico de eventos. Sugestões, execuções e falhas são categorias diferentes; um evento registrado não significa que o resultado foi validado."
           >
-            {events.length === 0 ? (
-              <p className="t-desc p-4 text-sm">{feedLoaded ? "Nenhum evento ainda. Aprovar, descartar e contatar leads aparece aqui." : "Carregando…"}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Mostrar
+                <select aria-label="Filtrar atividade do IA Office" value={activityFilter} onChange={(e) => setActivityFilter(e.target.value as typeof activityFilter)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground">
+                  <option value="all">Todos os eventos</option>
+                  <option value="suggestions">Sugestões / hipóteses</option>
+                  <option value="executions">Execuções</option>
+                  <option value="failures">Falhas / intervenção</option>
+                  <option value="learning">Aprendizados registrados</option>
+                </select>
+              </label>
+              <span className="text-xs text-muted-foreground">{visibleEvents.length} evento(s)</span>
+            </div>
+            {visibleEvents.length === 0 ? (
+              <p className="t-desc p-4 text-sm">{!feedLoaded ? "Carregando…" : events.length === 0 ? "Nenhum evento ainda. Aprovar, descartar e contatar leads aparece aqui." : "Nenhum evento corresponde a este filtro."}</p>
             ) : (
               <ul className="grid max-h-[28rem] overflow-y-auto p-2">
-                {events.slice(0, 80).map((e) => (
+                {visibleEvents.slice(0, 80).map((e) => (
                   <li key={e.id} className="flex gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40">
                     <span className="tabular w-11 shrink-0 text-xs text-muted-foreground">{format(new Date(e.created_at), "HH:mm")}</span>
                     <span className="min-w-0 flex-1">
+                      <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{eventKindLabel(String(e.event_type))}</span>
                       {feedText(e, e.event_type.startsWith("agent.") ? agentName(e.entity_id) : leads.find((l) => l.id === e.entity_id)?.name)}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{e.actor_type === "human" ? "" : e.actor_type === "agent" ? agentName(e.actor_id) ?? "agente" : "sistema"}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{e.actor_type === "human" ? "humano" : e.actor_type === "agent" ? agentName(e.actor_id) ?? "agente" : "sistema"}</span>
                   </li>
                 ))}
               </ul>
             )}
           </Panel>
 
-          <Panel title="Dados para aprendizado" description="O que o Intelligence Agent vai comparar: decisões, motivos e resultados por segmento.">
+          <Panel title="Dados para aprendizado" description="Indicadores de negócio usados como evidência. São dados observados; não são, por si só, uma hipótese validada nem uma decisão automática.">
             <div className="grid gap-4 p-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -170,6 +194,14 @@ export default function AiOfficePage() {
       </div>
     </div>
   )
+}
+
+function eventKindLabel(type: string) {
+  if (type === "hypothesis.created") return "Sugestão / hipótese"
+  if (type === "learning.created") return "Aprendizado registrado · não implica validação"
+  if (type === "agent.failed" || type === "job.failed" || type.includes("dead_letter")) return "Falha / requer atenção"
+  if (type.startsWith("agent.") || type.startsWith("job.")) return "Execução / operação"
+  return "Evento de negócio"
 }
 
 /** Frase do feed para qualquer evento (de negócio ou de job). */
@@ -276,7 +308,7 @@ function LearningsPanel() {
         </Button>
       }
     >
-      <List items={items.map((l) => ({ id: l.id, title: l.title, meta: `${l.category} · confiança ${Math.round(l.confidence * 100)}% · ${relative(l.createdAt)}`, body: l.description }))} empty="Nada ainda. O Knowledge Manager vai preencher isto — e você pode registrar à mão." />
+      <List items={items.map((l) => ({ id: l.id, title: l.title, meta: `${l.status === "draft" ? "Rascunho · não validado" : l.status === "active" ? "Ativo · validação precisa de evidência" : "Arquivado"} · ${l.category} · confiança declarada ${Math.round(l.confidence * 100)}% · ${relative(l.createdAt)}`, body: [l.description, l.evidence ? `Evidência: ${l.evidence}` : "Sem evidência registrada"].filter(Boolean).join(" · ") }))} empty="Nenhum aprendizado registrado. Um registro manual ou gerado não é considerado validado sem evidência e revisão." />
       {open && (
         <QuickForm
           title="Novo aprendizado"
@@ -299,7 +331,7 @@ function HypothesesPanel() {
           <FlaskConicalIcon className="size-4 text-muted-foreground" /> Hipóteses
         </span>
       }
-      description="Nenhuma hipótese muda a prospecção sozinha: só anda com sua aprovação."
+      description="Sugestão → aprovação humana → teste → validação ou rejeição. Só hipóteses no estado Validada contam como resultado validado."
       aside={
         <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
           <PlusIcon /> Nova
@@ -307,7 +339,7 @@ function HypothesesPanel() {
       }
     >
       {items.length === 0 ? (
-        <p className="t-desc p-4 text-sm">Nada ainda. O Intelligence Agent vai propor hipóteses com evidência.</p>
+        <p className="t-desc p-4 text-sm">Nenhuma hipótese registrada. Não presumimos que o Intelligence Agent esteja executando autonomamente.</p>
       ) : (
         <ul className="divide-y">
           {items.map((h) => (
