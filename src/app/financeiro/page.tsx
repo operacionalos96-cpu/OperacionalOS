@@ -28,18 +28,21 @@ import { BalanceChart, ExpensesByCategory } from "@/components/finance/charts"
 export default function FinancePage() {
   const transactions = useStore((s) => s.transactions)
   const settings = useStore((s) => s.financeSettings)
-  const now = new Date()
+  const now = useMemo(() => new Date(), [])
   const [tab, setTab] = useState<"visao" | "movimentacoes" | "pagar" | "receber">("visao")
-  const [period, setPeriod] = useState(format(now, "yyyy-MM"))
-  const periodDate = parseISO(`${period}-01`)
-  const goalDate = period < format(now, "yyyy-MM") ? endOfMonth(periodDate) : now
+  const [period, setPeriod] = useState(() => format(new Date(), "yyyy-MM"))
+  const periodDate = useMemo(() => parseISO(`${period}-01`), [period])
+  const goalDate = useMemo(
+    () => period < format(now, "yyyy-MM") ? endOfMonth(periodDate) : now,
+    [period, periodDate, now],
+  )
 
   const stats = useMemo(() => ({
     balance: balance(settings, transactions),
     delta: monthDelta(settings, transactions, periodDate),
     month: monthStats(transactions, periodDate),
     goal: goalProgress(settings, transactions, goalDate),
-  }), [settings, transactions, period, goalDate])
+  }), [settings, transactions, periodDate, goalDate])
 
   return (
     <div className="flex flex-col">

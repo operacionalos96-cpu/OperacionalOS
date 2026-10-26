@@ -6,7 +6,6 @@ import {
   CrownIcon,
   GitForkIcon,
   PlusIcon,
-  ShieldCheckIcon,
   UserPlusIcon,
   UsersIcon,
 } from "lucide-react"

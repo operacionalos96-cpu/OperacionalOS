@@ -33,22 +33,8 @@ describe("migração do mapa para 1 registro por balão", () => {
       ...legacy,
       nodes: [
         ...legacy.nodes,
-            {
-              id: "img",
-              label: "Referência visual",
-              x: 320,
-              y: 180,
-              type: "image",
-              src: "anexos/map-image/m/ref.png",
-            },
-            {
-              id: "shape",
-              label: "Decisão",
-              x: 600,
-              y: 180,
-              type: "shape",
-              shape: "diamond",
-            },
+        { id: "img", label: "Referência visual", x: 320, y: 180, type: "image", src: "anexos/map-image/m/ref.png" },
+        { id: "shape", label: "Decisão", x: 600, y: 180, type: "shape", shape: "diamond" },
       ],
     }
     const rows = migrationRows(withCanvasItems)
