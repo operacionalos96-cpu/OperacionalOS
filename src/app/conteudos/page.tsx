@@ -2,6 +2,8 @@
 
 import { Suspense, useMemo, useState } from "react"
 import Link from "next/link"
+import { addDays, differenceInCalendarDays, endOfMonth, endOfWeek, format as formatDate, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   BarChart3Icon,
@@ -117,8 +119,24 @@ function Content() {
 function Production({ onNew }: { onNew: () => void }) {
   const items = useContentItems((s) => s.items)
   const products = useProducts((s) => s.items)
+  const accounts = useContentAccounts((s) => s.items)
   const [productId, setProductId] = useState<string>("todos")
-  const visible = items.filter((i) => productId === "todos" || i.productId === productId)
+  const [brand, setBrand] = useState<string>("todos")
+  const [accountId, setAccountId] = useState<string>("todos")
+  const [viewMode, setViewMode] = useState<"etapas" | "calendario">("etapas")
+  const [calendarMonth, setCalendarMonth] = useState(formatDate(new Date(), "yyyy-MM"))
+  const brands = [...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR"))
+  const visible = items.filter((i) => {
+    const account = accounts.find((a) => a.id === (i.accountId ?? i.posts[0]?.accountId))
+    const itemBrand = i.brand ?? account?.brand
+    const brandMatches = brand === "todos" || itemBrand === brand || i.posts.some((p) => accounts.find((a) => a.id === p.accountId)?.brand === brand)
+    const accountMatches = accountId === "todos" || i.accountId === accountId || i.posts.some((p) => p.accountId === accountId)
+    return (productId === "todos" || i.productId === productId) && brandMatches && accountMatches
+  })
+  const monthStart = startOfMonth(parseISO(`${calendarMonth}-01`))
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
+  const calendarEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 1 })
+  const calendarDays = Array.from({ length: differenceInCalendarDays(calendarEnd, calendarStart) + 1 }, (_, i) => addDays(calendarStart, i))
 
   if (items.length === 0) {
     return (
@@ -138,25 +156,28 @@ function Production({ onNew }: { onNew: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {products.length > 0 && (
-        <div className="flex items-center gap-2 px-4 pt-4 sm:px-6">
-          <span className="t-label">Produto</span>
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className="h-7 rounded-md border bg-card px-2 text-xs text-foreground"
-            aria-label="Filtrar por produto"
-          >
-            <option value="todos">Todos</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-4 sm:px-6">
+        <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">Conta
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground" aria-label="Filtrar produção por conta">
+            <option value="todos">Todas</option>
+            {accounts.filter((a) => a.active && (brand === "todos" || !a.brand || a.brand === brand)).map((a) => <option key={a.id} value={a.id}>{a.name} · {a.platform}</option>)}
           </select>
-        </div>
-      )}
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 sm:px-6">
+        </label>
+        {products.length > 0 && <label className="flex items-center gap-2 text-xs text-muted-foreground">Produto
+          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground" aria-label="Filtrar por produto">
+            <option value="todos">Todos</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>}
+        <Segmented size="sm" value={viewMode} onChange={setViewMode} options={[{ value: "etapas", label: "Etapas" }, { value: "calendario", label: "Calendário" }]} />
+        {viewMode === "calendario" && <div className="flex items-center gap-1">
+          <button type="button" aria-label="Mês anterior" onClick={() => setCalendarMonth(formatDate(addDays(monthStart, -1), "yyyy-MM"))} className="rounded-md border px-2 py-1 text-xs hover:bg-accent">‹</button>
+          <span className="min-w-28 text-center text-xs font-medium capitalize">{formatDate(monthStart, "MMMM yyyy", { locale: ptBR })}</span>
+          <button type="button" aria-label="Próximo mês" onClick={() => setCalendarMonth(formatDate(addDays(endOfMonth(monthStart), 1), "yyyy-MM"))} className="rounded-md border px-2 py-1 text-xs hover:bg-accent">›</button>
+        </div>}
+        <span className="ml-auto text-xs text-muted-foreground">{visible.length} conteúdos</span>
+      </div>
+      {viewMode === "etapas" ? <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 sm:px-6">
         {CONTENT_STAGES.map((stage) => {
           const list = visible.filter((i) => i.stage === stage.id)
           return (
@@ -174,7 +195,24 @@ function Production({ onNew }: { onNew: () => void }) {
             </section>
           )
         })}
-      </div>
+      </div> : <div className="min-h-0 flex-1 overflow-auto p-4 sm:px-6">
+        <div className="grid grid-cols-7 gap-1.5">
+          {(["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]).map((day) => <div key={day} className="px-2 py-1 text-center text-xs font-semibold text-muted-foreground">{day}</div>)}
+          {calendarDays.map((day) => {
+            const key = formatDate(day, "yyyy-MM-dd")
+            const dayItems = visible.filter((item) => item.dueDate === key)
+            return <div key={key} className={cn("min-h-28 rounded-lg border p-1.5 sm:min-h-36 sm:p-2", !isSameMonth(day, monthStart) && "bg-muted/30 opacity-60", formatDate(day, "yyyy-MM-dd") === formatDate(new Date(), "yyyy-MM-dd") && "border-brand")}>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">{formatDate(day, "d")}</p>
+              <div className="grid gap-1">
+                {dayItems.map((item) => <Link key={item.id} href={`/conteudos/${item.id}`} className="rounded-md border bg-card px-1.5 py-1 text-[11px] leading-snug hover:border-brand" title={`${item.title} · ${CONTENT_STAGES.find((stage) => stage.id === item.stage)?.label ?? item.stage}`}>
+                  <span className="line-clamp-2 font-medium">{item.title}</span><span className="block truncate text-muted-foreground">{item.brand ?? "Sem frente"} · {CONTENT_STAGES.find((stage) => stage.id === item.stage)?.label ?? item.stage}</span>
+                </Link>)}
+              </div>
+            </div>
+          })}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">O calendário usa o prazo para publicar. Conteúdos sem prazo continuam visíveis na visão por etapas.</p>
+      </div>}
     </div>
   )
 }
@@ -192,7 +230,7 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
         <p className="line-clamp-2 text-sm leading-snug font-medium">{item.title}</p>
         <p className="t-desc mt-1 truncate text-xs">
           {formatLabel(item.format)}
-          {product ? ` · ${product.name}` : ""}
+          {product ? ` · ${product.name}` : ""}{item.brand ? ` · ${item.brand}` : ""}
         </p>
         <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
           {item.script?.trim() && (
@@ -327,6 +365,7 @@ function AccountRow({
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 truncate text-sm font-medium">
           {accountLabel(account)}
+          <span className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{account.brand || "Sem frente"}</span>
           <span className={cn("rounded px-1.5 py-px text-[10px] font-medium", account.role === "principal" ? "bg-brand-soft text-brand" : "bg-muted text-muted-foreground")}>
             {account.role === "principal" ? "Principal" : "Cortes"}
           </span>
@@ -362,7 +401,22 @@ function compact(n: number) {
 function Metrics() {
   const items = useContentItems((s) => s.items)
   const accounts = useContentAccounts((s) => s.items)
-  const byAccount = useMemo(() => metricsByAccount(items), [items])
+  const [brand, setBrand] = useState("todos")
+  const [platform, setPlatform] = useState<Platform | "todos">("todos")
+  const [accountId, setAccountId] = useState("todos")
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
+  const brands = [...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR"))
+  const filteredItems = useMemo(() => items.map((item) => ({ ...item, posts: item.posts.filter((post) => {
+    const account = accounts.find((a) => a.id === post.accountId)
+    const date = post.metricsAt ?? post.publishedAt
+    const brandMatches = brand === "todos" || (account?.brand ?? item.brand) === brand
+    const platformMatches = platform === "todos" || account?.platform === platform
+    const accountMatches = accountId === "todos" || post.accountId === accountId
+    const dateMatches = (!fromDate && !toDate) || (!!date && (!fromDate || date.slice(0, 10) >= fromDate) && (!toDate || date.slice(0, 10) <= toDate))
+    return brandMatches && platformMatches && accountMatches && dateMatches
+  }) })).filter((item) => item.posts.length > 0), [items, accounts, brand, platform, accountId, fromDate, toDate])
+  const byAccount = useMemo(() => metricsByAccount(filteredItems), [filteredItems])
   const total = sumMetrics([...byAccount.values()].map((v) => v.metrics))
   const posts = [...byAccount.values()].reduce((a, v) => a + v.posts, 0)
   const eng = engagementRate(total)
@@ -379,13 +433,12 @@ function Metrics() {
   }, [byAccount, accounts])
 
   const top = useMemo(
-    () =>
-      items
-        .map((i) => ({ item: i, views: sumMetrics(i.posts.map((p) => p.metrics)).views }))
-        .filter((x) => x.views > 0)
-        .sort((a, b) => b.views - a.views)
-        .slice(0, 8),
-    [items],
+    () => platform === "todos" ? [] : filteredItems
+      .map((i) => ({ item: i, views: sumMetrics(i.posts.map((p) => p.metrics)).views }))
+      .filter((x) => x.views > 0)
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 8),
+    [filteredItems, platform],
   )
   const maxViews = Math.max(...byPlatform.map(([, v]) => v.views), 1)
 
@@ -394,37 +447,47 @@ function Metrics() {
       <EmptyState
         className="py-20"
         icon={BarChart3Icon}
-        title="Sem métricas ainda"
-        description="Na página de cada conteúdo, registre as publicações (conta, link) e os números. Depois, a integração por API vai atualizar isso sozinha."
+        title={items.length === 0 ? "Sem métricas ainda" : "Nenhuma métrica para os filtros atuais"}
+        description={items.length === 0 ? "Na página de cada conteúdo, registre as publicações (conta, link) e os números. Depois, a integração por API vai atualizar isso sozinha." : "Altere frente, plataforma, conta ou período. Só entram no cálculo publicações marcadas como publicadas e com dados registrados."}
       />
     )
   }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+        <label className="grid gap-1 text-xs text-muted-foreground">Frente
+          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="h-8 min-w-32 rounded-md border bg-background px-2 text-sm text-foreground"><option value="todos">Visão geral</option>{brands.map((b) => <option key={b} value={b}>{b}</option>)}</select>
+        </label>
+        <label className="grid gap-1 text-xs text-muted-foreground">Plataforma
+          <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform | "todos")} className="h-8 min-w-32 rounded-md border bg-background px-2 text-sm text-foreground"><option value="todos">Todas</option>{PLATFORMS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+        </label>
+        <label className="grid gap-1 text-xs text-muted-foreground">Conta
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="h-8 min-w-36 rounded-md border bg-background px-2 text-sm text-foreground"><option value="todos">Todas</option>{accounts.filter((a) => brand === "todos" || !a.brand || a.brand === brand).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        </label>
+        <label className="grid gap-1 text-xs text-muted-foreground">De <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground" /></label>
+        <label className="grid gap-1 text-xs text-muted-foreground">Até <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground" /></label>
+        <p className="ml-auto text-xs text-muted-foreground">{fromDate || toDate ? `Período ${fromDate || "início"} – ${toDate || "hoje"}` : "Todo o período disponível"}</p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Publicações" icon={SendIcon} style={{ "--i": 0 } as React.CSSProperties}>
           <p className="t-value mt-3">
             <CountUp value={posts} />
           </p>
         </StatCard>
-        <StatCard label="Visualizações" icon={BarChart3Icon} style={{ "--i": 1 } as React.CSSProperties}>
-          <p className="t-value mt-3">
-            <CountUp value={total.views} format={compact} />
-          </p>
+        <StatCard label="Visualizações" icon={BarChart3Icon} info="Definições variam entre plataformas. Selecione uma plataforma para ver um total comparável dentro dela." style={{ "--i": 1 } as React.CSSProperties}>
+          <p className="t-value mt-3">{platform === "todos" ? "Por plataforma" : <CountUp value={total.views} format={compact} />}</p>
         </StatCard>
-        <StatCard label="Interações" icon={UsersIcon} info="Curtidas + comentários + compartilhamentos + salvos." style={{ "--i": 2 } as React.CSSProperties}>
-          <p className="t-value mt-3">
-            <CountUp value={total.likes + total.comments + total.shares + total.saves} format={compact} />
-          </p>
+        <StatCard label="Interações" icon={UsersIcon} info="Curtidas + comentários + compartilhamentos + salvos; exibidas por plataforma para evitar somas de métricas com definições diferentes." style={{ "--i": 2 } as React.CSSProperties}>
+          <p className="t-value mt-3">{platform === "todos" ? "Por plataforma" : <CountUp value={total.likes + total.comments + total.shares + total.saves} format={compact} />}</p>
         </StatCard>
-        <StatCard label="Engajamento" icon={ClapperboardIcon} info="Interações ÷ visualizações." style={{ "--i": 3 } as React.CSSProperties}>
-          <p className="t-value mt-3">{eng === null ? "—" : `${(eng * 100).toFixed(1)}%`}</p>
+        <StatCard label="Engajamento" icon={ClapperboardIcon} info="Interações ÷ visualizações, calculado apenas para a plataforma selecionada." style={{ "--i": 3 } as React.CSSProperties}>
+          <p className="t-value mt-3">{platform === "todos" ? "Selecione uma plataforma" : eng === null ? "—" : `${(eng * 100).toFixed(1)}%`}</p>
         </StatCard>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Visualizações por plataforma" description="Soma de todas as contas (principal + cortes).">
+        <Panel title="Visualizações por plataforma" description={`Visualizações informadas por cada plataforma; não são somadas como indicador único. Fonte: publicações registradas · ${fromDate || toDate ? "período filtrado" : "todo o histórico disponível"}.`}>
           <ul className="grid gap-3 p-4">
             {byPlatform.map(([platform, v], i) => (
               <li key={platform} className="grid gap-1.5">
@@ -444,8 +507,8 @@ function Metrics() {
           </ul>
         </Panel>
 
-        <Panel title="Conteúdos com mais visualizações" description="Somando todas as contas em que foram postados.">
-          <ol className="divide-y">
+        <Panel title="Conteúdos com mais visualizações" description={platform === "todos" ? "Selecione uma plataforma para comparar visualizações com a mesma definição." : `Ranking na plataforma ${platformLabel(platform)} para os filtros atuais.`}>
+          {top.length === 0 ? <p className="p-4 text-sm text-muted-foreground">Selecione uma plataforma ou aplique filtros para ver um ranking comparável.</p> : <ol className="divide-y">
             {top.map(({ item, views }, i) => (
               <li key={item.id}>
                 <Link href={`/conteudos/${item.id}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent/60">
@@ -455,7 +518,7 @@ function Metrics() {
                 </Link>
               </li>
             ))}
-          </ol>
+          </ol>}
         </Panel>
       </div>
 
@@ -464,7 +527,7 @@ function Metrics() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
-                {["Conta", "Posts", "Views", "Curtidas", "Coment.", "Compart.", "Salvos", "Engaj."].map((h, i) => (
+                {["Conta", "Fonte", "Posts", "Views", "Curtidas", "Coment.", "Compart.", "Salvos", "Engaj."].map((h, i) => (
                   <th key={h} className={cn("t-label px-4 py-2 font-semibold", i > 0 && "text-right")}>
                     {h}
                   </th>
@@ -485,6 +548,9 @@ function Metrics() {
                           <span className="truncate">{accountLabel(a)}</span>
                           {a?.role === "cortes" && <GroupLabel className="text-[10px]">cortes</GroupLabel>}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-xs text-muted-foreground">
+                        {[...new Set(filteredItems.flatMap((item) => item.posts.filter((post) => post.accountId === accountId).map((post) => post.source)))].map((source) => source === "api" ? "API" : "Manual").join(" / ") || "—"}
                       </td>
                       {[v.posts, v.metrics.views, v.metrics.likes, v.metrics.comments, v.metrics.shares, v.metrics.saves].map((n, i) => (
                         <td key={i} className="tabular px-4 py-2 text-right">

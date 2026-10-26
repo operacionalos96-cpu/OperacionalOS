@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { format, parseISO } from "date-fns"
+import { endOfMonth, format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, ScaleIcon, TargetIcon, Trash2Icon, WalletIcon, Link2Icon } from "lucide-react"
 import type { Transaction, TransactionType } from "@/lib/domain/types"
-import { balance, daysSince, goalProgress, monthDelta, monthKey, monthStats } from "@/lib/domain/rules"
+import { balance, daysSince, goalProgress, monthDelta, monthKey, monthStats, isRealizedTransaction } from "@/lib/domain/rules"
 import { money, moneyCompact, moneyInputValue, parseMoney } from "@/lib/format"
 import { deleteTransactionWithUndo } from "@/lib/actions"
 import { useStore } from "@/lib/store"
@@ -29,16 +29,17 @@ export default function FinancePage() {
   const transactions = useStore((s) => s.transactions)
   const settings = useStore((s) => s.financeSettings)
   const now = new Date()
+  const [tab, setTab] = useState<"visao" | "movimentacoes" | "pagar" | "receber">("visao")
+  const [period, setPeriod] = useState(format(now, "yyyy-MM"))
+  const periodDate = parseISO(`${period}-01`)
+  const goalDate = period < format(now, "yyyy-MM") ? endOfMonth(periodDate) : now
 
-  const stats = useMemo(() => {
-    const n = new Date()
-    return {
-      balance: balance(settings, transactions),
-      delta: monthDelta(settings, transactions, n),
-      month: monthStats(transactions, n),
-      goal: goalProgress(settings, transactions, n),
-    }
-  }, [settings, transactions])
+  const stats = useMemo(() => ({
+    balance: balance(settings, transactions),
+    delta: monthDelta(settings, transactions, periodDate),
+    month: monthStats(transactions, periodDate),
+    goal: goalProgress(settings, transactions, goalDate),
+  }), [settings, transactions, period, goalDate])
 
   return (
     <div className="flex flex-col">
@@ -56,12 +57,25 @@ export default function FinancePage() {
           </>
         }
       />
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6">
+        <Segmented size="sm" value={tab} onChange={setTab} options={[
+          { value: "visao", label: "Visão geral" },
+          { value: "movimentacoes", label: "Movimentações" },
+          { value: "pagar", label: "Contas a pagar" },
+          { value: "receber", label: "Contas a receber" },
+        ]} />
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">Período do resultado e da meta
+          <input type="month" aria-label="Período do resultado e da meta financeiros" value={period} onChange={(e) => setPeriod(e.target.value || format(now, "yyyy-MM"))} className="h-8 rounded-md border bg-card px-2 text-sm text-foreground" />
+        </label>
+      </div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
+        {tab === "visao" && <>
+        <p className="text-xs text-muted-foreground">Resultado e meta referem-se a {format(periodDate, "MMMM yyyy", { locale: ptBR })}; saldo é o caixa atual. Somente movimentações realizadas afetam saldo e gráficos; compromissos previstos ficam separados.</p>
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard
-            label="Saldo em caixa"
+            label="Saldo em caixa atual"
             icon={WalletIcon}
-            info="Saldo inicial informado + todas as entradas − todas as saídas registradas."
+            info="Saldo inicial informado + entradas realizadas − saídas realizadas. Contas previstas não alteram o caixa."
             aside={<OpeningBalanceEditor />}
             style={{ "--i": 0 } as React.CSSProperties}
           >
@@ -70,15 +84,15 @@ export default function FinancePage() {
             </p>
             <p className={cn("tabular mt-1.5 text-sm font-semibold", stats.delta.net >= 0 ? "text-success" : "text-danger")}>
               {stats.delta.net >= 0 ? "+" : "−"}
-              {money(Math.abs(stats.delta.net))} <span className="t-desc font-normal">este mês</span>
+              {money(Math.abs(stats.delta.net))} <span className="t-desc font-normal">no período</span>
             </p>
           </StatCard>
 
           <StatCard
-            label={`Resultado de ${format(now, "MMMM", { locale: ptBR })}`}
+            label={`Resultado de ${format(periodDate, "MMMM yyyy", { locale: ptBR })}`}
             icon={ScaleIcon}
             accent="var(--chart-in)"
-            info="Entradas menos saídas lançadas neste mês."
+            info="Entradas realizadas menos saídas realizadas no mês selecionado."
             style={{ "--i": 1 } as React.CSSProperties}
           >
             <p className={cn("t-value mt-3", stats.month.net < 0 && "text-danger")}>
@@ -95,10 +109,10 @@ export default function FinancePage() {
             label="Meta de faturamento"
             icon={TargetIcon}
             accent={stats.goal.pct >= 1 ? "var(--success)" : stats.goal.atRisk ? "var(--warning)" : "var(--brand)"}
-            info="Soma das entradas do mês comparada à meta. O traço na barra é onde você deveria estar hoje para bater a meta."
+            info="Entradas realizadas do período selecionado comparadas à meta daquele mês."
             aside={
               <GoalEditor
-                monthKey={monthKey(now)}
+                monthKey={monthKey(periodDate)}
                 trigger={<button className="text-xs font-medium text-brand hover:underline">{stats.goal.hasGoal ? "Editar" : "Definir"}</button>}
               />
             }
@@ -126,11 +140,39 @@ export default function FinancePage() {
           <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" />
           <ExpensesByCategory transactions={transactions} className="lg:col-span-2" />
         </div>
-        <CashflowChart transactions={transactions} />
-        <TransactionList transactions={transactions} />
+        <CashflowChart transactions={transactions.filter(isRealizedTransaction)} />
+        </>}
+        {tab === "movimentacoes" && <TransactionList transactions={transactions.filter(isRealizedTransaction)} />}
+        {tab === "pagar" && <PlannedAccounts transactions={transactions} type="saida" />}
+        {tab === "receber" && <PlannedAccounts transactions={transactions} type="entrada" />}
       </div>
     </div>
   )
+}
+
+function PlannedAccounts({ transactions, type }: { transactions: Transaction[]; type: TransactionType }) {
+  const updateTransaction = useStore((s) => s.updateTransaction)
+  const leads = useStore((s) => s.leads)
+  const [view, setView] = useState<"abertas" | "todas">("abertas")
+  const rows = transactions.filter((t) => t.type === type && (view === "todas" || t.status === "previsto"))
+    .sort((a, b) => (a.dueDate ?? a.date).localeCompare(b.dueDate ?? b.date))
+  const total = rows.filter((t) => t.status === "previsto").reduce((sum, t) => sum + t.amountCents, 0)
+  const isPayable = type === "saida"
+  return <Panel title={isPayable ? "Contas a pagar" : "Contas a receber"} description={isPayable ? "Compromissos previstos e despesas já realizadas." : "Recebimentos esperados e receitas já realizadas."} aside={<Segmented size="sm" value={view} onChange={setView} options={[{ value: "abertas", label: "Em aberto" }, { value: "todas", label: "Todas" }]} />}>
+    <div className="flex items-center justify-between border-b px-4 py-3">
+      <div><p className="t-label">Total previsto em aberto</p><p className="t-value mt-1">{money(total)}</p></div>
+      <Button size="sm" onClick={() => openTxForm({ prefill: { type, status: "previsto" } })}>{isPayable ? "Nova conta a pagar" : "Novo recebimento"}</Button>
+    </div>
+    {rows.length === 0 ? <EmptyState icon={ReceiptIcon} title={view === "abertas" ? "Nenhum compromisso em aberto" : "Nenhum registro"} description={isPayable ? "Cadastre despesas previstas para acompanhar vencimentos sem afetar o caixa antes do pagamento." : "Cadastre recebimentos previstos para acompanhar entradas sem inflar o saldo atual."} action={<Button onClick={() => openTxForm({ prefill: { type, status: "previsto" } })}>{isPayable ? "Adicionar conta a pagar" : "Adicionar conta a receber"}</Button>} /> : <ul className="divide-y">
+      {rows.map((t) => { const lead = t.leadId ? leads.find((l) => l.id === t.leadId) : undefined; const realized = isRealizedTransaction(t); return <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1"><p className="text-sm font-medium">{t.description}</p><p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{t.category}<span>· vencimento {format(parseISO(t.dueDate ?? t.date), "dd/MM/yyyy")}</span>{t.projectName && <span>· projeto: {t.projectName}</span>}{lead && <Link href={`/pipeline/${lead.id}`} className="hover:underline">· {lead.name}</Link>}</p></div>
+        <span className={cn("rounded-full px-2 py-1 text-xs font-medium", realized ? "bg-success/10 text-success" : "bg-warning/10 text-warning")}>{realized ? (isPayable ? "Pago" : "Recebido") : "Previsto"}</span>
+        <span className="tabular w-28 text-right text-sm font-semibold">{money(t.amountCents)}</span>
+        {!realized && <Button size="sm" variant="outline" onClick={() => { updateTransaction(t.id, { status: "realizado", date: t.dueDate ?? t.date }); toast.success(isPayable ? "Pagamento registrado" : "Recebimento registrado") }}>{isPayable ? "Marcar pago" : "Marcar recebido"}</Button>}
+        {realized && view === "todas" && <Button size="sm" variant="ghost" onClick={() => updateTransaction(t.id, { status: "previsto", dueDate: t.dueDate ?? t.date })}>Reabrir</Button>}
+      </li> })}
+    </ul>}
+  </Panel>
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
@@ -212,7 +254,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
 
   return (
     <Panel
-      title="Lançamentos"
+      title="Movimentações realizadas"
       aside={
         <Segmented
           size="sm"
@@ -250,6 +292,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
                         <p className="truncate text-sm">{t.description}</p>
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t.category}
+                          {t.projectName && <span>· projeto: {t.projectName}</span>}
                           {t.source && <span className="rounded bg-muted px-1 text-[10px] font-medium capitalize">via {t.source}</span>}
                           {lead && (
                             <Link href={`/pipeline/${lead.id}`} className="inline-flex items-center gap-0.5 hover:text-foreground hover:underline">

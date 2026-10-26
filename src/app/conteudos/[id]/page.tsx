@@ -52,6 +52,7 @@ export default function ContentItemPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const item = useContentItems((s) => s.items.find((i) => i.id === id))
+  const accounts = useContentAccounts((s) => s.items)
   const patch = useContentItems((s) => s.patch)
   const remove = useContentItems((s) => s.remove)
 
@@ -125,6 +126,16 @@ export default function ContentItemPage() {
                   </Chip>
                 ))}
               </div>
+            </Field>
+            <Field label="Frente / marca">
+              <Input list="content-item-brands" value={item.brand ?? ""} onChange={(e) => set({ brand: e.target.value.trim() || undefined })} placeholder="HZK, Gabriel ou outra" />
+              <datalist id="content-item-brands">{[...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand).filter(Boolean)])].map((b) => <option key={b} value={b!} />)}</datalist>
+            </Field>
+            <Field label="Conta principal">
+              <select value={item.accountId ?? "none"} onChange={(e) => { const accountId = e.target.value === "none" ? undefined : e.target.value; const account = accounts.find((a) => a.id === accountId); set({ accountId, ...(account?.brand ? { brand: account.brand } : {}) }) }} className="h-9 w-full rounded-md border bg-card px-2 text-sm">
+                <option value="none">Selecionar depois</option>
+                {accounts.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.brand ? `${a.brand} · ` : ""}{a.name} · {a.platform}</option>)}
+              </select>
             </Field>
             <Field label="Responsável">
               <OwnerToggle value={item.ownerId} onChange={(ownerId) => set({ ownerId })} />
@@ -347,6 +358,7 @@ function PostsPanel({ item }: { item: ContentItem }) {
   const accounts = useContentAccounts((s) => s.items)
   const patch = useContentItems((s) => s.patch)
   const [accountId, setAccountId] = useState("")
+  useEffect(() => setAccountId(""), [item.id])
   const used = new Set(item.posts.map((p) => p.accountId))
   const available = accounts.filter((a) => a.active && !used.has(a.id))
   const total = sumMetrics(item.posts.map((p) => p.metrics))
@@ -393,7 +405,7 @@ function PostsPanel({ item }: { item: ContentItem }) {
               <option value="">Adicionar conta…</option>
               {available.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.platform.toUpperCase()} · {accountLabel(a)} {a.role === "cortes" ? "(cortes)" : ""}
+                  {a.platform.toUpperCase()} · {a.brand ? `${a.brand} · ` : ""}{accountLabel(a)} {a.role === "cortes" ? "(cortes)" : ""}
                 </option>
               ))}
             </select>

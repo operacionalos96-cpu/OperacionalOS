@@ -15,6 +15,7 @@ import {
   leadUrgency,
   leadsNeedingAction,
   monthDelta,
+  monthStats,
   myAgenda,
   nextOccurrence,
   parseQuickAdd,
@@ -181,6 +182,21 @@ describe("tarefas personalizadas", () => {
     ]
     expect(dayProgress(tasks, "u1", NOW)).toEqual({ done: 1, total: 2, pct: 0.5 })
     expect(dayProgress(tasks, null, NOW).total).toBe(3)
+  })
+})
+
+describe("compromissos financeiros previstos", () => {
+  it("não altera saldo nem resultado até ser realizado", () => {
+    const settings = { openingBalanceCents: 100_00, monthlyGoals: {} }
+    const txs: Transaction[] = [
+      { id: "real", type: "entrada", amountCents: 50_00, category: "Serviços", description: "Recebido", date: "2026-10-05", createdById: "u1" },
+      { id: "prev", type: "saida", amountCents: 20_00, category: "Operação", description: "Conta futura", date: "2026-10-28", dueDate: "2026-10-28", status: "previsto", createdById: "u1" },
+    ]
+    const selectedPeriod = new Date("2026-10-10T12:00:00")
+    expect(balance(settings, txs)).toBe(150_00)
+    expect(monthStats(txs, selectedPeriod)).toEqual({ income: 50_00, expense: 0, net: 50_00 })
+    expect(cashflowSeries(txs, 30, selectedPeriod).reduce((sum, point) => sum + point.saidas, 0)).toBe(0)
+    expect(balanceSeries(settings, txs, 3, selectedPeriod).at(-1)?.saldo).toBe(150_00)
   })
 })
 

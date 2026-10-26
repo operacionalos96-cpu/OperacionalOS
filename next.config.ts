@@ -3,6 +3,9 @@ import type { NextConfig } from "next"
 const isDev = process.env.NODE_ENV !== "production"
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
 const supabaseWs = supabase.replace(/^https:/, "wss:")
+const supabaseOrigin = (() => {
+  try { return new URL(supabase).origin } catch { return "" }
+})()
 
 /**
  * Content-Security-Policy: o navegador só executa/conecta no que está listado.
@@ -13,7 +16,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
   "font-src 'self' data:",
   `connect-src 'self' ${supabase} ${supabaseWs}${isDev ? " ws://localhost:* http://localhost:*" : ""}`.trim(),
   "frame-ancestors 'none'",

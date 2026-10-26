@@ -24,6 +24,8 @@ export type AccountRole = "principal" | "cortes"
 export interface ContentAccount {
   id: string
   name: string
+  /** Frente/marca organizacional; string livre para permitir novas contas no futuro. */
+  brand?: string
   handle?: string
   platform: Platform
   role: AccountRole
@@ -109,6 +111,10 @@ export interface ContentItem {
   format: ContentFormat
   stage: ContentStage
   productId?: string
+  /** Frente responsável pelo conteúdo (ex.: HZK, Gabriel); não fixa a lista de frentes. */
+  brand?: string
+  /** Conta principal sugerida para publicação. Publicações podem ir a várias contas. */
+  accountId?: string
   ownerId: string
   dueDate?: ISODate
   script?: string

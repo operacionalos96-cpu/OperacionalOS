@@ -6,6 +6,17 @@ const NOW = new Date(2025, 9, 15, 10)
 const node = (p: object) => ({ id: Math.random().toString(), label: "Etapa", x: 0, y: 0, ...p })
 const task = (p: object) => ({ id: "t", done: false, createdAt: "2025-10-01T10:00:00Z", ...p })
 
+describe("tipos de item na lousa", () => {
+  it("imagem e forma não contam como ideias estruturadas", () => {
+    const items = [
+      { id: "idea", label: "Plano", x: 0, y: 0 },
+      { id: "image", label: "Foto", x: 0, y: 0, type: "image" as const, imagePath: "anexos/map-image/m/foto.png" },
+      { id: "shape", label: "Decisão", x: 0, y: 0, type: "shape" as const, shapeKind: "diamond" as const },
+    ]
+    expect(ideaNodes(items).map((item) => item.id)).toEqual(["idea"])
+  })
+})
+
 describe("status do mapa", () => {
   it("sem tarefa: usa o status do item (padrão a fazer)", () => {
     expect(nodeStatus({}, [], NOW)).toBe("afazer")

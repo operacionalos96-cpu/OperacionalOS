@@ -91,16 +91,20 @@ export function pipelineSummary(leads: Lead[]) {
 
 // ---------- financeiro ----------
 
+export function isRealizedTransaction(t: Transaction) {
+  return t.status !== "previsto"
+}
+
 function signed(t: Transaction) {
   return t.type === "entrada" ? t.amountCents : -t.amountCents
 }
 
 export function balance(settings: FinanceSettings, txs: Transaction[]) {
-  return settings.openingBalanceCents + sum(txs.map(signed))
+  return settings.openingBalanceCents + sum(txs.filter(isRealizedTransaction).map(signed))
 }
 
 export function monthStats(txs: Transaction[], now: Date) {
-  const inMonth = txs.filter((t) => isSameMonth(parseISO(t.date), now))
+  const inMonth = txs.filter((t) => isRealizedTransaction(t) && isSameMonth(parseISO(t.date), now))
   const income = sum(inMonth.filter((t) => t.type === "entrada").map((t) => t.amountCents))
   const expense = sum(inMonth.filter((t) => t.type === "saida").map((t) => t.amountCents))
   return { income, expense, net: income - expense }
@@ -147,7 +151,7 @@ export function cashflowSeries(txs: Transaction[], range: 30 | 90, now: Date): C
     }
   })
 
-  for (const t of txs) {
+  for (const t of txs.filter(isRealizedTransaction)) {
     const idx = Math.floor(differenceInCalendarDays(parseISO(t.date), start) / bucketDays)
     if (idx < 0 || idx >= buckets) continue
     points[idx][t.type === "entrada" ? "entradas" : "saidas"] += t.amountCents / 100
@@ -160,9 +164,9 @@ export function balanceSeries(settings: FinanceSettings, txs: Transaction[], day
   const today = startOfDay(now)
   const start = addDays(today, -(days - 1))
   const startKey = format(start, "yyyy-MM-dd")
-  let running = settings.openingBalanceCents + sum(txs.filter((t) => t.date < startKey).map(signed))
+  let running = settings.openingBalanceCents + sum(txs.filter((t) => isRealizedTransaction(t) && t.date < startKey).map(signed))
   const byDay = new Map<string, number>()
-  for (const t of txs) if (t.date >= startKey) byDay.set(t.date, (byDay.get(t.date) ?? 0) + signed(t))
+  for (const t of txs) if (isRealizedTransaction(t) && t.date >= startKey) byDay.set(t.date, (byDay.get(t.date) ?? 0) + signed(t))
   return Array.from({ length: days }, (_, i) => {
     const d = addDays(start, i)
     const key = format(d, "yyyy-MM-dd")
@@ -175,7 +179,7 @@ export function balanceSeries(settings: FinanceSettings, txs: Transaction[], day
 export function expensesByCategory(txs: Transaction[], now: Date) {
   const map = new Map<string, number>()
   for (const t of txs) {
-    if (t.type !== "saida" || !isSameMonth(parseISO(t.date), now)) continue
+    if (!isRealizedTransaction(t) || t.type !== "saida" || !isSameMonth(parseISO(t.date), now)) continue
     map.set(t.category, (map.get(t.category) ?? 0) + t.amountCents)
   }
   const total = sum([...map.values()])

@@ -22,6 +22,9 @@ export function TransactionFormDialog() {
   const [category, setCategory] = useState(CATEGORIES.entrada[0])
   const [description, setDescription] = useState("")
   const [date, setDate] = useState(today())
+  const [dueDate, setDueDate] = useState(today())
+  const [status, setStatus] = useState<"previsto" | "realizado">("realizado")
+  const [projectName, setProjectName] = useState("")
   const [leadId, setLeadId] = useState<string | undefined>()
   const [productId, setProductId] = useState<string | undefined>()
   const leads = useStore((s) => s.leads)
@@ -35,6 +38,9 @@ export function TransactionFormDialog() {
     setCategory(p.category ?? CATEGORIES[t][0])
     setDescription(p.description ?? "")
     setDate(p.date ?? today())
+    setDueDate(p.dueDate ?? p.date ?? today())
+    setStatus(p.status ?? "realizado")
+    setProjectName(p.projectName ?? "")
     setLeadId(p.leadId)
     setProductId(p.productId)
   }, [form])
@@ -60,7 +66,10 @@ export function TransactionFormDialog() {
       amountCents: cents!,
       category,
       description: description.trim() || category,
-      date,
+      date: status === "previsto" ? dueDate : date,
+      dueDate: status === "previsto" ? dueDate : undefined,
+      status,
+      projectName: projectName.trim() || undefined,
       leadId: type === "entrada" ? leadId : undefined,
       productId,
     })
@@ -102,7 +111,11 @@ export function TransactionFormDialog() {
           <Field label="Descrição">
             <Input placeholder={category} value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
-          <Field label="Data">
+          <Field label="Situação do lançamento">
+            <Segmented value={status} onChange={setStatus} options={[{ value: "realizado", label: "Realizado" }, { value: "previsto", label: type === "saida" ? "A pagar" : "A receber" }]} />
+            <p className="mt-1 text-xs text-muted-foreground">Previstos não alteram o saldo nem os gráficos de caixa até serem marcados como realizados.</p>
+          </Field>
+          <Field label={status === "previsto" ? "Vencimento" : "Data do movimento"}>
             <div className="flex flex-wrap items-center gap-1.5">
               <Chip active={date === today()} onClick={() => setDate(today())}>
                 Hoje
@@ -110,8 +123,11 @@ export function TransactionFormDialog() {
               <Chip active={date === yesterday} onClick={() => setDate(yesterday)}>
                 Ontem
               </Chip>
-              <CalendarChip value={date} onChange={setDate} highlight={date !== today() && date !== yesterday} />
+              <CalendarChip value={status === "previsto" ? dueDate : date} onChange={status === "previsto" ? setDueDate : setDate} highlight={(status === "previsto" ? dueDate : date) !== today() && (status === "previsto" ? dueDate : date) !== yesterday} />
             </div>
+          </Field>
+          <Field label="Projeto" hint="opcional">
+            <Input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Ex.: Lançamento HZK" />
           </Field>
           {type === "entrada" && (
             <Field label="Veio de um negócio do pipeline?" hint="opcional">

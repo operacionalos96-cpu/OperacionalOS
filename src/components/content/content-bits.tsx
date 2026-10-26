@@ -46,6 +46,7 @@ export function AccountFormDialog({ open, account, onClose }: { open: boolean; a
   const save = useContentAccounts((s) => s.save)
   const removeAccount = useContentAccounts((s) => s.remove)
   const [name, setName] = useState("")
+  const [brand, setBrand] = useState("HZK")
   const [handle, setHandle] = useState("")
   const [platform, setPlatform] = useState<Platform>("youtube")
   const [role, setRole] = useState<AccountRole>("principal")
@@ -57,6 +58,7 @@ export function AccountFormDialog({ open, account, onClose }: { open: boolean; a
   useEffect(() => {
     if (!open) return
     setName(account?.name ?? "")
+    setBrand(account?.brand ?? "HZK")
     setHandle(account?.handle ?? "")
     setPlatform(account?.platform ?? "youtube")
     setRole(account?.role ?? "principal")
@@ -81,6 +83,7 @@ export function AccountFormDialog({ open, account, onClose }: { open: boolean; a
       createdAt: account?.createdAt ?? new Date().toISOString(),
       active: account?.active ?? true,
       name: name.trim(),
+      brand: brand.trim() || undefined,
       handle: handle.trim().replace(/^@/, "") || undefined,
       platform,
       role,
@@ -137,7 +140,10 @@ export function AccountFormDialog({ open, account, onClose }: { open: boolean; a
             </Field>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nome *">
+            <Field label="Frente / marca" hint="ex.: HZK, Gabriel ou outra">
+              <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Nome da frente" />
+            </Field>
+            <Field label="Nome da conta *">
               <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Canal principal" />
             </Field>
             <Field label="@ da conta">
@@ -192,6 +198,9 @@ export function NewContentDialog({ open, onClose, onCreated }: { open: boolean; 
   const [format, setFormat] = useState<ContentFormat>("short")
   const [productId, setProductId] = useState<string | undefined>()
   const [dueDate, setDueDate] = useState<string | undefined>()
+  const [brand, setBrand] = useState("HZK")
+  const [accountId, setAccountId] = useState<string | undefined>()
+  const accounts = useContentAccounts((s) => s.items)
 
   useEffect(() => {
     if (!open) return
@@ -199,6 +208,8 @@ export function NewContentDialog({ open, onClose, onCreated }: { open: boolean; 
     setFormat("short")
     setProductId(undefined)
     setDueDate(undefined)
+    setBrand("HZK")
+    setAccountId(undefined)
   }, [open])
 
   function submit(e: React.FormEvent) {
@@ -210,6 +221,8 @@ export function NewContentDialog({ open, onClose, onCreated }: { open: boolean; 
       format,
       stage: "ideia",
       productId,
+      brand: brand.trim() || undefined,
+      accountId,
       ownerId: meId,
       dueDate,
       assets: [],
@@ -238,6 +251,18 @@ export function NewContentDialog({ open, onClose, onCreated }: { open: boolean; 
               ))}
             </div>
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Frente / marca">
+              <Input list="content-brands" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="HZK, Gabriel…" />
+              <datalist id="content-brands">{[...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand).filter(Boolean)])].map((b) => <option key={b} value={b!} />)}</datalist>
+            </Field>
+            <Field label="Conta principal" hint="opcional">
+              <select value={accountId ?? "none"} onChange={(e) => { const id = e.target.value === "none" ? undefined : e.target.value; setAccountId(id); const a = accounts.find((x) => x.id === id); if (a?.brand) setBrand(a.brand) }} className="h-9 w-full rounded-md border bg-card px-2 text-sm">
+                <option value="none">Selecionar depois</option>
+                {accounts.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.brand ? `${a.brand} · ` : ""}{a.name} · {a.platform}</option>)}
+              </select>
+            </Field>
+          </div>
           <Field label="Prazo para publicar" hint="opcional">
             <DueDateField allowEmpty value={dueDate} onChange={setDueDate} />
           </Field>

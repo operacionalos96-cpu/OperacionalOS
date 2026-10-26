@@ -95,11 +95,15 @@ export function TaskList() {
   const [query, setQuery] = useState("")
   const [priority, setPriority] = useState<Priority | null>(null)
   const [label, setLabel] = useState<string | null>(null)
+  const [project, setProject] = useState<string>("todos")
+  const [responsible, setResponsible] = useState<string>("todos")
+  const [dueFilter, setDueFilter] = useState<"todos" | "atrasadas" | "hoje" | "com_prazo" | "sem_prazo">("todos")
   const [sort, setSort] = useState<TaskSort>("prazo")
   const now = new Date()
 
   const allLabels = useMemo(() => [...new Set(tasks.flatMap((t) => t.labels ?? []))].sort(), [tasks])
-  const filtering = !!query || !!priority || !!label
+  const allProjects = useMemo(() => [...new Set(tasks.map((t) => t.projectName?.trim()).filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, "pt-BR")), [tasks])
+  const filtering = !!query || !!priority || !!label || project !== "todos" || responsible !== "todos" || dueFilter !== "todos"
 
   const grouped = useMemo(() => {
     const n = new Date()
@@ -110,7 +114,10 @@ export function TaskList() {
         (!t.done || !t.doneAt || daysSince(t.doneAt, n) <= DONE_VISIBLE_DAYS) &&
         (!priority || t.priority === priority) &&
         (!label || t.labels?.includes(label)) &&
-        (!q || t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)),
+        (project === "todos" || t.projectName === project) &&
+        (responsible === "todos" || taskPeople(t).includes(responsible)) &&
+        (dueFilter === "todos" || (dueFilter === "atrasadas" && !t.done && !!t.dueDate && daysSince(t.dueDate, n) > 0) || (dueFilter === "hoje" && !t.done && !!t.dueDate && daysSince(t.dueDate, n) === 0) || (dueFilter === "com_prazo" && !!t.dueDate) || (dueFilter === "sem_prazo" && !t.dueDate)) &&
+        (!q || t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.projectName?.toLowerCase().includes(q)),
     )
     const map = new Map<TaskBucket | "andamento", Task[]>()
     for (const t of visible) {
@@ -119,7 +126,7 @@ export function TaskList() {
     }
     for (const list of map.values()) list.sort((a, b) => compareTasks(a, b, sort))
     return map
-  }, [tasks, scope, meId, query, priority, label, sort])
+  }, [tasks, scope, meId, query, priority, label, project, responsible, dueFilter, sort])
 
   const openCount = [...grouped.entries()].filter(([b]) => b !== "feitas").reduce((acc, [, l]) => acc + l.length, 0)
   const progress = dayProgress(tasks, scope === "minhas" ? meId : null, now)
@@ -127,7 +134,7 @@ export function TaskList() {
   let rowIndex = 0
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 sm:p-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
       <DayProgress done={progress.done} total={progress.total} team={scope === "todas"} />
 
       <QuickAdd />
@@ -146,6 +153,17 @@ export function TaskList() {
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar tarefa" className="h-7 pl-8 text-xs" />
         </div>
+        <select aria-label="Filtrar por projeto" value={project} onChange={(e) => setProject(e.target.value)} className="h-7 max-w-40 rounded-md border bg-card px-2 text-xs text-foreground">
+          <option value="todos">Todos os projetos</option>
+          {allProjects.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <select aria-label="Filtrar por responsável" value={responsible} onChange={(e) => setResponsible(e.target.value)} className="h-7 max-w-40 rounded-md border bg-card px-2 text-xs text-foreground">
+          <option value="todos">Todos responsáveis</option>
+          {TEAM.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+        </select>
+        <select aria-label="Filtrar por prazo" value={dueFilter} onChange={(e) => setDueFilter(e.target.value as typeof dueFilter)} className="h-7 max-w-36 rounded-md border bg-card px-2 text-xs text-foreground">
+          <option value="todos">Todos os prazos</option><option value="atrasadas">Atrasadas</option><option value="hoje">Vencem hoje</option><option value="com_prazo">Com prazo</option><option value="sem_prazo">Sem prazo</option>
+        </select>
         <FilterMenu
           icon={FlagIcon}
           label={priority ? PRIORITIES.find((p) => p.id === priority)!.label : "Prioridade"}
@@ -330,10 +348,10 @@ function TaskRow({ task, now, index, blockedBy }: { task: Task; now: Date; index
       {accent && !task.done && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full" style={{ background: accent }} />}
       <StatusButton status={taskStatus(task)} onClick={() => cycleTaskStatus(task.id)} className="mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm leading-snug transition-colors", task.done && "text-muted-foreground line-through decoration-muted-foreground/50")}>
+        <p className={cn("text-[15px] leading-snug transition-colors", task.done && "text-muted-foreground line-through decoration-muted-foreground/50")}>
           {task.title}
         </p>
-        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status || blockedBy > 0) && (
+        {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status || task.projectName || blockedBy > 0) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
             {blockedBy > 0 && (
               <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-px text-[11px] font-medium text-danger" title="Depende de algo que ainda não foi feito">
@@ -344,6 +362,7 @@ function TaskRow({ task, now, index, blockedBy }: { task: Task; now: Date; index
               <span className="rounded bg-warning-soft px-1.5 py-px text-[11px] font-medium text-warning">Em andamento</span>
             )}
             <PriorityFlag priority={task.priority} withLabel />
+            {task.projectName && <span className="rounded bg-muted px-1.5 py-px text-[11px] text-foreground/80">{task.projectName}</span>}
             {task.labels?.map((l) => <LabelChip key={l} label={l} />)}
             {progress.total > 0 && (
               <span className={cn("inline-flex items-center gap-1", progress.done === progress.total && "text-success")}>
@@ -423,6 +442,7 @@ function QuickAdd() {
   const [people, setPeople] = useState<string[] | null>(null)
   const [dueDate, setDueDate] = useState<string | undefined>()
   const [priority, setPriority] = useState<Priority | undefined>()
+  const [projectName, setProjectName] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const assignees = people ?? [meId]
   const shortcuts = dueShortcuts().slice(0, 2)
@@ -432,9 +452,10 @@ function QuickAdd() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!parsed.title) return
-    createTask({ title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels })
+    createTask({ title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels, projectName })
     setTitle("")
     setPriority(undefined)
+    setProjectName("")
     inputRef.current?.focus()
   }
 
@@ -467,6 +488,8 @@ function QuickAdd() {
         ))}
         <span className="mx-1 h-4 w-px bg-border" />
         <PeoplePicker value={assignees} onChange={setPeople} />
+        <input list="operacional-quickadd-projects" aria-label="Projeto da tarefa" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Projeto…" className="h-7 w-28 rounded-md border bg-background px-2 text-xs" />
+        <datalist id="operacional-quickadd-projects">{[...new Set(useStore.getState().tasks.map((t) => t.projectName).filter(Boolean))].map((name) => <option key={name} value={name!} />)}</datalist>
         <span className="mx-1 h-4 w-px bg-border" />
         {PRIORITIES.slice(0, 2).map((p) => (
           <Chip
@@ -486,7 +509,7 @@ function QuickAdd() {
           aria-label="Mais opções (data, lead, checklist, repetir)"
           title="Mais opções: data específica, lead, checklist, repetir"
           onClick={() => {
-            openTaskForm({ prefill: { title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels } })
+            openTaskForm({ prefill: { title: parsed.title, ...assignPeople(assignees), dueDate, priority: effectivePriority, labels: parsed.labels, projectName } })
             setTitle("")
           }}
         >

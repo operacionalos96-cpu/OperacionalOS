@@ -39,6 +39,8 @@ export function TaskDetailSheet() {
 function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const task = useStore((s) => s.tasks.find((t) => t.id === taskId))!
   const lead = useStore((s) => (task.leadId ? s.leads.find((l) => l.id === task.leadId) : undefined))
+  const notes = useStore((s) => s.notes)
+  const relatedNotes = notes.filter((n) => n.taskId === task.id || (!!task.projectName && n.projectName === task.projectName))
   const updateTask = useStore((s) => s.updateTask)
   const set = (patch: Parameters<typeof updateTask>[1]) => updateTask(task.id, patch)
   const progress = checklistProgress(task)
@@ -78,6 +80,10 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
               { value: "feito", label: <><span className="size-2 rounded-full bg-success" /> Feita</> },
             ]}
           />
+        </Field>
+        <Field label="Projeto" hint="usado para agrupar tarefas e notas relacionadas">
+          <input list="task-detail-projects" value={task.projectName ?? ""} onChange={(e) => set({ projectName: e.target.value.trim() || undefined })} placeholder="Ex.: Lançamento HZK" className="h-9 w-full rounded-md border bg-background px-3 text-sm" />
+          <datalist id="task-detail-projects">{[...new Set(useStore.getState().tasks.map((t) => t.projectName).filter(Boolean))].map((p) => <option key={p} value={p!} />)}</datalist>
         </Field>
         <Field label="Prazo" hint={task.dueDate ? dueLabel(task.dueDate) : undefined}>
           <DueDateField allowEmpty value={task.dueDate} onChange={(dueDate) => set({ dueDate })} />
@@ -122,6 +128,13 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
       <div className="border-t">
         <p className="t-label px-5 pt-4">Conexões</p>
         <ConnectionsPanel entity={{ type: "task", id: task.id }} bare />
+      </div>
+      <div className="border-t">
+        <p className="t-label px-5 pt-4">Notas relacionadas</p>
+        <div className="grid gap-1 px-5 py-3">
+          {relatedNotes.length ? relatedNotes.map((note) => <Link key={note.id} href={`/tarefas?aba=notas&nota=${encodeURIComponent(note.id)}`} onClick={onClose} className="rounded-md border px-3 py-2 hover:bg-accent"><span className="block truncate text-sm font-medium">{note.title || "Sem título"}</span><span className="text-xs text-muted-foreground">{note.projectName || task.projectName || "Sem projeto"}</span></Link>) : <p className="text-xs text-muted-foreground">Vincule uma nota a esta tarefa ou ao projeto para manter decisões e contexto juntos.</p>}
+          <Link href={`/tarefas?aba=notas`} onClick={onClose} className="mt-1 text-xs text-brand hover:underline">Abrir notas</Link>
+        </div>
       </div>
       <div className="border-t">
         <p className="t-label px-5 pt-4">Contexto</p>

@@ -4,7 +4,7 @@ import { create } from "zustand"
 import { toast } from "sonner"
 import { TEAM, syncTeamMembers } from "@/config/team"
 import { isOpenStage, stageLabel } from "@/lib/domain/constants"
-import { nextOccurrence } from "@/lib/domain/rules"
+import { isRealizedTransaction, nextOccurrence } from "@/lib/domain/rules"
 import type { OrgMember, RoleLevel } from "@/lib/domain/org"
 import type {
   Activity,
@@ -70,6 +70,7 @@ export interface NewTaskInput {
   recurrence?: Recurrence
   collaborators?: string[]
   seriesId?: string
+  projectName?: string
 }
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
@@ -113,11 +114,12 @@ interface State {
   restoreTask(task: Task): void
 
   createNote(): Note
-  updateNote(id: string, patch: Partial<Pick<Note, "title" | "body">>): void
+  updateNote(id: string, patch: Partial<Pick<Note, "title" | "body" | "taskId" | "projectName">>): void
   deleteNote(id: string): void
   restoreNote(note: Note): void
 
   createTransaction(input: NewTransactionInput): Transaction
+  updateTransaction(id: string, patch: Partial<Omit<Transaction, "id" | "createdById">>): void
   deleteTransaction(id: string): void
   restoreTransaction(tx: Transaction): void
   setMonthlyGoal(monthKey: string, cents: number): void
@@ -397,6 +399,7 @@ export const useStore = create<State>((set, get) => {
         checklist: input.checklist?.length ? input.checklist : undefined,
         recurrence: input.recurrence,
         seriesId: input.seriesId,
+        projectName: input.projectName?.trim() || undefined,
         collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
@@ -470,8 +473,19 @@ export const useStore = create<State>((set, get) => {
       const tx: Transaction = { ...input, id: uid(), createdById: get().meId }
       set((s) => ({ transactions: [...s.transactions, tx] }))
       persist(repos().transactions.upsert(tx))
-      if (tx.type === "entrada") emit({ type: "entrada.lancada", transactionId: tx.id, amountCents: tx.amountCents })
+      if (tx.type === "entrada" && isRealizedTransaction(tx)) emit({ type: "entrada.lancada", transactionId: tx.id, amountCents: tx.amountCents })
       return tx
+    },
+
+    updateTransaction(id, patch) {
+      const current = get().transactions.find((t) => t.id === id)
+      if (!current) return
+      const updated = { ...current, ...patch }
+      set((s) => ({ transactions: s.transactions.map((t) => (t.id === id ? updated : t)) }))
+      persist(repos().transactions.upsert(updated))
+      if (current.type === "entrada" && current.status === "previsto" && isRealizedTransaction(updated)) {
+        emit({ type: "entrada.lancada", transactionId: id, amountCents: updated.amountCents })
+      }
     },
 
     deleteTransaction(id) {

@@ -28,6 +28,20 @@ describe("migração do mapa para 1 registro por balão", () => {
     expect(resolved.edges).toEqual(legacy.edges)
   })
 
+  it("preserva caminho de imagem e tipo de forma na migração e recuperação", () => {
+    const withCanvasItems: MindMap = {
+      ...legacy,
+      nodes: [
+        ...legacy.nodes,
+        { id: "img", label: "Referência visual", x: 320, y: 180, type: "image", imagePath: "anexos/map-image/m/ref.png" },
+        { id: "shape", label: "Decisão", x: 600, y: 180, type: "shape", shapeKind: "diamond" },
+      ],
+    }
+    const rows = migrationRows(withCanvasItems)
+    const [resolved] = resolveMaps([{ ...withCanvasItems, storage: "rows" }], rows.nodes, rows.edges)
+    expect(resolved.nodes).toEqual(withCanvasItems.nodes)
+  })
+
   it("mapa ainda no formato antigo não muda", () => {
     const rows = migrationRows(legacy)
     expect(resolveMaps([legacy], rows.nodes, rows.edges)[0]).toBe(legacy)

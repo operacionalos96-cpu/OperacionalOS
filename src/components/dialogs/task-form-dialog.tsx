@@ -29,6 +29,7 @@ export function TaskFormDialog() {
   const [labels, setLabels] = useState<string[]>([])
   const [recurrence, setRecurrence] = useState<Recurrence | undefined>()
   const [description, setDescription] = useState("")
+  const [projectName, setProjectName] = useState("")
   const [more, setMore] = useState(false)
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export function TaskFormDialog() {
     setLabels(form.prefill?.labels ?? [])
     setRecurrence(form.prefill?.recurrence)
     setDescription(form.prefill?.description ?? "")
+    setProjectName(form.prefill?.projectName ?? "")
     setMore(false)
   }, [form, meId])
 
@@ -51,7 +53,7 @@ export function TaskFormDialog() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    const task = createTask({ title, ...assignPeople(people), dueDate, leadId, priority, labels, recurrence, description })
+    const task = createTask({ title, ...assignPeople(people), dueDate, leadId, priority, labels, recurrence, description, projectName })
     form?.onCreated?.(task)
     close()
     toast.success("Tarefa criada", {
@@ -69,6 +71,9 @@ export function TaskFormDialog() {
         </DialogHeader>
         <form onSubmit={submit} onKeyDown={submitOnModEnter} className="grid gap-4">
           <Input autoFocus placeholder="O que precisa ser feito?" value={title} onChange={(e) => setTitle(e.target.value)} className="h-10 text-base" />
+          <Field label="Projeto" hint="opcional · nome usado para agrupar tarefas e notas">
+            <Input list="operacional-form-projects" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Ex.: Lançamento HZK" />
+          </Field>
           <Field label="Prazo">
             <DueDateField value={dueDate} onChange={setDueDate} allowEmpty />
           </Field>

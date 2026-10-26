@@ -133,6 +133,8 @@ export interface Task {
   status?: "andamento"
   /** Tarefas recorrentes: id da primeira da série (as próximas nascem com ele). */
   seriesId?: string
+  /** Nome do projeto para agrupamento transversal sem exigir cadastro de projeto novo. */
+  projectName?: string
 }
 
 export interface Note {
@@ -141,6 +143,9 @@ export interface Note {
   body: string
   authorId: string
   updatedAt: ISODate
+  /** Vínculos opcionais para manter notas de reunião junto das atividades. */
+  taskId?: string
+  projectName?: string
 }
 
 export type TransactionType = "entrada" | "saida"
@@ -158,6 +163,10 @@ export interface Transaction {
   createdById: string
   /** Veio sozinho de uma integração ("hotmart", "kiwify"…). Sem valor = lançado à mão. */
   source?: string
+  /** undefined/realizado = movimento efetivo; previsto = compromisso futuro. */
+  status?: "previsto" | "realizado"
+  dueDate?: ISODate
+  projectName?: string
 }
 
 export interface FinanceSettings {
