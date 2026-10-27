@@ -57,7 +57,7 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
       { href: "/mapas", label: "Mapas", icon: NetworkIcon },
       { href: "/metas", label: "Metas", icon: TargetIcon },
       { href: "/equipe", label: "Equipe", icon: UsersIcon },
-      { href: "/cofre", label: "Cofre", icon: KeyRoundIcon },
+      { href: "/equipe/cofre", label: "Cofre", icon: KeyRoundIcon },
     ],
   },
 ]

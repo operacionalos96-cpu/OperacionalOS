@@ -207,7 +207,11 @@ export const useStore = create<State>((set, get) => {
         return
       }
       // O banco só devolve a linha se o e-mail estiver autorizado (RLS).
-      const { data: member, error: memberError } = await sb.from("members").select("*").maybeSingle()
+      const { data: member, error: memberError } = await sb
+        .from("members")
+        .select("*")
+        .ilike("email", auth.user.email ?? "")
+        .maybeSingle()
       if (memberError) {
         set({ access: "erro" })
         return
