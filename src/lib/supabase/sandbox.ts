@@ -68,6 +68,9 @@ class Query implements PromiseLike<{ data: unknown; error: null }> {
     this.filters.push([col, v])
     return this
   }
+  ilike(col: string, v: unknown) {
+    return this.eq(col, v)
+  }
   maybeSingle() {
     this.single = true
     return this

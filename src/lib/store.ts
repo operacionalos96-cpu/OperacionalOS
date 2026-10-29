@@ -4,7 +4,7 @@ import { create } from "zustand"
 import { toast } from "sonner"
 import { TEAM, syncTeamMembers } from "@/config/team"
 import { isOpenStage, stageLabel } from "@/lib/domain/constants"
-import { isRealizedTransaction, nextOccurrence } from "@/lib/domain/rules"
+import { isRealizedTransaction, nextOccurrence, planSettlement } from "@/lib/domain/rules"
 import type { OrgMember, RoleLevel } from "@/lib/domain/org"
 import type {
   Activity,
@@ -30,6 +30,7 @@ import { getRepositories } from "@/lib/repositories"
 import { TABLES, subscribeToChanges } from "@/lib/repositories/supabase"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { registeredCollections } from "@/lib/collection-store"
+import { canonicalProjectName } from "@/lib/domain/project-names"
 import { emit } from "@/lib/events"
 import { recordEvent } from "@/lib/event-service"
 import "@/lib/modules"
@@ -114,12 +115,14 @@ interface State {
   restoreTask(task: Task): void
 
   createNote(): Note
-  updateNote(id: string, patch: Partial<Pick<Note, "title" | "body" | "taskId" | "projectName">>): void
+  updateNote(id: string, patch: Partial<Pick<Note, "title" | "body" | "taskId" | "taskIds" | "projectName">>): void
   deleteNote(id: string): void
   restoreNote(note: Note): void
 
   createTransaction(input: NewTransactionInput): Transaction
   updateTransaction(id: string, patch: Partial<Omit<Transaction, "id" | "createdById">>): void
+  /** Baixa um compromisso previsto na data real; se o valor for menor, registra pagamento parcial e mantém o restante em aberto. */
+  settleTransaction(id: string, input: { date: string; amountCents?: number }): void
   deleteTransaction(id: string): void
   restoreTransaction(tx: Transaction): void
   setMonthlyGoal(monthKey: string, cents: number): void
@@ -155,7 +158,16 @@ export const useStore = create<State>((set, get) => {
     persist(repos().leads.upsert(lead))
   }
 
+  /** Projetos já usados em tarefas, notas e lançamentos — base para não duplicar "Site"/"site". */
+  const knownProjects = () => [
+    ...get().tasks.map((t) => t.projectName),
+    ...get().notes.map((n) => n.projectName),
+    ...get().transactions.map((t) => t.projectName),
+  ]
+  const canon = (name: string | undefined | null) => canonicalProjectName(name, knownProjects())
+
   const saveTask = (task: Task) => {
+    task = { ...task, projectName: canon(task.projectName) }
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) }))
     persist(repos().tasks.upsert(task))
   }
@@ -206,11 +218,18 @@ export const useStore = create<State>((set, get) => {
         window.location.href = "/login"
         return
       }
-      // O banco só devolve a linha se o e-mail estiver autorizado (RLS).
+      // Resolve o membro autenticado explicitamente. Sem o filtro, `maybeSingle()` falha
+      // quando a política RLS permite enxergar mais de um membro da equipe.
+      const authenticatedEmail = auth.user.email?.trim()
+      if (!authenticatedEmail) {
+        set({ access: "negado", meEmail: "" })
+        await sb.auth.signOut()
+        return
+      }
       const { data: member, error: memberError } = await sb
         .from("members")
         .select("*")
-        .ilike("email", auth.user.email ?? "")
+        .ilike("email", authenticatedEmail)
         .maybeSingle()
       if (memberError) {
         set({ access: "erro" })
@@ -403,7 +422,7 @@ export const useStore = create<State>((set, get) => {
         checklist: input.checklist?.length ? input.checklist : undefined,
         recurrence: input.recurrence,
         seriesId: input.seriesId,
-        projectName: input.projectName?.trim() || undefined,
+        projectName: canon(input.projectName),
         collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
@@ -457,6 +476,7 @@ export const useStore = create<State>((set, get) => {
       const note = get().notes.find((n) => n.id === id)
       if (!note) return
       const updated = { ...note, ...patch, updatedAt: nowIso() }
+      if ("projectName" in patch) updated.projectName = canon(patch.projectName)
       set((s) => ({ notes: s.notes.map((n) => (n.id === id ? updated : n)) }))
       persist(repos().notes.upsert(updated))
     },
@@ -474,7 +494,7 @@ export const useStore = create<State>((set, get) => {
     // ---------- financeiro ----------
 
     createTransaction(input) {
-      const tx: Transaction = { ...input, id: uid(), createdById: get().meId }
+      const tx: Transaction = { ...input, projectName: canon(input.projectName), id: uid(), createdById: get().meId }
       set((s) => ({ transactions: [...s.transactions, tx] }))
       persist(repos().transactions.upsert(tx))
       if (tx.type === "entrada" && isRealizedTransaction(tx)) emit({ type: "entrada.lancada", transactionId: tx.id, amountCents: tx.amountCents })
@@ -485,11 +505,29 @@ export const useStore = create<State>((set, get) => {
       const current = get().transactions.find((t) => t.id === id)
       if (!current) return
       const updated = { ...current, ...patch }
+      if ("projectName" in patch) updated.projectName = canon(patch.projectName)
       set((s) => ({ transactions: s.transactions.map((t) => (t.id === id ? updated : t)) }))
       persist(repos().transactions.upsert(updated))
       if (current.type === "entrada" && current.status === "previsto" && isRealizedTransaction(updated)) {
         emit({ type: "entrada.lancada", transactionId: id, amountCents: updated.amountCents })
       }
+    },
+
+    settleTransaction(id, { date, amountCents }) {
+      const current = get().transactions.find((t) => t.id === id)
+      if (!current || current.status !== "previsto") return
+      const plan = planSettlement(current, date, amountCents)
+      if (plan.full) {
+        get().updateTransaction(id, { status: "realizado", date })
+        return
+      }
+      // Parcial: nasce um movimento realizado com o valor pago; o compromisso segue em aberto com o restante.
+      get().createTransaction({
+        type: current.type, amountCents: plan.paid, category: current.category, description: `${current.description} (parcial)`,
+        date, status: "realizado", dueDate: current.dueDate, leadId: current.leadId, productId: current.productId,
+        projectName: current.projectName, source: current.source,
+      })
+      get().updateTransaction(id, { amountCents: plan.remaining, originalCents: plan.originalCents })
     },
 
     deleteTransaction(id) {

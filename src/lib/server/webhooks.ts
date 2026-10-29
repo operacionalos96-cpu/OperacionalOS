@@ -3,6 +3,9 @@ import { randomBytes } from "node:crypto"
 import { afterFailure, publicId } from "@/lib/domain/jobs"
 import { decrypt, encrypt } from "./crypto"
 import { queueConfig } from "./jobs"
+import { safePost, assertPublicHost } from "./ssrf"
+import { forbiddenAddress } from "./ssrf-rules"
+import { isIP } from "node:net"
 import { supabaseAdmin } from "./supabase-admin"
 import { DELIVERY_ID_HEADER, EVENT_ID_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER, sign, verify } from "./webhook-signing"
 
@@ -24,6 +27,9 @@ export function checkEndpoint(url: string) {
     if (local && process.env.NODE_ENV === "production") return "endereço local não é permitido em produção"
     if (u.username || u.password) return "não coloque usuário/senha na URL"
     if (/(secret|token|key)=/i.test(u.search)) return "nunca coloque segredo na URL"
+    const host = u.hostname.replace(/^\[|\]$/g, "")
+    if (isIP(host) && forbiddenAddress(host, process.env.NODE_ENV !== "production")) return "destino bloqueado (rede privada ou interna)"
+    if (/\.(local|internal|localhost|lan|home)$/i.test(host)) return "destino bloqueado (rede privada ou interna)"
     return null
   } catch {
     return "URL inválida"
@@ -33,6 +39,8 @@ export function checkEndpoint(url: string) {
 export async function createWebhook(input: { name: string; endpoint: string; eventTypes: string[]; createdBy: string }) {
   const problem = checkEndpoint(input.endpoint)
   if (problem) throw new Error(problem)
+  const dnsProblem = await assertPublicHost(new URL(input.endpoint).hostname)
+  if (dnsProblem) throw new Error(dnsProblem)
   const id = publicId("wh")
   const secret = newSecret()
   const { error } = await supabaseAdmin()
@@ -93,9 +101,9 @@ export async function deliverDue(limit = 25) {
       let preview = ""
       let err: string | null = null
       try {
-        const res = await fetch(d.endpoint, {
-          method: "POST",
-          headers: {
+        const res = await safePost(
+          d.endpoint,
+          {
             "content-type": "application/json",
             "user-agent": "OperacionalOS-Webhooks/1",
             [SIGNATURE_HEADER]: sign(open(d.webhook_id, d.secret_enc), ts, body),
@@ -104,11 +112,10 @@ export async function deliverDue(limit = 25) {
             [DELIVERY_ID_HEADER]: d.delivery_id,
           },
           body,
-          redirect: "manual",
-          signal: AbortSignal.timeout(cfg.webhook.timeoutMs),
-        })
+          cfg.webhook.timeoutMs,
+        )
         status = res.status
-        preview = (await res.text().catch(() => "")).slice(0, 500)
+        preview = res.text
         if (status < 200 || status >= 300) err = `HTTP ${status}`
       } catch (e) {
         err = e instanceof Error ? (e.name === "TimeoutError" ? "tempo esgotado" : e.message.slice(0, 200)) : "falha de rede"

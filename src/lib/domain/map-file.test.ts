@@ -7,7 +7,7 @@ const valid = {
   title: "Planejamento",
   nodes: [
     { id: "a", label: "Raiz", x: 0, y: 0 },
-    { id: "b", label: "Imagem", x: 200, y: 20, type: "image", imagePath: "anexos/map-image/m/a.png" },
+    { id: "b", label: "Imagem", x: 200, y: 20, type: "image", src: "anexos/map-image/m/a.png" },
   ],
   edges: [{ id: "e1", source: "a", target: "b" }],
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { projectKey, uniqueProjects } from "@/lib/domain/project-names"
 import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
@@ -102,7 +103,7 @@ export function TaskList() {
   const now = new Date()
 
   const allLabels = useMemo(() => [...new Set(tasks.flatMap((t) => t.labels ?? []))].sort(), [tasks])
-  const allProjects = useMemo(() => [...new Set(tasks.map((t) => t.projectName?.trim()).filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, "pt-BR")), [tasks])
+  const allProjects = useMemo(() => uniqueProjects(tasks.map((t) => t.projectName)), [tasks])
   const filtering = !!query || !!priority || !!label || project !== "todos" || responsible !== "todos" || dueFilter !== "todos"
 
   const grouped = useMemo(() => {
@@ -114,7 +115,7 @@ export function TaskList() {
         (!t.done || !t.doneAt || daysSince(t.doneAt, n) <= DONE_VISIBLE_DAYS) &&
         (!priority || t.priority === priority) &&
         (!label || t.labels?.includes(label)) &&
-        (project === "todos" || t.projectName === project) &&
+        (project === "todos" || projectKey(t.projectName) === projectKey(project)) &&
         (responsible === "todos" || taskPeople(t).includes(responsible)) &&
         (dueFilter === "todos" || (dueFilter === "atrasadas" && !t.done && !!t.dueDate && daysSince(t.dueDate, n) > 0) || (dueFilter === "hoje" && !t.done && !!t.dueDate && daysSince(t.dueDate, n) === 0) || (dueFilter === "com_prazo" && !!t.dueDate) || (dueFilter === "sem_prazo" && !t.dueDate)) &&
         (!q || t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.projectName?.toLowerCase().includes(q)),

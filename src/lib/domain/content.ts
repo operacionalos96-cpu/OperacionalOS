@@ -5,6 +5,7 @@
  * `ContentPost.externalId` e `source` já existem para isso (ver docs/ARQUITETURA.md).
  */
 import type { ISODate } from "./types"
+import { projectKey } from "./project-names"
 
 export type Platform = "youtube" | "instagram" | "tiktok" | "kwai" | "facebook" | "x" | "linkedin" | "outro"
 
@@ -170,4 +171,63 @@ export function safeFileName(name: string) {
   const base = name.normalize("NFD").replace(/[̀-ͯ]/g, "")
   const clean = base.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^[-.]+/, "")
   return (clean || "arquivo").slice(-120)
+}
+
+// ---------- métricas por marca / plataforma (Visão geral sem cruzar dados) ----------
+
+
+/** Marca efetiva de uma publicação: a da conta onde saiu; só cai para a do conteúdo se a conta não tiver marca. */
+export function postBrand(account: ContentAccount | undefined, item: ContentItem) {
+  return (account?.brand?.trim() || item.brand?.trim() || undefined)
+}
+
+export interface MetricFilters {
+  brand: string // "todos" = visão geral
+  platform: Platform | "todos"
+  accountId: string
+  from?: string
+  to?: string
+}
+
+/** Publicações que passam nos filtros combinados; marca comparada sem caixa/acento. */
+export function filterPublished(items: ContentItem[], accounts: ContentAccount[], f: MetricFilters) {
+  return items
+    .map((item) => ({
+      ...item,
+      posts: item.posts.filter((post) => {
+        const account = accounts.find((a) => a.id === post.accountId)
+        const date = (post.metricsAt ?? post.publishedAt)?.slice(0, 10)
+        return (
+          (f.brand === "todos" || projectKey(postBrand(account, item)) === projectKey(f.brand)) &&
+          (f.platform === "todos" || account?.platform === f.platform) &&
+          (f.accountId === "todos" || post.accountId === f.accountId) &&
+          ((!f.from && !f.to) || (!!date && (!f.from || date >= f.from) && (!f.to || date <= f.to)))
+        )
+      }),
+    }))
+    .filter((item) => item.posts.length > 0)
+}
+
+export interface BrandPlatformRow {
+  brand: string
+  platform: Platform
+  posts: number
+  metrics: PostMetrics
+}
+
+/** Uma linha por marca × plataforma (só publicados): comparável dentro da plataforma, origem preservada. */
+export function metricsByBrandPlatform(items: ContentItem[], accounts: ContentAccount[]): BrandPlatformRow[] {
+  const map = new Map<string, BrandPlatformRow>()
+  for (const item of items) {
+    for (const post of item.posts) {
+      if (post.status !== "publicado") continue
+      const account = accounts.find((a) => a.id === post.accountId)
+      if (!account) continue
+      const brand = postBrand(account, item) ?? "Sem marca"
+      const key = `${projectKey(brand)}|${account.platform}`
+      const cur = map.get(key) ?? { brand, platform: account.platform, posts: 0, metrics: { ...EMPTY_METRICS } }
+      map.set(key, { ...cur, posts: cur.posts + 1, metrics: sumMetrics([cur.metrics, post.metrics]) })
+    }
+  }
+  return [...map.values()].sort((a, b) => a.brand.localeCompare(b.brand, "pt-BR") || a.platform.localeCompare(b.platform))
 }

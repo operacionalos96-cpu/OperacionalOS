@@ -2,6 +2,7 @@
 
 import { toast } from "sonner"
 import { goalValue, linkedTaskIds } from "@/lib/domain/insights"
+import { planWonLead } from "@/lib/domain/won-lead"
 import { on } from "@/lib/events"
 import { useGoals, useRelations } from "@/lib/modules"
 import { useStore } from "@/lib/store"
@@ -13,7 +14,7 @@ import { useStore } from "@/lib/store"
  */
 export const AUTOMATIONS = [
   { id: "meta-batida", label: "Meta batida", description: "Comemora quando uma meta chega a 100% (por qualquer um da equipe)." },
-  { id: "virou-cliente", label: "Virou cliente", description: "Lead ganho vira cliente, com atalho para a lista de clientes." },
+  { id: "virou-cliente", label: "Virou cliente", description: "Lead ganho vira cliente e gera tarefa de onboarding e recebimento previsto (uma vez por lead); o evento lead.converted também segue para os webhooks." },
 ] as const
 
 let started = false
@@ -25,7 +26,14 @@ export function startAutomations(navigate: (href: string) => void) {
   // Virou cliente.
   on("lead.ganho", ({ leadId }) => {
     const lead = useStore.getState().leads.find((l) => l.id === leadId)
-    if (lead) toast.success(`${lead.name} virou cliente`, { action: { label: "Ver clientes", onClick: () => navigate("/clientes") } })
+    if (!lead) return
+    // Piloto intersetorial: cria a tarefa de onboarding e o recebimento previsto (uma vez só por lead).
+    const st = useStore.getState()
+    const plan = planWonLead(lead, st.tasks, st.transactions, new Date())
+    if (plan.task) st.createTask(plan.task)
+    if (plan.transaction) st.createTransaction(plan.transaction)
+    const made = [plan.task && "tarefa de onboarding", plan.transaction && "recebimento previsto"].filter(Boolean).join(" e ")
+    toast.success(`${lead.name} virou cliente${made ? ` · criada(o): ${made}` : ""}`, { action: { label: "Ver clientes", onClick: () => navigate("/clientes") } })
   })
 
   // Meta batida: olha os dados (vale também para o que o sócio fez em tempo real).

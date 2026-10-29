@@ -8,6 +8,7 @@ import {
   addMonths,
   addWeeks,
   differenceInCalendarDays,
+  endOfMonth,
   endOfWeek,
   format,
   getDaysInMonth,
@@ -97,6 +98,61 @@ export function isRealizedTransaction(t: Transaction) {
 
 function signed(t: Transaction) {
   return t.type === "entrada" ? t.amountCents : -t.amountCents
+}
+
+/** Data de referência do compromisso: vencimento (previsto) ou data efetiva (realizado). */
+export function referenceDate(t: Transaction) {
+  return isRealizedTransaction(t) ? t.date : (t.dueDate ?? t.date)
+}
+
+export type TransactionState = "realizado" | "previsto" | "parcial" | "vencido"
+
+/** Estado exibido: realizado, previsto, parcial (houve pagamento parcial) ou vencido (previsto com vencimento passado). */
+export function transactionState(t: Transaction, now: Date): TransactionState {
+  if (isRealizedTransaction(t)) return "realizado"
+  if (isOverdue(t.dueDate ?? t.date, now)) return "vencido"
+  if (t.originalCents && t.originalCents > t.amountCents) return "parcial"
+  return "previsto"
+}
+
+/** Filtra pelo mês (data de referência) do período selecionado. */
+export function inPeriod(t: Transaction, period: Date) {
+  return isSameMonth(parseISO(referenceDate(t)), period)
+}
+
+/** Fim do período para cálculo "até": fim do mês, ou hoje se o mês é o atual/futuro. */
+export function periodEnd(period: Date, now: Date) {
+  const end = endOfMonth(period)
+  return end < startOfDay(now) ? end : startOfDay(now)
+}
+
+/** Saldo realizado até o fim do dia `asOf` (inclusive). */
+export function balanceAsOf(settings: FinanceSettings, txs: Transaction[], asOf: Date) {
+  const key = format(asOf, "yyyy-MM-dd")
+  return settings.openingBalanceCents + sum(txs.filter((t) => isRealizedTransaction(t) && t.date <= key).map(signed))
+}
+
+/** Compromissos previstos com vencimento no período, separados do realizado. */
+export function plannedStats(txs: Transaction[], period: Date, now: Date) {
+  const planned = txs.filter((t) => !isRealizedTransaction(t) && inPeriod(t, period))
+  const pick = (type: "entrada" | "saida", overdue?: boolean) =>
+    sum(planned.filter((t) => t.type === type && (overdue === undefined || isOverdue(t.dueDate ?? t.date, now) === overdue)).map((t) => t.amountCents))
+  const incomeOpen = pick("entrada")
+  const expenseOpen = pick("saida")
+  return {
+    incomeOpen,
+    expenseOpen,
+    incomeOverdue: pick("entrada", true),
+    expenseOverdue: pick("saida", true),
+    netOpen: incomeOpen - expenseOpen,
+  }
+}
+
+/** Resultado de uma baixa: pagamento total (`full`) ou parcial (movimento realizado + restante em aberto). */
+export function planSettlement(t: Transaction, date: string, amountCents?: number) {
+  const paid = Math.min(Math.max(amountCents ?? t.amountCents, 1), t.amountCents)
+  if (paid >= t.amountCents) return { full: true as const, paid: t.amountCents, remaining: 0, originalCents: t.originalCents }
+  return { full: false as const, paid, remaining: t.amountCents - paid, originalCents: t.originalCents ?? t.amountCents, date }
 }
 
 export function balance(settings: FinanceSettings, txs: Transaction[]) {

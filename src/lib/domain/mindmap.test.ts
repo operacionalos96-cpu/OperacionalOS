@@ -10,8 +10,8 @@ describe("tipos de item na lousa", () => {
   it("imagem e forma não contam como ideias estruturadas", () => {
     const items = [
       { id: "idea", label: "Plano", x: 0, y: 0 },
-      { id: "image", label: "Foto", x: 0, y: 0, type: "image" as const, imagePath: "anexos/map-image/m/foto.png" },
-      { id: "shape", label: "Decisão", x: 0, y: 0, type: "shape" as const, shapeKind: "diamond" as const },
+      { id: "image", label: "Foto", x: 0, y: 0, type: "image" as const, src: "anexos/map-image/m/foto.png" },
+      { id: "shape", label: "Decisão", x: 0, y: 0, type: "shape" as const, shape: "diamond" as const },
     ]
     expect(ideaNodes(items).map((item) => item.id)).toEqual(["idea"])
   })

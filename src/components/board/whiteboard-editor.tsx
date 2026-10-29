@@ -140,7 +140,7 @@ export function WhiteboardEditor({ map }: { map: MindMap }) {
 const boxOf = (n: IdeaNode) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.measured?.width ?? n.width ?? 120, height: n.measured?.height ?? n.height ?? 40 })
 
 function Board({ map }: { map: MindMap }) {
-  const initial = useMemo(() => toFlow(map), [map])
+  const initial = useMemo(() => toFlow(map), [map.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<IdeaNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -166,7 +166,7 @@ function Board({ map }: { map: MindMap }) {
 
   const topZ = useRef(0)
   topZ.current = Math.max(topZ.current, ...nodes.map((n) => n.data.z ?? 0))
-  const nextZ = useCallback(() => ++topZ.current, [])
+  const nextZ = () => ++topZ.current
 
   const addNodes = useCallback(
     (list: IdeaNode[], extraEdges: Edge[] = []) => {
@@ -191,7 +191,7 @@ function Board({ map }: { map: MindMap }) {
       if (kind === "sticky") return { id, type: "sticky", zIndex: z, position, width: w, height: h, data: { label: "", hue: 75, z } }
       return { id, type: "shape", zIndex: z, position, width: w, height: h, data: { label: "", shape, fill: "soft", z } }
     },
-    [nextZ],
+    [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const place = useCallback(
@@ -219,7 +219,7 @@ function Board({ map }: { map: MindMap }) {
       addNodes([{ id: uid(), type: "image", zIndex: z, position: { x: center.x - img.width / 2, y: center.y - img.height / 2 }, width: img.width, height: img.height, data: { label: "", src: img.src, z } }])
       setToolState("select")
     },
-    [screenToFlowPosition, addNodes, nextZ],
+    [screenToFlowPosition, addNodes], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   // ---------- ações dos elementos ----------
@@ -271,7 +271,7 @@ function Board({ map }: { map: MindMap }) {
       return { ...n, id: idMap.get(n.id)!, position: { x: n.position.x + off, y: n.position.y + off }, selected: true, ...(z !== undefined ? { zIndex: z, data: { ...n.data, z } } : {}) }
     })
     addNodes(fresh, c.edges.map((e) => ({ ...e, id: uid(), source: idMap.get(e.source)!, target: idMap.get(e.target)!, selected: false })))
-  }, [addNodes, nextZ])
+  }, [addNodes]) // eslint-disable-line react-hooks/exhaustive-deps
   const duplicate = () => {
     if (copySelected()) pasteClip()
   }

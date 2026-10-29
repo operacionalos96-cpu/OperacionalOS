@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import { ArrowDownLeftIcon, ArrowUpRightIcon, LinkIcon, ReceiptIcon, ScaleIcon, TargetIcon, Trash2Icon, WalletIcon, Link2Icon } from "lucide-react"
 import type { Transaction, TransactionType } from "@/lib/domain/types"
-import { balance, daysSince, goalProgress, monthDelta, monthKey, monthStats, isRealizedTransaction } from "@/lib/domain/rules"
+import { balanceAsOf, goalProgress, inPeriod, monthDelta, monthKey, monthStats, isRealizedTransaction, periodEnd, plannedStats, referenceDate, transactionState } from "@/lib/domain/rules"
 import { money, moneyCompact, moneyInputValue, parseMoney } from "@/lib/format"
 import { deleteTransactionWithUndo } from "@/lib/actions"
 import { useStore } from "@/lib/store"
@@ -28,21 +28,20 @@ import { BalanceChart, ExpensesByCategory } from "@/components/finance/charts"
 export default function FinancePage() {
   const transactions = useStore((s) => s.transactions)
   const settings = useStore((s) => s.financeSettings)
-  const now = useMemo(() => new Date(), [])
+  const now = new Date()
   const [tab, setTab] = useState<"visao" | "movimentacoes" | "pagar" | "receber">("visao")
-  const [period, setPeriod] = useState(() => format(new Date(), "yyyy-MM"))
-  const periodDate = useMemo(() => parseISO(`${period}-01`), [period])
-  const goalDate = useMemo(
-    () => period < format(now, "yyyy-MM") ? endOfMonth(periodDate) : now,
-    [period, periodDate, now],
-  )
+  const [period, setPeriod] = useState(format(now, "yyyy-MM"))
+  const periodDate = parseISO(`${period}-01`)
+  const asOf = useMemo(() => periodEnd(periodDate, now), [period]) // eslint-disable-line react-hooks/exhaustive-deps
+  const goalDate = period < format(now, "yyyy-MM") ? endOfMonth(periodDate) : now
 
   const stats = useMemo(() => ({
-    balance: balance(settings, transactions),
+    balance: balanceAsOf(settings, transactions, asOf),
+    planned: plannedStats(transactions, periodDate, now),
     delta: monthDelta(settings, transactions, periodDate),
     month: monthStats(transactions, periodDate),
     goal: goalProgress(settings, transactions, goalDate),
-  }), [settings, transactions, periodDate, goalDate])
+  }), [settings, transactions, period, goalDate, asOf])
 
   return (
     <div className="flex flex-col">
@@ -67,16 +66,16 @@ export default function FinancePage() {
           { value: "pagar", label: "Contas a pagar" },
           { value: "receber", label: "Contas a receber" },
         ]} />
-        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">Período do resultado e da meta
-          <input type="month" aria-label="Período do resultado e da meta financeiros" value={period} onChange={(e) => setPeriod(e.target.value || format(now, "yyyy-MM"))} className="h-8 rounded-md border bg-card px-2 text-sm text-foreground" />
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">Período
+          <input type="month" aria-label="Período dos indicadores financeiros" value={period} onChange={(e) => setPeriod(e.target.value || format(now, "yyyy-MM"))} className="h-8 rounded-md border bg-card px-2 text-sm text-foreground" />
         </label>
       </div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
         {tab === "visao" && <>
-        <p className="text-xs text-muted-foreground">Resultado e meta referem-se a {format(periodDate, "MMMM yyyy", { locale: ptBR })}; saldo é o caixa atual. Somente movimentações realizadas afetam saldo e gráficos; compromissos previstos ficam separados.</p>
+        <p className="text-xs text-muted-foreground">Todos os indicadores desta página referem-se a {format(periodDate, "MMMM yyyy", { locale: ptBR })}: saldo ao fim do período, resultado, meta, gráficos e contas. Somente movimentações realizadas afetam o caixa; compromissos previstos aparecem separados em “Previsto vs realizado”.</p>
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard
-            label="Saldo em caixa atual"
+            label={period < format(now, "yyyy-MM") ? "Saldo ao fim do período" : "Saldo em caixa atual"}
             icon={WalletIcon}
             info="Saldo inicial informado + entradas realizadas − saídas realizadas. Contas previstas não alteram o caixa."
             aside={<OpeningBalanceEditor />}
@@ -139,43 +138,95 @@ export default function FinancePage() {
           </StatCard>
         </div>
 
+        <PlannedVsRealized stats={stats} />
         <div className="grid gap-4 lg:grid-cols-5">
-          <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" />
-          <ExpensesByCategory transactions={transactions} className="lg:col-span-2" />
+          <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" asOf={asOf} />
+          <ExpensesByCategory transactions={transactions} className="lg:col-span-2" period={periodDate} />
         </div>
-        <CashflowChart transactions={transactions.filter(isRealizedTransaction)} />
+        <CashflowChart transactions={transactions.filter(isRealizedTransaction)} asOf={asOf} />
         </>}
-        {tab === "movimentacoes" && <TransactionList transactions={transactions.filter(isRealizedTransaction)} />}
-        {tab === "pagar" && <PlannedAccounts transactions={transactions} type="saida" />}
-        {tab === "receber" && <PlannedAccounts transactions={transactions} type="entrada" />}
+        {tab === "movimentacoes" && <TransactionList transactions={transactions.filter((t) => isRealizedTransaction(t) && inPeriod(t, periodDate))} periodLabel={format(periodDate, "MMMM yyyy", { locale: ptBR })} />}
+        {tab === "pagar" && <PlannedAccounts transactions={transactions} type="saida" periodDate={periodDate} />}
+        {tab === "receber" && <PlannedAccounts transactions={transactions} type="entrada" periodDate={periodDate} />}
       </div>
     </div>
   )
 }
 
-function PlannedAccounts({ transactions, type }: { transactions: Transaction[]; type: TransactionType }) {
+function PlannedVsRealized({ stats }: { stats: { planned: ReturnType<typeof plannedStats>; month: { income: number; expense: number; net: number }; balance: number } }) {
+  const { planned, month } = stats
+  const projected = stats.balance + planned.netOpen
+  return (
+    <Panel title="Previsto vs realizado" description="Realizado já passou pelo caixa. Previsto são contas com vencimento no período ainda não baixadas.">
+      <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <div className="px-4 py-3"><p className="t-label">Entradas</p>
+          <p className="tabular mt-1 text-sm">Realizado <span className="font-semibold text-success">{money(month.income)}</span></p>
+          <p className="tabular text-sm">A receber <span className="font-semibold">{money(planned.incomeOpen)}</span>{planned.incomeOverdue > 0 && <span className="ml-1 text-xs text-danger">({money(planned.incomeOverdue)} vencido)</span>}</p></div>
+        <div className="px-4 py-3"><p className="t-label">Saídas</p>
+          <p className="tabular mt-1 text-sm">Realizado <span className="font-semibold">{money(month.expense)}</span></p>
+          <p className="tabular text-sm">A pagar <span className="font-semibold">{money(planned.expenseOpen)}</span>{planned.expenseOverdue > 0 && <span className="ml-1 text-xs text-danger">({money(planned.expenseOverdue)} vencido)</span>}</p></div>
+        <div className="px-4 py-3"><p className="t-label">Caixa</p>
+          <p className="tabular mt-1 text-sm">Efetivo <span className="font-semibold">{money(stats.balance)}</span></p>
+          <p className={cn("tabular text-sm", projected < 0 && "text-danger")}>Projetado se tudo for baixado <span className="font-semibold">{money(projected)}</span></p></div>
+      </div>
+    </Panel>
+  )
+}
+
+const STATE_LABEL = (payable: boolean) => ({ realizado: payable ? "Pago" : "Recebido", previsto: "Previsto", parcial: "Parcial", vencido: "Vencido" })
+const STATE_CLASS = { realizado: "bg-success/10 text-success", previsto: "bg-warning/10 text-warning", parcial: "bg-brand/10 text-brand", vencido: "bg-danger/10 text-danger" }
+
+function PlannedAccounts({ transactions, type, periodDate }: { transactions: Transaction[]; type: TransactionType; periodDate: Date }) {
+  const settleTransaction = useStore((s) => s.settleTransaction)
   const updateTransaction = useStore((s) => s.updateTransaction)
   const leads = useStore((s) => s.leads)
   const [view, setView] = useState<"abertas" | "todas">("abertas")
-  const rows = transactions.filter((t) => t.type === type && (view === "todas" || t.status === "previsto"))
-    .sort((a, b) => (a.dueDate ?? a.date).localeCompare(b.dueDate ?? b.date))
+  const now = new Date()
+  const ofType = transactions.filter((t) => t.type === type)
+  const rows = ofType.filter((t) => inPeriod(t, periodDate) && (view === "todas" || t.status === "previsto"))
+    .sort((a, b) => referenceDate(a).localeCompare(referenceDate(b)))
+  const outsideOverdue = ofType.filter((t) => t.status === "previsto" && !inPeriod(t, periodDate) && transactionState(t, now) === "vencido").length
   const total = rows.filter((t) => t.status === "previsto").reduce((sum, t) => sum + t.amountCents, 0)
   const isPayable = type === "saida"
-  return <Panel title={isPayable ? "Contas a pagar" : "Contas a receber"} description={isPayable ? "Compromissos previstos e despesas já realizadas." : "Recebimentos esperados e receitas já realizadas."} aside={<Segmented size="sm" value={view} onChange={setView} options={[{ value: "abertas", label: "Em aberto" }, { value: "todas", label: "Todas" }]} />}>
+  const label = format(periodDate, "MMMM yyyy", { locale: ptBR })
+  return <Panel title={isPayable ? "Contas a pagar" : "Contas a receber"} description={`Vencimentos e baixas de ${label}. ${isPayable ? "Pagamentos" : "Recebimentos"} só entram no caixa quando baixados.`} aside={<Segmented size="sm" value={view} onChange={setView} options={[{ value: "abertas", label: "Em aberto" }, { value: "todas", label: "Todas" }]} />}>
     <div className="flex items-center justify-between border-b px-4 py-3">
-      <div><p className="t-label">Total previsto em aberto</p><p className="t-value mt-1">{money(total)}</p></div>
+      <div><p className="t-label">Total previsto em aberto no período</p><p className="t-value mt-1">{money(total)}</p>
+        {outsideOverdue > 0 && <p className="mt-1 text-xs text-danger">{outsideOverdue} vencida(s) em outros períodos — mude o período para vê-las.</p>}</div>
       <Button size="sm" onClick={() => openTxForm({ prefill: { type, status: "previsto" } })}>{isPayable ? "Nova conta a pagar" : "Novo recebimento"}</Button>
     </div>
-    {rows.length === 0 ? <EmptyState icon={ReceiptIcon} title={view === "abertas" ? "Nenhum compromisso em aberto" : "Nenhum registro"} description={isPayable ? "Cadastre despesas previstas para acompanhar vencimentos sem afetar o caixa antes do pagamento." : "Cadastre recebimentos previstos para acompanhar entradas sem inflar o saldo atual."} action={<Button onClick={() => openTxForm({ prefill: { type, status: "previsto" } })}>{isPayable ? "Adicionar conta a pagar" : "Adicionar conta a receber"}</Button>} /> : <ul className="divide-y">
-      {rows.map((t) => { const lead = t.leadId ? leads.find((l) => l.id === t.leadId) : undefined; const realized = isRealizedTransaction(t); return <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-        <div className="min-w-0 flex-1"><p className="text-sm font-medium">{t.description}</p><p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{t.category}<span>· vencimento {format(parseISO(t.dueDate ?? t.date), "dd/MM/yyyy")}</span>{t.projectName && <span>· projeto: {t.projectName}</span>}{lead && <Link href={`/pipeline/${lead.id}`} className="hover:underline">· {lead.name}</Link>}</p></div>
-        <span className={cn("rounded-full px-2 py-1 text-xs font-medium", realized ? "bg-success/10 text-success" : "bg-warning/10 text-warning")}>{realized ? (isPayable ? "Pago" : "Recebido") : "Previsto"}</span>
+    {rows.length === 0 ? <EmptyState icon={ReceiptIcon} title={view === "abertas" ? "Nenhum compromisso em aberto neste período" : "Nenhum registro neste período"} description={isPayable ? "Cadastre despesas previstas para acompanhar vencimentos sem afetar o caixa antes do pagamento." : "Cadastre recebimentos previstos para acompanhar entradas sem inflar o saldo atual."} action={<Button onClick={() => openTxForm({ prefill: { type, status: "previsto" } })}>{isPayable ? "Adicionar conta a pagar" : "Adicionar conta a receber"}</Button>} /> : <ul className="divide-y">
+      {rows.map((t) => { const lead = t.leadId ? leads.find((l) => l.id === t.leadId) : undefined; const st = transactionState(t, now); const realized = st === "realizado"; return <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1"><p className="text-sm font-medium">{t.description}</p><p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{t.category}<span>· vencimento {format(parseISO(t.dueDate ?? t.date), "dd/MM/yyyy")}</span>{realized && t.dueDate && t.dueDate !== t.date && <span>· {isPayable ? "pago" : "recebido"} em {format(parseISO(t.date), "dd/MM/yyyy")}</span>}{t.originalCents && t.originalCents > t.amountCents && !realized && <span>· restam {money(t.amountCents)} de {money(t.originalCents)}</span>}{t.projectName && <span>· projeto: {t.projectName}</span>}{lead && <Link href={`/pipeline/${lead.id}`} className="hover:underline">· cliente: {lead.name}</Link>}</p></div>
+        <span className={cn("rounded-full px-2 py-1 text-xs font-medium", STATE_CLASS[st])}>{STATE_LABEL(isPayable)[st]}</span>
         <span className="tabular w-28 text-right text-sm font-semibold">{money(t.amountCents)}</span>
-        {!realized && <Button size="sm" variant="outline" onClick={() => { updateTransaction(t.id, { status: "realizado", date: t.dueDate ?? t.date }); toast.success(isPayable ? "Pagamento registrado" : "Recebimento registrado") }}>{isPayable ? "Marcar pago" : "Marcar recebido"}</Button>}
-        {realized && view === "todas" && <Button size="sm" variant="ghost" onClick={() => updateTransaction(t.id, { status: "previsto", dueDate: t.dueDate ?? t.date })}>Reabrir</Button>}
+        {!realized && <SettleButton payable={isPayable} t={t} onSettle={(date, cents) => { settleTransaction(t.id, { date, amountCents: cents }); toast.success(isPayable ? "Pagamento registrado" : "Recebimento registrado") }} />}
+        {realized && view === "todas" && <Button size="sm" variant="ghost" onClick={() => updateTransaction(t.id, { status: "previsto", date: t.dueDate ?? t.date, dueDate: t.dueDate ?? t.date })}>Reabrir</Button>}
       </li> })}
     </ul>}
   </Panel>
+}
+
+function SettleButton({ t, payable, onSettle }: { t: Transaction; payable: boolean; onSettle: (date: string, cents: number) => void }) {
+  const [open, setOpen] = useState(false)
+  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"))
+  const [text, setText] = useState("")
+  const parsed = text.trim() === "" ? t.amountCents : parseMoney(text)
+  const valid = parsed !== null && parsed > 0 && parsed <= t.amountCents
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) { setDate(format(new Date(), "yyyy-MM-dd")); setText(moneyInputValue(t.amountCents)) } }}>
+      <PopoverTrigger asChild><Button size="sm" variant="outline">{payable ? "Marcar pago" : "Marcar recebido"}</Button></PopoverTrigger>
+      <PopoverContent align="end" className="w-72">
+        <form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); if (!valid || parsed === null) return; onSettle(date, parsed); setOpen(false) }}>
+          <p className="text-sm font-medium">{payable ? "Data do pagamento" : "Data do recebimento"}</p>
+          <input type="date" aria-label="Data efetiva" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-sm" />
+          <p className="text-xs text-muted-foreground">Valor {payable ? "pago" : "recebido"} (menor que o total registra parcial e mantém o restante em aberto)</p>
+          <MoneyInput value={text} onChange={(v) => setText(v)} />
+          <Button type="submit" size="sm" disabled={!valid || !date}>Confirmar baixa</Button>
+        </form>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
@@ -233,18 +284,14 @@ function OpeningBalanceEditor() {
   )
 }
 
-const PAGE_DAYS = 90
-
-function TransactionList({ transactions }: { transactions: Transaction[] }) {
+function TransactionList({ transactions, periodLabel }: { transactions: Transaction[]; periodLabel: string }) {
   const leads = useStore((s) => s.leads)
   const [filter, setFilter] = useState<"todos" | TransactionType>("todos")
-  const [showAll, setShowAll] = useState(false)
-  const now = new Date()
 
   const filtered = transactions
     .filter((t) => filter === "todos" || t.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date))
-  const visible = showAll ? filtered : filtered.filter((t) => daysSince(t.date, now) <= PAGE_DAYS)
+  const visible = filtered
 
   // Agrupa por mês para leitura rápida.
   const groups: { key: string; items: Transaction[] }[] = []
@@ -257,7 +304,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
 
   return (
     <Panel
-      title="Movimentações realizadas"
+      title={`Movimentações realizadas · ${periodLabel}`}
       aside={
         <Segmented
           size="sm"
@@ -274,7 +321,7 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
       {transactions.length === 0 ? (
         <EmptyState
           icon={ReceiptIcon}
-          title="Nenhum lançamento ainda"
+          title="Nenhum lançamento realizado neste período"
           description="Registre cada dinheiro que entra ou sai. Leva 10 segundos e mantém o saldo sempre certo."
           action={<Button onClick={() => openTxForm()}>Registrar primeiro lançamento</Button>}
         />
@@ -295,6 +342,8 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
                         <p className="truncate text-sm">{t.description}</p>
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t.category}
+                          {t.dueDate && <span>· venc. {format(parseISO(t.dueDate), "dd/MM")}</span>}
+                          <span className="rounded bg-success/10 px-1 text-[10px] font-medium text-success">{t.type === "entrada" ? "Recebido" : "Pago"}</span>
                           {t.projectName && <span>· projeto: {t.projectName}</span>}
                           {t.source && <span className="rounded bg-muted px-1 text-[10px] font-medium capitalize">via {t.source}</span>}
                           {lead && (
@@ -333,13 +382,6 @@ function TransactionList({ transactions }: { transactions: Transaction[] }) {
               </ul>
             </div>
           ))}
-          {!showAll && filtered.length > visible.length && (
-            <div className="px-4 pt-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>
-                Mostrar {filtered.length - visible.length} lançamentos mais antigos
-              </Button>
-            </div>
-          )}
         </div>
       )}
     </Panel>

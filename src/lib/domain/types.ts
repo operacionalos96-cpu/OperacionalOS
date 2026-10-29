@@ -145,6 +145,8 @@ export interface Note {
   updatedAt: ISODate
   /** Vínculos opcionais para manter notas de reunião junto das atividades. */
   taskId?: string
+  /** Várias tarefas relacionadas (união com taskId, mantido por compatibilidade). */
+  taskIds?: string[]
   projectName?: string
 }
 
@@ -166,6 +168,8 @@ export interface Transaction {
   /** undefined/realizado = movimento efetivo; previsto = compromisso futuro. */
   status?: "previsto" | "realizado"
   dueDate?: ISODate
+  /** Valor original do compromisso quando houve pagamento/recebimento parcial (o restante fica em amountCents). */
+  originalCents?: number
   projectName?: string
 }
 

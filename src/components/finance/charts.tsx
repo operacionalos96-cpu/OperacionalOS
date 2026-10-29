@@ -1,5 +1,7 @@
 "use client"
 
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import { useId, useMemo, useState } from "react"
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceDot, XAxis, YAxis } from "recharts"
 import type { FinanceSettings, Transaction } from "@/lib/domain/types"
@@ -21,9 +23,9 @@ const axisFormat = new Intl.NumberFormat("pt-BR", { notation: "compact", maximum
 const balanceConfig = { saldo: { label: "Saldo", color: "var(--brand)" } } satisfies ChartConfig
 
 /** Evolução do saldo em caixa. Uma série só: o título nomeia, sem caixa de legenda. */
-export function BalanceChart({ settings, transactions, className }: { settings: FinanceSettings; transactions: Transaction[]; className?: string }) {
+export function BalanceChart({ settings, transactions, className, asOf }: { settings: FinanceSettings; transactions: Transaction[]; className?: string; asOf?: Date }) {
   const [range, setRange] = useState<"30" | "90">("90")
-  const data = useMemo(() => balanceSeries(settings, transactions, Number(range), new Date()), [settings, transactions, range])
+  const data = useMemo(() => balanceSeries(settings, transactions, Number(range), asOf ?? new Date()), [settings, transactions, range, asOf])
   const gradId = useId().replace(/:/g, "")
   const last = data[data.length - 1]
   const first = data[0]
@@ -112,15 +114,15 @@ export function Sparkline({ values, color = "var(--brand)", className }: { value
  * Para onde vai o dinheiro: barras horizontais, UMA cor (magnitude, não identidade).
  * Nome da categoria e valor em cor de texto; a barra só carrega o tamanho.
  */
-export function ExpensesByCategory({ transactions, className }: { transactions: Transaction[]; className?: string }) {
-  const rows = useMemo(() => expensesByCategory(transactions, new Date()), [transactions])
+export function ExpensesByCategory({ transactions, className, period }: { transactions: Transaction[]; className?: string; period?: Date }) {
+  const rows = useMemo(() => expensesByCategory(transactions, period ?? new Date()), [transactions, period])
   const max = Math.max(...rows.map((r) => r.cents), 1)
   const total = rows.reduce((a, r) => a + r.cents, 0)
 
   return (
-    <Panel className={className} title="Para onde vai o dinheiro" description={`Saídas deste mês por categoria · total ${moneyCompact(total)}`}>
+    <Panel className={className} title="Para onde vai o dinheiro" description={`Saídas realizadas de ${format(period ?? new Date(), "MMMM yyyy", { locale: ptBR })} por categoria · total ${moneyCompact(total)}`}>
       {rows.length === 0 ? (
-        <EmptyState icon={PieChartIcon} title="Nenhuma saída este mês" description="Quando lançar despesas, elas aparecem aqui agrupadas por categoria." />
+        <EmptyState icon={PieChartIcon} title="Nenhuma saída realizada neste período" description="Quando lançar despesas, elas aparecem aqui agrupadas por categoria." />
       ) : (
         <ul className="grid gap-3 px-4 py-4">
           {rows.map((r, i) => (

@@ -19,9 +19,9 @@ const config = {
   saidas: { label: "Saídas", color: "var(--chart-out)" },
 } satisfies ChartConfig
 
-export function CashflowChart({ transactions }: { transactions: Transaction[] }) {
+export function CashflowChart({ transactions, asOf }: { transactions: Transaction[]; asOf?: Date }) {
   const [range, setRange] = useState<"30" | "90">("30")
-  const data = useMemo(() => cashflowSeries(transactions, Number(range) as 30 | 90, new Date()), [transactions, range])
+  const data = useMemo(() => cashflowSeries(transactions, Number(range) as 30 | 90, asOf ?? new Date()), [transactions, range, asOf])
   const totalIn = sum(data.map((d) => d.entradas)) * 100
   const totalOut = sum(data.map((d) => d.saidas)) * 100
   const net = totalIn - totalOut

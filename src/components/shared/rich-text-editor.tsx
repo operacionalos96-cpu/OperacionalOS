@@ -68,7 +68,7 @@ export function RichTextEditor({ value, onChange, placeholder, className }: { va
   })
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid grid-rows-[auto_1fr] content-start gap-2", className)}>
       {editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>

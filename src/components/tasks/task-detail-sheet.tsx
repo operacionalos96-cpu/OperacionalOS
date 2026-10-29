@@ -1,5 +1,6 @@
 "use client"
 
+import { noteTaskIds, projectKey } from "@/lib/domain/project-names"
 import { useState } from "react"
 import Link from "next/link"
 import { CheckIcon, GripVerticalIcon, LinkIcon, ListChecksIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react"
@@ -40,7 +41,11 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
   const task = useStore((s) => s.tasks.find((t) => t.id === taskId))!
   const lead = useStore((s) => (task.leadId ? s.leads.find((l) => l.id === task.leadId) : undefined))
   const notes = useStore((s) => s.notes)
-  const relatedNotes = notes.filter((n) => n.taskId === task.id || (!!task.projectName && n.projectName === task.projectName))
+  const updateNote = useStore((s) => s.updateNote)
+  const linkedNotes = notes.filter((n) => noteTaskIds(n).includes(task.id))
+  const projectNotes = notes.filter((n) => !noteTaskIds(n).includes(task.id) && !!task.projectName && projectKey(n.projectName) === projectKey(task.projectName))
+  const relatedNotes = [...linkedNotes, ...projectNotes]
+  const linkable = notes.filter((n) => !noteTaskIds(n).includes(task.id))
   const updateTask = useStore((s) => s.updateTask)
   const set = (patch: Parameters<typeof updateTask>[1]) => updateTask(task.id, patch)
   const progress = checklistProgress(task)
@@ -132,7 +137,8 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
       <div className="border-t">
         <p className="t-label px-5 pt-4">Notas relacionadas</p>
         <div className="grid gap-1 px-5 py-3">
-          {relatedNotes.length ? relatedNotes.map((note) => <Link key={note.id} href={`/tarefas?aba=notas&nota=${encodeURIComponent(note.id)}`} onClick={onClose} className="rounded-md border px-3 py-2 hover:bg-accent"><span className="block truncate text-sm font-medium">{note.title || "Sem título"}</span><span className="text-xs text-muted-foreground">{note.projectName || task.projectName || "Sem projeto"}</span></Link>) : <p className="text-xs text-muted-foreground">Vincule uma nota a esta tarefa ou ao projeto para manter decisões e contexto juntos.</p>}
+          {relatedNotes.length ? relatedNotes.map((note) => <Link key={note.id} href={`/tarefas?aba=notas&nota=${encodeURIComponent(note.id)}`} onClick={onClose} className="rounded-md border px-3 py-2 hover:bg-accent"><span className="block truncate text-sm font-medium">{note.title || "Sem título"}</span><span className="text-xs text-muted-foreground">{noteTaskIds(note).includes(task.id) ? "Vinculada à tarefa" : "Do mesmo projeto"} · {note.projectName || task.projectName || "Sem projeto"}</span></Link>) : <p className="text-xs text-muted-foreground">Vincule uma nota a esta tarefa ou ao projeto para manter decisões e contexto juntos.</p>}
+          <select aria-label="Vincular nota a esta tarefa" value="" onChange={(e) => { const n = notes.find((x) => x.id === e.target.value); if (n) updateNote(n.id, { taskId: undefined, taskIds: [...noteTaskIds(n), task.id], projectName: n.projectName ?? task.projectName }) }} className="mt-1 h-8 rounded-md border bg-background px-2 text-xs"><option value="">Vincular nota existente…</option>{linkable.map((n) => <option key={n.id} value={n.id}>{n.title || "Sem título"}</option>)}</select>
           <Link href={`/tarefas?aba=notas`} onClick={onClose} className="mt-1 text-xs text-brand hover:underline">Abrir notas</Link>
         </div>
       </div>

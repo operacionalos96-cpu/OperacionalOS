@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { leaderOfMember, wouldCreateHierarchyCycle, type OrgMember } from "@/lib/domain/org"
+import { leaderOfMember, wouldCreateHierarchyCycle, type MemberRole, type OrgMember } from "@/lib/domain/org"
 import { uid } from "@/lib/format"
 import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"

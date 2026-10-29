@@ -40,59 +40,57 @@ export function InviteMemberDialog({
 
     setSaving(true)
     try {
-      const response = await fetch("/api/equipe/convites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: cleanEmail,
-          displayName: displayName.trim(),
-          roleLevel,
-        }),
+      const sb = supabaseBrowser()
+      const newTeamId = `u_${uid().slice(0, 8)}`
+
+      // 1. Inserir na tabela members
+      const { error: insertError } = await sb.from("members").insert({
+        email: cleanEmail,
+        team_id: newTeamId,
+        display_name: displayName.trim() || undefined,
+        role_level: roleLevel,
+        active: true,
       })
-      const result = await response.json().catch(() => ({})) as { error?: string; message?: string; ok?: boolean; teamId?: string }
-      if (!response.ok || !result.ok) {
-        toast.error(result.error || "Não foi possível enviar o convite")
+
+      if (insertError) {
+        if (insertError.code === "23505") {
+          toast.error("Este e-mail já está cadastrado na equipe")
+        } else {
+          toast.error("Erro ao cadastrar membro", { description: insertError.message })
+        }
         return
       }
 
-      // A API de servidor cria a conta de autenticação e a autorização em members.
-      // O vínculo opcional de cargo organizacional continua usando o repositório atual.
+      // 2. Se um cargo inicial foi selecionado, atribuir
       if (initialRoleId) {
-        const { data: createdMember } = await supabaseBrowser()
-          .from("members")
-          .select("team_id")
-          .eq("email", cleanEmail)
-          .maybeSingle()
-        if (createdMember?.team_id) {
-          saveMemberRole({
-            id: uid(),
-            memberId: String(createdMember.team_id),
-            roleId: initialRoleId,
-            isPrimary: true,
-            assignedAt: new Date().toISOString(),
-            assignedBy: meId,
-          })
-        }
+        saveMemberRole({
+          id: uid(),
+          memberId: newTeamId,
+          roleId: initialRoleId,
+          isPrimary: true,
+          assignedAt: new Date().toISOString(),
+          assignedBy: meId,
+        })
       }
 
+      // 3. Registrar no log de auditoria
       recordEvent({
-        type: "lead.created",
-        entity: { type: "lead", id: cleanEmail },
+        type: "lead.created", // utilizando o event_type padrão com metadado
+        entity: { type: "lead", id: newTeamId },
         actor: { type: "human", id: meId },
         metadata: {
-          action: "member_invited",
+          action: "member_added",
           email: cleanEmail,
           displayName,
           roleLevel,
+          teamId: newTeamId,
         },
       })
 
       await refreshOrgMembers()
-      toast.success("Convite enviado", { description: result.message || `${cleanEmail} receberá um e-mail para definir a senha.` })
-      setEmail("")
-      setDisplayName("")
-      setRoleLevel("operator")
-      setInitialRoleId("")
+      toast.success("Membro cadastrado com sucesso", {
+        description: `${cleanEmail} agora tem acesso ao OperacionalOS.`,
+      })
       onOpenChange(false)
     } catch {
       toast.error("Falha inesperada ao cadastrar")
@@ -116,12 +114,12 @@ export function InviteMemberDialog({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nome@empresa.com.br"
+                placeholder="colaborador@hzk.com.br"
                 required
                 autoFocus
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Enviaremos um convite para este e-mail. A pessoa definirá a própria senha.
+                O colaborador usará este e-mail para fazer login no sistema.
               </p>
             </div>
 
@@ -141,7 +139,7 @@ export function InviteMemberDialog({
                 onChange={(e) => setRoleLevel(e.target.value as RoleLevel)}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
               >
-                {ROLE_LEVELS.filter((rl) => rl.id !== "owner").map((rl) => (
+                {ROLE_LEVELS.map((rl) => (
                   <option key={rl.id} value={rl.id}>
                     {rl.label} — {rl.description}
                   </option>
@@ -171,7 +169,7 @@ export function InviteMemberDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? "Enviando convite..." : "Enviar Convite"}
+              {saving ? "Adicionando..." : "Cadastrar Membro"}
             </Button>
           </DialogFooter>
         </form>

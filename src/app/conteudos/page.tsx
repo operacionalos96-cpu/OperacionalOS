@@ -25,13 +25,16 @@ import {
   PLATFORMS,
   accountTree,
   engagementRate,
+  filterPublished,
   metricsByAccount,
+  metricsByBrandPlatform,
   sumMetrics,
   type ContentAccount,
   type ContentItem,
   type ContentStage,
   type Platform,
 } from "@/lib/domain/content"
+import { uniqueProjects } from "@/lib/domain/project-names"
 import { dueLabel } from "@/lib/format"
 import { useContentAccounts, useContentItems, useProducts } from "@/lib/modules"
 import { cn } from "@/lib/utils"
@@ -125,7 +128,7 @@ function Production({ onNew }: { onNew: () => void }) {
   const [accountId, setAccountId] = useState<string>("todos")
   const [viewMode, setViewMode] = useState<"etapas" | "calendario">("etapas")
   const [calendarMonth, setCalendarMonth] = useState(formatDate(new Date(), "yyyy-MM"))
-  const brands = [...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR"))
+  const brands = uniqueProjects(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)])
   const visible = items.filter((i) => {
     const account = accounts.find((a) => a.id === (i.accountId ?? i.posts[0]?.accountId))
     const itemBrand = i.brand ?? account?.brand
@@ -140,6 +143,10 @@ function Production({ onNew }: { onNew: () => void }) {
 
   if (items.length === 0) {
     return (
+      <div className="flex flex-col">
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-4 sm:px-6">
+          <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
+        </div>
       <EmptyState
         className="py-20"
         icon={ClapperboardIcon}
@@ -151,6 +158,7 @@ function Production({ onNew }: { onNew: () => void }) {
           </Button>
         }
       />
+      </div>
     )
   }
 
@@ -406,16 +414,9 @@ function Metrics() {
   const [accountId, setAccountId] = useState("todos")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
-  const brands = [...new Set(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR"))
-  const filteredItems = useMemo(() => items.map((item) => ({ ...item, posts: item.posts.filter((post) => {
-    const account = accounts.find((a) => a.id === post.accountId)
-    const date = post.metricsAt ?? post.publishedAt
-    const brandMatches = brand === "todos" || (account?.brand ?? item.brand) === brand
-    const platformMatches = platform === "todos" || account?.platform === platform
-    const accountMatches = accountId === "todos" || post.accountId === accountId
-    const dateMatches = (!fromDate && !toDate) || (!!date && (!fromDate || date.slice(0, 10) >= fromDate) && (!toDate || date.slice(0, 10) <= toDate))
-    return brandMatches && platformMatches && accountMatches && dateMatches
-  }) })).filter((item) => item.posts.length > 0), [items, accounts, brand, platform, accountId, fromDate, toDate])
+  const brands = uniqueProjects(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)])
+  const filteredItems = useMemo(() => filterPublished(items, accounts, { brand, platform, accountId, from: fromDate, to: toDate }), [items, accounts, brand, platform, accountId, fromDate, toDate])
+  const brandRows = useMemo(() => metricsByBrandPlatform(filteredItems, accounts), [filteredItems, accounts])
   const byAccount = useMemo(() => metricsByAccount(filteredItems), [filteredItems])
   const total = sumMetrics([...byAccount.values()].map((v) => v.metrics))
   const posts = [...byAccount.values()].reduce((a, v) => a + v.posts, 0)
@@ -521,6 +522,26 @@ function Metrics() {
           </ol>}
         </Panel>
       </div>
+
+      {brand === "todos" && (
+        <Panel title="Marca × plataforma" description="Cada linha preserva a marca e a plataforma de origem. Só compare números dentro da mesma plataforma.">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b text-left">{["Marca", "Plataforma", "Posts", "Views", "Interações", "Engaj."].map((h, i) => <th key={h} className={cn("t-label px-4 py-2 font-semibold", i > 1 && "text-right")}>{h}</th>)}</tr></thead>
+              <tbody className="divide-y">
+                {brandRows.map((r) => { const e = engagementRate(r.metrics); return <tr key={`${r.brand}-${r.platform}`}>
+                  <td className="px-4 py-2 font-medium">{r.brand}</td>
+                  <td className="px-4 py-2"><span className="flex items-center gap-2"><PlatformIcon platform={r.platform} /> {platformLabel(r.platform)}</span></td>
+                  <td className="tabular px-4 py-2 text-right">{r.posts}</td>
+                  <td className="tabular px-4 py-2 text-right">{compact(r.metrics.views)}</td>
+                  <td className="tabular px-4 py-2 text-right">{compact(r.metrics.likes + r.metrics.comments + r.metrics.shares + r.metrics.saves)}</td>
+                  <td className="tabular px-4 py-2 text-right">{e === null ? "—" : `${(e * 100).toFixed(1)}%`}</td>
+                </tr> })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
 
       <Panel title="Por conta" description="Principal e cortes separadas.">
         <div className="overflow-x-auto">

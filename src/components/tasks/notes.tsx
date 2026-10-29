@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import type { Note } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { useStore } from "@/lib/store"
+import { noteTaskIds, projectKey, uniqueProjects } from "@/lib/domain/project-names"
 import { plainText } from "@/lib/domain/rich-text"
 import { RichTextEditor } from "@/components/shared/rich-text-editor"
 import { cn } from "@/lib/utils"
@@ -20,12 +21,13 @@ export function Notes({ selectedId, onSelect }: { selectedId: string | null; onS
   const createNote = useStore((s) => s.createNote)
   const [query, setQuery] = useState("")
   const [projectFilter, setProjectFilter] = useState("todos")
-  const projects = useMemo(() => [...new Set([...notes.map((n) => n.projectName), ...tasks.map((t) => t.projectName)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR")), [notes, tasks])
+  const projects = useMemo(() => uniqueProjects([...notes.map((n) => n.projectName), ...tasks.map((t) => t.projectName)]), [notes, tasks])
   const sorted = useMemo(() => notes.filter((n) => {
     const q = query.trim().toLocaleLowerCase("pt-BR")
-    const task = tasks.find((t) => t.id === n.taskId)
-    const searchable = `${n.title} ${plainText(n.body)} ${n.projectName ?? ""} ${task?.title ?? ""}`.toLocaleLowerCase("pt-BR")
-    return (!q || searchable.includes(q)) && (projectFilter === "todos" || n.projectName === projectFilter || task?.projectName === projectFilter)
+    const linked = tasks.filter((t) => noteTaskIds(n).includes(t.id))
+    const searchable = `${n.title} ${plainText(n.body)} ${n.projectName ?? ""} ${linked.map((t) => t.title).join(" ")}`.toLocaleLowerCase("pt-BR")
+    const pk = projectKey(projectFilter)
+    return (!q || searchable.includes(q)) && (projectFilter === "todos" || projectKey(n.projectName) === pk || linked.some((t) => projectKey(t.projectName) === pk))
   }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [notes, tasks, query, projectFilter])
   const selected = notes.find((n) => n.id === selectedId)
 
@@ -52,12 +54,13 @@ export function Notes({ selectedId, onSelect }: { selectedId: string | null; onS
         <p className="px-1 text-xs text-muted-foreground">{sorted.length} {sorted.length === 1 ? "nota" : "notas"}</p>
         <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {sorted.map((n) => {
-            const task = tasks.find((t) => t.id === n.taskId)
+            const linked = tasks.filter((t) => noteTaskIds(n).includes(t.id))
+            const task = linked[0]
             return <li key={n.id}>
               <button onClick={() => onSelect(n.id)} className={cn("w-full rounded-lg border border-transparent px-3 py-3 text-left transition-colors hover:bg-accent", n.id === selectedId && "border-border bg-accent")}>
                 <p className={cn("line-clamp-2 text-sm leading-snug font-semibold", !n.title && "text-muted-foreground")}>{n.title || "Sem título"}</p>
                 <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{plainText(n.body).split("\n")[0] || "Sem conteúdo ainda"}</p>
-                {(n.projectName || task) && <p className="mt-2 truncate text-[11px] font-medium text-brand">{n.projectName || "Sem projeto"}{task ? ` · ${task.title}` : ""}</p>}
+                {(n.projectName || task) && <p className="mt-2 truncate text-[11px] font-medium text-brand">{n.projectName || "Sem projeto"}{task ? ` · ${task.title}${linked.length > 1 ? ` +${linked.length - 1}` : ""}` : ""}</p>}
                 <p className="mt-1 text-[11px] text-muted-foreground">{relative(n.updatedAt)}</p>
               </button>
             </li>
@@ -78,17 +81,17 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
   const deleteNote = useStore((s) => s.deleteNote)
   const tasks = useStore((s) => s.tasks)
   const allNotes = useStore((s) => s.notes)
-  const projects = useMemo(() => [...new Set([...tasks.map((t) => t.projectName), ...allNotes.map((n) => n.projectName)].filter((v): v is string => !!v?.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR")), [tasks, allNotes])
+  const projects = useMemo(() => uniqueProjects([...tasks.map((t) => t.projectName), ...allNotes.map((n) => n.projectName)]), [tasks, allNotes])
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body)
-  const [taskId, setTaskId] = useState(note.taskId ?? "")
+  const [taskIds, setTaskIds] = useState<string[]>(noteTaskIds(note))
   const [projectName, setProjectName] = useState(note.projectName ?? "")
   const [status, setStatus] = useState<"salvo" | "salvando">("salvo")
-  const pending = useRef<{ title: string; body: string; taskId?: string; projectName?: string } | null>(null)
+  const pending = useRef<{ title: string; body: string; taskId?: string; taskIds?: string[]; projectName?: string } | null>(null)
 
   useEffect(() => {
-    if (title === note.title && body === note.body && taskId === (note.taskId ?? "") && projectName === (note.projectName ?? "")) return
-    const next = { title, body, taskId: taskId || undefined, projectName: projectName.trim() || undefined }
+    if (title === note.title && body === note.body && sameIds(taskIds, noteTaskIds(note)) && projectName === (note.projectName ?? "")) return
+    const next = { title, body, taskId: undefined, taskIds: taskIds.length ? taskIds : undefined, projectName: projectName.trim() || undefined }
     pending.current = next
     setStatus("salvando")
     const t = setTimeout(() => {
@@ -97,12 +100,12 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
       setStatus("salvo")
     }, 500)
     return () => clearTimeout(t)
-  }, [title, body, taskId, projectName, note.id, note.title, note.body, note.taskId, note.projectName, updateNote])
+  }, [title, body, taskIds, projectName, note, updateNote])
 
   useEffect(() => () => { if (pending.current) useStore.getState().updateNote(note.id, pending.current) }, [note.id])
 
   function remove() {
-    const snapshot = { ...note, title, body, taskId: taskId || undefined, projectName: projectName.trim() || undefined }
+    const snapshot = { ...note, title, body, taskId: undefined, taskIds: taskIds.length ? taskIds : undefined, projectName: projectName.trim() || undefined }
     deleteNote(note.id)
     onBack()
     toast("Nota excluída", { action: { label: "Desfazer", onClick: () => useStore.getState().restoreNote(snapshot) } })
@@ -122,14 +125,21 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
           <input list="note-projects" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Ex.: Lançamento HZK" className="h-9 rounded-md border bg-background px-3 text-sm text-foreground" />
           <datalist id="note-projects">{projects.map((p) => <option key={p} value={p} />)}</datalist>
         </label>
-        <label className="grid gap-1 text-xs font-medium text-muted-foreground">Tarefa relacionada
-          <select value={taskId} onChange={(e) => { const id = e.target.value; setTaskId(id); const task = tasks.find((t) => t.id === id); if (task?.projectName && !projectName) setProjectName(task.projectName) }} className="h-9 rounded-md border bg-background px-2 text-sm text-foreground">
-            <option value="">Sem tarefa vinculada</option>
-            {tasks.filter((t) => !t.done || t.id === taskId).sort((a, b) => a.title.localeCompare(b.title, "pt-BR")).map((t) => <option key={t.id} value={t.id}>{t.title}{t.projectName ? ` · ${t.projectName}` : ""}</option>)}
+        <div className="grid gap-1 text-xs font-medium text-muted-foreground">Tarefas relacionadas
+          <div className="flex flex-wrap gap-1.5">
+            {taskIds.map((id) => { const t = tasks.find((x) => x.id === id); return <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-foreground">{t?.title ?? "Tarefa removida"}<button type="button" aria-label="Remover vínculo" onClick={() => setTaskIds(taskIds.filter((x) => x !== id))} className="text-muted-foreground hover:text-foreground">×</button></span> })}
+          </div>
+          <select aria-label="Vincular tarefa" value="" onChange={(e) => { const id = e.target.value; if (!id) return; setTaskIds([...new Set([...taskIds, id])]); const task = tasks.find((t) => t.id === id); if (task?.projectName && !projectName) setProjectName(task.projectName) }} className="h-9 rounded-md border bg-background px-2 text-sm text-foreground">
+            <option value="">Vincular tarefa…</option>
+            {tasks.filter((t) => (!t.done && !taskIds.includes(t.id))).sort((a, b) => a.title.localeCompare(b.title, "pt-BR")).map((t) => <option key={t.id} value={t.id}>{t.title}{t.projectName ? ` · ${t.projectName}` : ""}</option>)}
           </select>
-        </label>
+        </div>
       </div>
-      <RichTextEditor value={body} onChange={setBody} placeholder="Registre decisões, contexto e próximos passos…" className="mt-5 min-h-[55vh] text-base" />
+      <RichTextEditor value={body} onChange={setBody} placeholder="Registre decisões, contexto e próximos passos…" className="mt-5 text-base [&_.ProseMirror]:min-h-[50vh]" />
     </div>
   </article>
+}
+
+function sameIds(a: string[], b: string[]) {
+  return a.length === b.length && a.every((x) => b.includes(x))
 }

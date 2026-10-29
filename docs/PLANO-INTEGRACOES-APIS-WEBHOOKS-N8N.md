@@ -55,7 +55,7 @@ Não publicar dados pessoais ou segredos no payload por padrão. Quando necessá
 1. URL HTTPS, lista explícita de eventos, segredo rotacionável e assinatura HMAC com timestamp.
 2. Entrega assíncrona via fila, retries com backoff exponencial e jitter, limite de tentativas e dead letter.
 3. Idempotência por `(webhook_id, event_id)`; guardar status HTTP e preview redigido da resposta.
-4. Não permitir SSRF: validar DNS/IP e bloquear loopback, redes privadas, link-local e redirecionamentos para destinos proibidos; revalidar após redirects.
+4. **Implementado** — proteção SSRF (`src/lib/server/ssrf.ts`, `ssrf-rules.ts`): validação no cadastro e **no momento da conexão** (anti DNS rebinding), bloqueio de loopback/redes privadas/link-local/metadados, sem seguir redirecionamentos. Regra original: não permitir SSRF: validar DNS/IP e bloquear loopback, redes privadas, link-local e redirecionamentos para destinos proibidos; revalidar após redirects.
 5. Interface de retry deve exigir permissão e registrar ator.
 
 ### APIs internas / ferramentas de IA
@@ -68,7 +68,7 @@ Não publicar dados pessoais ou segredos no payload por padrão. Quando necessá
 
 ## Integração inicial proposta para validação técnica
 
-**Proposta, não implementação aprovada:** evento `lead.converted` → webhook de saída → fluxo de teste no n8n → criar uma tarefa de onboarding no OperacionalOS após validação humana.
+**Piloto implementado e validado tecnicamente (29/10/2026):** ao marcar um lead como **Ganho**, o sistema (a) emite `lead.converted` para os webhooks de saída/n8n e (b) cria **uma** tarefa de onboarding e **um** recebimento previsto, vinculados ao lead e ao projeto, de forma idempotente (`src/lib/domain/won-lead.ts`, `src/lib/automations.ts`; testes em `won-lead.test.ts`). Validado no navegador: lead ganho → tarefa "Onboarding: <projeto>" + conta a receber com vencimento em 30 dias. Pendente de aceite humano: responsável e prazo padrão da tarefa. O fluxo n8n continua em modo de teste (acknowledgement) até aprovação.
 
 Por que começar por aqui:
 - Usa evento de domínio existente e o mecanismo de entregas de webhook já previsto.
