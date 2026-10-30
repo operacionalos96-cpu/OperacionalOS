@@ -73,6 +73,8 @@
   --animate-shimmer: shimmer 1.6s linear infinite;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Material 3 "emphasized decelerate": entra rápido e assenta devagar (sensação de peso real). */
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
 /*
@@ -132,11 +134,13 @@
   --stage-negociacao: oklch(0.34 0 0);
 
   --shadow-card: 0 1px 2px oklch(0.3 0.04 255 / 4%), 0 10px 30px -14px oklch(0.3 0.06 255 / 14%);
+  --sheen-color: color-mix(in oklch, var(--hzk-orange) 9%, transparent);
   --shadow-lift: 0 2px 4px oklch(0.3 0.04 255 / 4%), 0 22px 44px -18px oklch(0.3 0.08 255 / 26%);
 
   /* Entradas = verde (positivo), saídas = neutro. Validado com dataviz. */
-  --chart-in: oklch(0.55 0.14 152);
-  --chart-out: #8a8a8a;
+  /* Par validado (scripts/validate_palette.js do dataviz): CVD ΔE 23, contraste ≥ 3:1. */
+  --chart-in: #1f78c8;
+  --chart-out: #ea5b25;
   --chart-1: oklch(0.55 0.14 152);
   --chart-2: oklch(0.72 0 0);
   --chart-3: oklch(0.45 0 0);
@@ -193,11 +197,13 @@
   --stage-proposta: #9aa4b5;
   --stage-negociacao: #d3d9e3;
 
-  --shadow-card: 0 12px 32px -18px rgb(0 0 0 / 70%);
+  /* Aresta de vidro: 1px de luz no topo do card dá a sensação de camada sobre o fundo. */
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 5%), 0 12px 32px -18px rgb(0 0 0 / 70%);
+  --sheen-color: rgb(255 255 255 / 7%);
   --shadow-lift: 0 8px 24px -12px rgb(0 0 0 / 70%);
 
-  --chart-in: oklch(0.7 0.15 152);
-  --chart-out: #6b778a;
+  --chart-in: #3d8fd6;
+  --chart-out: #e85a24;
   --chart-1: oklch(0.7 0.15 152);
   --chart-2: #6b778a;
   --chart-3: #9aa4b5;
@@ -228,6 +234,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Luz ambiente: dois brilhos muito suaves da marca no fundo. Estático (não anima, não pesa). */
+    background-image:
+      radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%),
+      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--chart-in) 6%, transparent), transparent 70%);
+    background-attachment: fixed;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -245,9 +256,10 @@
  * Regra: animar só o que muda de estado ou chega na tela; 150–420ms; nunca bloquear clique.
  * `--i` na linha define o atraso em cascata (stagger).
  */
+/* Entrada usa `translate` (não `transform`) para somar com a inclinação dos cards, sem brigar com ela. */
 @keyframes enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: none; }
 }
 @keyframes pop {
   0% { transform: scale(0.6); }
@@ -297,7 +309,47 @@
   *, *::before, *::after {
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
+    /* Sem isto, animações infinitas (pulso, brilho) piscariam a cada 1ms. */
+    animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+}
+
+/* ---------- Profundidade "4D" ----------
+ * Regras: usabilidade primeiro. Só transform/opacity (a placa de vídeo faz o trabalho, sem travar),
+ * inclinação máxima de 3°, só com mouse (não no toque) e nunca com "reduzir movimento" ligado.
+ * Durações 150–420ms (faixa recomendada pela Nielsen Norman Group para UI).
+ */
+@keyframes beacon {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
+}
+/* Ponto "ao vivo" no fim de uma linha: um pulso discreto marca o valor de hoje. */
+.beacon {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: beacon 2.4s var(--ease-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .beacon { animation: none; opacity: 0; }
+}
+
+/* Card que inclina levemente na direção do mouse, com um reflexo de luz (src/lib/use-tilt.ts). */
+@utility tilt {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--ty, 0px));
+  transition: transform 420ms var(--ease-emphasized), box-shadow 300ms var(--ease-out);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(26rem circle at var(--mx, 50%) var(--my, 0%), var(--sheen-color), transparent 42%);
+    opacity: var(--sheen, 0);
+    transition: opacity 300ms var(--ease-out);
+  }
+  &:hover {
+    box-shadow: var(--shadow-lift);
   }
 }
 

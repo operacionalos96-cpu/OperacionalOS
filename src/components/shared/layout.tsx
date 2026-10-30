@@ -5,6 +5,7 @@ import { InfoIcon } from "lucide-react"
 import { PAGES } from "@/config/pages"
 import { METRICS, type MetricId } from "@/lib/domain/metrics"
 import { PageHelp } from "./page-help"
+import { useTilt } from "@/lib/use-tilt"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -191,13 +192,17 @@ export function StatCard({
       {children}
     </>
   )
-  const cls = cn("relative flex flex-col rounded-xl border bg-card p-5 shadow-card stagger", className)
+  // Profundidade: inclina levemente na direção do mouse (desligado no toque e com "reduzir movimento").
+  const tiltRef = useTilt<HTMLDivElement>()
+  const cls = cn("tilt relative flex flex-col rounded-xl border bg-card p-5 shadow-card stagger", className)
   return href ? (
-    <Link href={href} className={cn(cls, "lift")} style={style}>
-      {body}
+    <Link href={href} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2" style={style}>
+      <div ref={tiltRef} className={cn(cls, "h-full")}>
+        {body}
+      </div>
     </Link>
   ) : (
-    <div className={cls} style={style}>
+    <div ref={tiltRef} className={cls} style={style}>
       {body}
     </div>
   )

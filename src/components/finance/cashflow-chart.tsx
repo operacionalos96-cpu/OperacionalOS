@@ -13,7 +13,8 @@ import { TooltipCard, TooltipRow } from "./charts"
 
 const axisFormat = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 })
 
-// Petróleo × laranja: par validado para daltonismo (verde × vermelho reprovou).
+// Azul × laranja (HZK): par validado com o validate_palette.js do dataviz nos dois temas
+// (daltonismo ΔE 23+, contraste ≥ 3:1). Verde × cinza reprovou: o cinza "lê como cinza".
 const config = {
   entradas: { label: "Entradas", color: "var(--chart-in)" },
   saidas: { label: "Saídas", color: "var(--chart-out)" },
@@ -50,6 +51,15 @@ export function CashflowChart({ transactions, asOf }: { transactions: Transactio
       </div>
       <ChartContainer config={config} className="aspect-auto h-60 w-full px-2 pt-3 pb-2">
         <BarChart data={data} barGap={2} barCategoryGap="22%" margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+          {/* Degradê vertical: topo mais vivo, base mais suave — dá volume sem mudar a cor da série. */}
+          <defs>
+            {(["entradas", "saidas"] as const).map((k) => (
+              <linearGradient key={k} id={`bar-${k}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={`var(--color-${k})`} stopOpacity={1} />
+                <stop offset="100%" stopColor={`var(--color-${k})`} stopOpacity={0.55} />
+              </linearGradient>
+            ))}
+          </defs>
           <CartesianGrid vertical={false} stroke="var(--border)" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
           <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(v: number) => axisFormat.format(v)} />
@@ -64,8 +74,8 @@ export function CashflowChart({ transactions, asOf }: { transactions: Transactio
               ) : null
             }
           />
-          <Bar dataKey="entradas" fill="var(--color-entradas)" radius={[4, 4, 0, 0]} maxBarSize={20} animationDuration={700} animationEasing="ease-out" />
-          <Bar dataKey="saidas" fill="var(--color-saidas)" radius={[4, 4, 0, 0]} maxBarSize={20} animationDuration={700} animationEasing="ease-out" />
+          <Bar dataKey="entradas" fill="url(#bar-entradas)" radius={[5, 5, 0, 0]} maxBarSize={20} activeBar={{ fill: "var(--color-entradas)" }} animationDuration={800} animationEasing="ease-out" />
+          <Bar dataKey="saidas" fill="url(#bar-saidas)" radius={[5, 5, 0, 0]} maxBarSize={20} activeBar={{ fill: "var(--color-saidas)" }} animationDuration={800} animationEasing="ease-out" />
         </BarChart>
       </ChartContainer>
     </Panel>
