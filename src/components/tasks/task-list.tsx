@@ -19,7 +19,8 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react"
-import { TEAM, getUser } from "@/config/team"
+import { getUser } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { PRIORITIES } from "@/lib/domain/constants"
 import type { Priority, Task } from "@/lib/domain/types"
 import {
@@ -62,6 +63,7 @@ const SCOPE_KEY = "operacional:tarefas-escopo"
 const DONE_VISIBLE_DAYS = 7
 
 export function TaskList() {
+  const TEAM = useTeam()
   const tasks = useStore((s) => s.tasks)
   // Bloqueio automático: tarefa que "depende de" algo ainda não feito.
   const snap = useEntitySnapshot()
@@ -225,7 +227,7 @@ export function TaskList() {
               <GroupLabel tone={bucket.id === "atrasadas" ? "danger" : undefined}>
                 {bucket.id === "atrasadas" && <span className="size-1.5 animate-pulse rounded-full bg-danger" />}
                 {bucket.label}
-                <span className="tabular rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{list.length}</span>
+                <span className="tabular rounded-full bg-muted px-1.5 py-px text-xs text-muted-foreground">{list.length}</span>
               </GroupLabel>
               <TaskGroup tasks={list} now={now} startIndex={start} blocked={blocked} />
             </section>
@@ -329,6 +331,7 @@ function TaskRow({ task, now, index, blockedBy }: { task: Task; now: Date; index
   const [dueOpen, setDueOpen] = useState(false)
   const overdue = !task.done && task.dueDate && daysSince(task.dueDate, now) > 0
   const people = taskPeople(task)
+  const TEAM = useTeam()
   // Clique no avatar alterna: uma pessoa → a outra → os dois → ...
   const options: string[][] = [...TEAM.map((u) => [u.id]), TEAM.map((u) => u.id)]
   const current = options.findIndex((o) => o.length === people.length && o.every((id) => people.includes(id)))
@@ -355,15 +358,15 @@ function TaskRow({ task, now, index, blockedBy }: { task: Task; now: Date; index
         {(task.labels?.length || progress.total || task.description || task.recurrence || lead || task.priority || task.status || task.projectName || blockedBy > 0) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
             {blockedBy > 0 && (
-              <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-px text-[11px] font-medium text-danger" title="Depende de algo que ainda não foi feito">
+              <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-px text-xs font-medium text-danger" title="Depende de algo que ainda não foi feito">
                 <LockIcon className="size-3" /> Bloqueada{blockedBy > 1 ? ` (${blockedBy})` : ""}
               </span>
             )}
             {!task.done && task.status === "andamento" && (
-              <span className="rounded bg-warning-soft px-1.5 py-px text-[11px] font-medium text-warning">Em andamento</span>
+              <span className="rounded bg-warning-soft px-1.5 py-px text-xs font-medium text-warning">Em andamento</span>
             )}
             <PriorityFlag priority={task.priority} withLabel />
-            {task.projectName && <span className="rounded bg-muted px-1.5 py-px text-[11px] text-foreground/80">{task.projectName}</span>}
+            {task.projectName && <span className="rounded bg-muted px-1.5 py-px text-xs text-foreground/80">{task.projectName}</span>}
             {task.labels?.map((l) => <LabelChip key={l} label={l} />)}
             {progress.total > 0 && (
               <span className={cn("inline-flex items-center gap-1", progress.done === progress.total && "text-success")}>
@@ -471,7 +474,7 @@ function QuickAdd() {
       />
       {(parsed.labels.length > 0 || parsed.priority) && (
         <div className="flex animate-enter flex-wrap items-center gap-1.5 px-3 pb-1">
-          <span className="text-[11px] text-muted-foreground">Vai criar com:</span>
+          <span className="text-xs text-muted-foreground">Vai criar com:</span>
           <PriorityFlag priority={parsed.priority} withLabel />
           {parsed.labels.map((l) => (
             <LabelChip key={l} label={l} />

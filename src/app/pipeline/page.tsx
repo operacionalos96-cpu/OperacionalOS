@@ -58,8 +58,7 @@ function Pipeline() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Pipeline"
+      <PageHeader page="/pipeline"
         actions={
           <>
             <RebalanceButton />
@@ -84,7 +83,7 @@ function Pipeline() {
                   <>
                     Precisa de ação
                     {needsCount > 0 && (
-                      <span className="tabular rounded-full bg-danger-soft px-1.5 text-[11px] font-semibold text-danger">{needsCount}</span>
+                      <span className="tabular rounded-full bg-danger-soft px-1.5 text-xs font-semibold text-danger">{needsCount}</span>
                     )}
                   </>
                 ),

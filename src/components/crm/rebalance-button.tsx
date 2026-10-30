@@ -3,7 +3,8 @@
 import { useMemo } from "react"
 import { toast } from "sonner"
 import { ScaleIcon } from "lucide-react"
-import { TEAM, getUser } from "@/config/team"
+import { getUser } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { openCounts, rebalance } from "@/lib/domain/distribution"
 import { useStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
@@ -12,13 +13,13 @@ import { Button } from "@/components/ui/button"
  * Aparece só quando a divisão está desigual. Move leads ainda em "Novo" de quem
  * tem mais para quem tem menos, até ficar meio a meio. Tem desfazer.
  */
-const TEAM_IDS = TEAM.map((u) => u.id)
-
 export function RebalanceButton({ productId }: { productId?: string }) {
   const leads = useStore((s) => s.leads)
   const updateLead = useStore((s) => s.updateLead)
-  const ids = TEAM_IDS
-  const moves = useMemo(() => rebalance(leads, TEAM_IDS, productId), [leads, productId])
+  // Lista viva: quem entrou depois também recebe leads (antes ficava congelada na abertura do app).
+  const TEAM = useTeam()
+  const ids = useMemo(() => TEAM.map((u) => u.id), [TEAM])
+  const moves = useMemo(() => rebalance(leads, ids, productId), [leads, ids, productId])
   if (!moves.length) return null
 
   function run() {

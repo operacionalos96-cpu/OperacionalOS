@@ -73,7 +73,7 @@ export default function MapsPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Mapas" description="Lousa livre para pensar solto. Mapa estruturado para organizar ideias e fluxos. Os dois se ligam a tarefas, leads, produtos e metas." actions={actions}>
+      <PageHeader page="/mapas" actions={actions}>
         {maps.length > 0 && (
           <div className="flex gap-1.5" role="tablist" aria-label="Filtrar por tipo">
             {(["todos", "lousa", "estruturado"] as const).map((f) => (

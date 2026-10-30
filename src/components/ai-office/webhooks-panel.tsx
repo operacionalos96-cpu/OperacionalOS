@@ -120,8 +120,8 @@ export function WebhooksPanel() {
             <tbody>
               {deliveries.slice(0, 60).map((d) => (
                 <tr key={d.id} className="border-b last:border-0">
-                  <td className="px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{d.id.slice(0, 12)}…</td>
-                  <td className="px-3 py-1.5 font-mono text-[11px]">{d.event_id.slice(0, 12)}…</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{d.id.slice(0, 12)}…</td>
+                  <td className="px-3 py-1.5 font-mono text-xs">{d.event_id.slice(0, 12)}…</td>
                   <td className={cn("px-3 py-1.5 text-xs", d.status === "delivered" ? "text-success" : d.status === "dead_letter" ? "text-danger" : "text-muted-foreground")}>
                     {DELIVERY_LABEL[d.status] ?? d.status}
                     {d.error ? ` · ${d.error}` : ""}
@@ -191,7 +191,7 @@ function CreateWebhook({ onClose, onCreated }: { onClose: () => void; onCreated:
                   key={ev}
                   type="button"
                   onClick={() => setEvents((v) => (v.includes(ev) ? v.filter((x) => x !== ev) : [...v, ev]))}
-                  className={cn("rounded-full border px-2 py-0.5 font-mono text-[11px]", events.includes(ev) ? "border-brand bg-accent" : "text-muted-foreground")}
+                  className={cn("rounded-full border px-2 py-0.5 font-mono text-xs", events.includes(ev) ? "border-brand bg-accent" : "text-muted-foreground")}
                 >
                   {ev === "*" ? "* (todos)" : ev}
                 </button>

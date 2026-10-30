@@ -272,7 +272,7 @@ function FunnelEditor({ onClose }: { onClose: () => void }) {
               {s.kind !== "texto" && (
                 <>
                   {s.kind === "video" && videoSourceAt(steps, i) !== "arquivo" && (
-                    <p className="text-[11px] text-muted-foreground">Vai o vídeo deste lead (gerado com o site dele e aprovado por vocês). O arquivo abaixo é reserva, para quem não tiver vídeo.</p>
+                    <p className="text-xs text-muted-foreground">Vai o vídeo deste lead (gerado com o site dele e aprovado por vocês). O arquivo abaixo é reserva, para quem não tiver vídeo.</p>
                   )}
                   <MediaPicker step={s} onChange={(media) => patch(i, { media })} />
                 </>

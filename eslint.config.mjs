@@ -9,6 +9,9 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
+/** Áreas do app (cada uma pode virar um app próprio). Base comum fora desta lista: ui, shared, entities, dialogs, shell. */
+const FEATURE_MODULES = ["ai-office", "board", "content", "crm", "dashboard", "finance", "goals", "mindmap", "org", "products", "prospecting", "tasks"];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
@@ -21,6 +24,25 @@ const eslintConfig = [
       "workers/**",
     ],
   },
+  // Fronteiras entre módulos (docs/adr/0007-frontend-modular.md): uma área (ex.: tarefas) não usa
+  // telas de outra área diretamente — só a base comum (ui, shared, entities, dialogs). É o que permite
+  // separar cada área em um app no futuro. Aviso (não erro) enquanto os 4 casos antigos são resolvidos.
+  ...FEATURE_MODULES.map((mod) => ({
+    files: [`src/components/${mod}/**/*.{ts,tsx}`],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: FEATURE_MODULES.filter((m) => m !== mod).map((m) => `@/components/${m}/*`),
+              message: "Área importando tela de outra área: mova o que é comum para components/shared ou components/entities (ADR 0007).",
+            },
+          ],
+        },
+      ],
+    },
+  })),
 ];
 
 export default eslintConfig;

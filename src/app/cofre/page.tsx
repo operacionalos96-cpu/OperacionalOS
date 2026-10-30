@@ -144,9 +144,7 @@ export default function VaultPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title="Cofre"
-        description="Senhas e acessos da equipe, criptografados. Só aparecem quando você pede."
+      <PageHeader page="/cofre"
         actions={
           items && (
             <div className="flex items-center gap-2">

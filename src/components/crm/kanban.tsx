@@ -133,7 +133,7 @@ function Column({
           </p>
         )}
         {hidden > 0 && (
-          <p className="px-2 py-1 text-center text-[11px] text-muted-foreground">+{hidden} fechados há mais de 30 dias</p>
+          <p className="px-2 py-1 text-center text-xs text-muted-foreground">+{hidden} fechados há mais de 30 dias</p>
         )}
       </div>
     </div>

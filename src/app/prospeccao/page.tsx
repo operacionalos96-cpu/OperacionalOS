@@ -132,9 +132,7 @@ export default function ProspectingPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title="Prospecção"
-        description="Revise rápido: aprovar e chamar no WhatsApp, ou descartar dizendo o porquê."
+      <PageHeader page="/prospeccao"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SiteInfoButton leads={leads} />
@@ -376,7 +374,7 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: string
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
-  return <kbd className="ml-1 rounded border bg-muted px-1 font-sans text-[10px] text-muted-foreground">{children}</kbd>
+  return <kbd className="ml-1 rounded border bg-muted px-1 font-sans text-xs text-muted-foreground">{children}</kbd>
 }
 
 const TARGETS: { id: WhatsappTarget; label: string; hint: string }[] = [
@@ -427,7 +425,7 @@ function WhatsChip({ lead, target, message }: { lead: Lead; target: WhatsappTarg
       >
         <CopyIcon className="size-4" />
       </button>
-      {!mobile && <span className="text-[11px] text-warning">fixo — pode não ter WhatsApp</span>}
+      {!mobile && <span className="text-xs text-warning">fixo — pode não ter WhatsApp</span>}
     </span>
   )
 }

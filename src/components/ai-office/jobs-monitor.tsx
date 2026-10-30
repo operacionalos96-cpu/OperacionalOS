@@ -86,7 +86,7 @@ export function JobsMonitor() {
             <tbody>
               {shown.map((j) => (
                 <tr key={j.public_id} onClick={() => setOpen(j)} className="cursor-pointer border-b last:border-0 hover:bg-accent/40">
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{j.public_id.slice(0, 12)}…</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{j.public_id.slice(0, 12)}…</td>
                   <td className="px-3 py-2">{JOB_TYPES[j.job_type]?.label ?? j.job_type}</td>
                   <td className="px-3 py-2">{agents.find((a) => a.id === j.agent_id)?.name ?? j.agent_id}</td>
                   <td className="max-w-40 truncate px-3 py-2">{entityName(j)}</td>
@@ -178,7 +178,7 @@ function JobDetail({ job, entity, onClose }: { job: JobRow; entity: string; onCl
           </Button>
         </div>
         {inspect && (
-          <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-[11px]">{JSON.stringify({ payload: job.payload, result: job.result, idempotency_key: job.idempotency_key, causation_id: job.causation_id }, null, 2)}</pre>
+          <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify({ payload: job.payload, result: job.result, idempotency_key: job.idempotency_key, causation_id: job.causation_id }, null, 2)}</pre>
         )}
         <div>
           <p className="t-label mb-1">Timeline</p>
@@ -190,9 +190,9 @@ function JobDetail({ job, entity, onClose }: { job: JobRow; entity: string; onCl
                 <li key={e.id} className="flex gap-3">
                   <span className="tabular w-16 shrink-0 text-xs text-muted-foreground">{format(new Date(e.created_at), "HH:mm:ss")}</span>
                   <span className="min-w-0 flex-1">
-                    <code className="text-[11px] text-muted-foreground">{e.event_type}</code> {describeJobEvent(e.event_type, e.metadata)}
+                    <code className="text-xs text-muted-foreground">{e.event_type}</code> {describeJobEvent(e.event_type, e.metadata)}
                   </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{e.actor_id}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{e.actor_id}</span>
                 </li>
               ))}
             </ol>

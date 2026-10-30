@@ -74,7 +74,7 @@ export function TeamFeedPanel({ className }: { className?: string }) {
                 <span className="min-w-0 flex-1 text-sm">
                   <span className="font-medium">{f.who ? getUser(f.who).name : ""}</span> <span className="text-muted-foreground">{f.text}</span>
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">{relative(f.at)}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{relative(f.at)}</span>
               </button>
             </li>
           ))}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { FileSpreadsheetIcon, Loader2Icon, UploadIcon } from "lucide-react"
-import { TEAM } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { normalizeHeader, rowsToLeads } from "@/lib/domain/lead-import"
 import { distributeOwners, openCounts } from "@/lib/domain/distribution"
 import { dueShortcuts, moneyInputValue, parseMoney } from "@/lib/format"
@@ -58,6 +58,7 @@ function scriptSheet(sheets: Sheet[]) {
 }
 
 export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const TEAM = useTeam()
   const leads = useStore((s) => s.leads)
   const createLead = useStore((s) => s.createLead)
   const updateLead = useStore((s) => s.updateLead)

@@ -118,7 +118,7 @@ export function InviteMemberDialog({
                 required
                 autoFocus
               />
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 O colaborador usará este e-mail para fazer login no sistema.
               </p>
             </div>

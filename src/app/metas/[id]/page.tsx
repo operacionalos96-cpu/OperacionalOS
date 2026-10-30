@@ -4,11 +4,11 @@ import { useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeftIcon, PencilIcon, SearchXIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react"
 import { GOAL_SOURCES } from "@/lib/domain/insights"
 import { useGoals, useProducts } from "@/lib/modules"
 import { Button } from "@/components/ui/button"
-import { EmptyState, Panel } from "@/components/shared/layout"
+import { Panel, NotFound } from "@/components/shared/layout"
 import { GoalDialog, GoalRow } from "@/components/goals/goal-bits"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
@@ -22,16 +22,7 @@ export default function GoalPage() {
 
   if (!goal)
     return (
-      <EmptyState
-        icon={SearchXIcon}
-        title="Meta não encontrada"
-        action={
-          <Button asChild variant="outline">
-            <Link href="/metas">Voltar às metas</Link>
-          </Button>
-        }
-        className="py-24"
-      />
+      <NotFound title="Meta não encontrada" backHref="/metas" backLabel="Voltar às metas" />
     )
 
   function remove() {

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { FlagIcon, PlusIcon, RepeatIcon, UsersIcon, XIcon } from "lucide-react"
-import { TEAM } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { LABEL_HUES, PRIORITIES, RECURRENCES, priorityMeta } from "@/lib/domain/constants"
 import type { Priority, Recurrence } from "@/lib/domain/types"
 import { useStore } from "@/lib/store"
@@ -20,7 +20,7 @@ export function LabelChip({ label, onRemove, className }: { label: string; onRem
   const hue = labelHue(label)
   return (
     <span
-      className={cn("inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium", className)}
+      className={cn("inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium", className)}
       style={{
         background: `oklch(0.7 0.05 ${hue} / 14%)`,
         color: `light-dark(oklch(0.42 0.07 ${hue}), oklch(0.8 0.05 ${hue}))`,
@@ -40,7 +40,7 @@ export function PriorityFlag({ priority, withLabel = false, className }: { prior
   const meta = priorityMeta(priority)
   if (!meta) return null
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", className)} style={{ color: meta.color }} title={`Prioridade ${meta.label}`}>
+    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", className)} style={{ color: meta.color }} title={`Prioridade ${meta.label}`}>
       <FlagIcon className="size-3.5" fill="currentColor" fillOpacity={0.2} />
       {withLabel && meta.label}
     </span>
@@ -114,7 +114,7 @@ export function LabelEditor({ value, onChange }: { value: string[]; onChange: (l
       </div>
       {known.length > 0 && (
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[11px] text-muted-foreground">Usadas:</span>
+          <span className="text-xs text-muted-foreground">Usadas:</span>
           {known.slice(0, 8).map((l) => (
             <button key={l} type="button" onClick={() => add(l)} className="inline-flex items-center rounded-full opacity-70 transition-opacity hover:opacity-100">
               <PlusIcon className="size-3 text-muted-foreground" />
@@ -132,6 +132,7 @@ export function LabelEditor({ value, onChange }: { value: string[]; onChange: (l
  * pelo menos uma. O primeiro da lista é o principal (dono padrão da tarefa).
  */
 export function PeoplePicker({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const TEAM = useTeam()
   const all = TEAM.map((u) => u.id)
   const everyone = all.every((id) => value.includes(id))
   function toggle(id: string) {

@@ -12,8 +12,8 @@ export function AvatarDot({ userId, size = "sm", className }: { userId: string; 
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white select-none",
         size === "xs" && "size-4 text-[8px]",
-        size === "sm" && "size-5 text-[9px]",
-        size === "md" && "size-7 text-[11px]",
+        size === "sm" && "size-5 text-xs",
+        size === "md" && "size-7 text-xs",
         className,
       )}
       style={{ backgroundColor: user.color }}

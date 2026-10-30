@@ -53,7 +53,7 @@ function TreeNodeItem({
             </div>
             <div className="flex flex-wrap gap-1 pt-0.5">
               {assignedRoles.length === 0 ? (
-                <span className="text-[11px] text-muted-foreground italic">Sem cargo</span>
+                <span className="text-xs text-muted-foreground italic">Sem cargo</span>
               ) : (
                 assignedRoles.map((role) => (
                   <RoleBadge
@@ -68,7 +68,7 @@ function TreeNodeItem({
         </div>
 
         {node.subordinates.length > 0 && (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
             {node.subordinates.length} {node.subordinates.length === 1 ? "liderado" : "liderados"}
           </span>
         )}

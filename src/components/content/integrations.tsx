@@ -44,7 +44,7 @@ export function ConnectionBadge({ account, connection, onChanged }: { account: C
     return (
       <a
         href={`/api/integracoes/${account.platform}/conectar?conta=${encodeURIComponent(account.id)}`}
-        className="inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+        className="inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
         title="Conectar via API para puxar métricas automaticamente"
       >
         <PlugIcon className="size-3" /> Conectar
@@ -67,18 +67,18 @@ export function ConnectionBadge({ account, connection, onChanged }: { account: C
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
-        className={cn("inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium", problem ? "bg-warning-soft text-warning" : "bg-success-soft text-success")}
+        className={cn("inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium", problem ? "bg-warning-soft text-warning" : "bg-success-soft text-success")}
         title={connection.last_sync_error ?? (connection.last_sync_at ? `Última atualização ${relative(connection.last_sync_at)}` : "Conectado")}
       >
         {problem ? <TriangleAlertIcon className="size-3" /> : <CheckCircle2Icon className="size-3" />}
         {problem ? "Reconectar" : "API"}
       </span>
       {problem ? (
-        <a href={`/api/integracoes/${account.platform}/conectar?conta=${encodeURIComponent(account.id)}`} className="text-[11px] text-muted-foreground underline hover:text-foreground">
+        <a href={`/api/integracoes/${account.platform}/conectar?conta=${encodeURIComponent(account.id)}`} className="text-xs text-muted-foreground underline hover:text-foreground">
           conectar de novo
         </a>
       ) : (
-        <button onClick={disconnect} disabled={busy} className="text-[11px] text-muted-foreground hover:text-danger">
+        <button onClick={disconnect} disabled={busy} className="text-xs text-muted-foreground hover:text-danger">
           desconectar
         </button>
       )}

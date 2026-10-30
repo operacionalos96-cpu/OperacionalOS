@@ -60,8 +60,8 @@ export function Notes({ selectedId, onSelect }: { selectedId: string | null; onS
               <button onClick={() => onSelect(n.id)} className={cn("w-full rounded-lg border border-transparent px-3 py-3 text-left transition-colors hover:bg-accent", n.id === selectedId && "border-border bg-accent")}>
                 <p className={cn("line-clamp-2 text-sm leading-snug font-semibold", !n.title && "text-muted-foreground")}>{n.title || "Sem título"}</p>
                 <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{plainText(n.body).split("\n")[0] || "Sem conteúdo ainda"}</p>
-                {(n.projectName || task) && <p className="mt-2 truncate text-[11px] font-medium text-brand">{n.projectName || "Sem projeto"}{task ? ` · ${task.title}${linked.length > 1 ? ` +${linked.length - 1}` : ""}` : ""}</p>}
-                <p className="mt-1 text-[11px] text-muted-foreground">{relative(n.updatedAt)}</p>
+                {(n.projectName || task) && <p className="mt-2 truncate text-xs font-medium text-brand">{n.projectName || "Sem projeto"}{task ? ` · ${task.title}${linked.length > 1 ? ` +${linked.length - 1}` : ""}` : ""}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">{relative(n.updatedAt)}</p>
               </button>
             </li>
           })}

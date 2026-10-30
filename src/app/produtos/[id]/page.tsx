@@ -31,7 +31,7 @@ import { openLeadForm, openTxForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { EmptyState, Panel, StatCard } from "@/components/shared/layout"
+import { EmptyState, Panel, StatCard, NotFound } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
 import { ProductFormDialog } from "@/components/products/product-form-dialog"
@@ -64,17 +64,7 @@ export default function ProductPage() {
 
   if (!product) {
     return (
-      <EmptyState
-        className="py-24"
-        icon={ReceiptIcon}
-        title="Produto não encontrado"
-        description="Ele pode ter sido excluído."
-        action={
-          <Button variant="outline" onClick={() => router.push("/produtos")}>
-            <ArrowLeftIcon /> Voltar para produtos
-          </Button>
-        }
-      />
+      <NotFound title="Produto não encontrado" backHref="/produtos" backLabel="Voltar aos produtos" />
     )
   }
 
@@ -121,7 +111,7 @@ export default function ProductPage() {
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads" icon={UsersIcon} info="Leads com este produto como interesse." style={{ "--i": 0 } as React.CSSProperties}>
+          <StatCard metric="leads-produto" icon={UsersIcon} style={{ "--i": 0 } as React.CSSProperties}>
             <p className="t-value mt-3">
               <CountUp value={stats.leads} />
             </p>
@@ -130,19 +120,17 @@ export default function ProductPage() {
             </p>
           </StatCard>
           <StatCard
-            label="Conversão"
+            metric="conversao"
             icon={TrendingUpIcon}
-            info="Ganhos ÷ (ganhos + perdidos). Leads ainda abertos não entram na conta."
             style={{ "--i": 1 } as React.CSSProperties}
           >
             <p className="t-value mt-3">{stats.conversion === null ? "—" : `${Math.round(stats.conversion * 100)}%`}</p>
             <p className="t-desc mt-1 text-xs">Pipeline aberto: {moneyCompact(stats.pipelineCents)}</p>
           </StatCard>
           <StatCard
-            label="Entradas"
+            metric="entradas-produto"
             icon={ArrowDownLeftIcon}
             accent={stats.incomeCents > 0 ? "var(--success)" : undefined}
-            info="Soma dos lançamentos de entrada ligados a este produto."
             style={{ "--i": 2 } as React.CSSProperties}
           >
             <p className="t-value mt-3">
@@ -150,7 +138,7 @@ export default function ProductPage() {
             </p>
             <p className="t-desc mt-1 text-xs">Este mês: {moneyCompact(stats.incomeMonthCents)}</p>
           </StatCard>
-          <StatCard label="Resultado" icon={WalletIcon} info="Entradas − saídas ligadas a este produto (tráfego, ferramentas, equipe…)." style={{ "--i": 3 } as React.CSSProperties}>
+          <StatCard metric="resultado-produto" icon={WalletIcon} style={{ "--i": 3 } as React.CSSProperties}>
             <p className={cn("t-value mt-3", stats.netCents < 0 && "text-danger")}>
               <CountUp value={stats.netCents} format={moneyCompact} />
             </p>

@@ -64,7 +64,7 @@ export default function AiOfficePage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="AI Office" description="Os funcionários IA, o que está acontecendo e o que estamos aprendendo. Mudança de regra só com aprovação humana." />
+      <PageHeader page="/ai-office" />
       <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6">
         <div className="flex gap-1 border-b text-sm">
           {(
@@ -126,10 +126,10 @@ export default function AiOfficePage() {
                   <li key={e.id} className="flex gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40">
                     <span className="tabular w-11 shrink-0 text-xs text-muted-foreground">{format(new Date(e.created_at), "HH:mm")}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{eventKindLabel(String(e.event_type))}</span>
+                      <span className="mb-0.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">{eventKindLabel(String(e.event_type))}</span>
                       {feedText(e, e.event_type.startsWith("agent.") ? agentName(e.entity_id) : leads.find((l) => l.id === e.entity_id)?.name)}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{e.actor_type === "human" ? "humano" : e.actor_type === "agent" ? agentName(e.actor_id) ?? "agente" : "sistema"}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{e.actor_type === "human" ? "humano" : e.actor_type === "agent" ? agentName(e.actor_id) ?? "agente" : "sistema"}</span>
                   </li>
                 ))}
               </ul>
@@ -228,7 +228,7 @@ function AgentCard({ agent, jobs, workers }: { agent: Agent; jobs: JobRow[]; wor
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+            "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
             st.tone === "brand" && "bg-brand/15 text-brand",
             st.tone === "warning" && "bg-warning/15 text-warning",
             st.tone === "danger" && "bg-danger-soft text-danger",
@@ -276,11 +276,11 @@ function AgentCard({ agent, jobs, workers }: { agent: Agent; jobs: JobRow[]; wor
           ))}
         </ul>
       ) : (
-        <p className="border-t pt-2 text-[11px] text-muted-foreground">Nenhum worker conectado (aba Workers).</p>
+        <p className="border-t pt-2 text-xs text-muted-foreground">Nenhum worker conectado (aba Workers).</p>
       )}
       <div className="flex flex-wrap gap-1">
         {agent.permissions.map((p) => (
-          <code key={p} className="rounded bg-muted px-1 py-px text-[10px] text-muted-foreground">
+          <code key={p} className="rounded bg-muted px-1 py-px text-xs text-muted-foreground">
             {p}
           </code>
         ))}
@@ -339,14 +339,14 @@ function HypothesesPanel() {
       }
     >
       {items.length === 0 ? (
-        <p className="t-desc p-4 text-sm">Nenhuma hipótese registrada. Não presumimos que o Intelligence Agent esteja executando autonomamente.</p>
+        <p className="t-desc p-4 text-sm">Nenhuma sugestão ainda. Quando os assistentes perceberem um padrão, a sugestão aparece aqui para uma pessoa aprovar ou recusar.</p>
       ) : (
         <ul className="divide-y">
           {items.map((h) => (
             <li key={h.id} className="grid gap-1 px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium">{h.title}</p>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px]">{HYPOTHESIS_STATUS[h.status]}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">{HYPOTHESIS_STATUS[h.status]}</span>
               </div>
               {h.description && <p className="text-xs text-muted-foreground">{h.description}</p>}
               {h.proposedTest && <p className="text-xs">Teste: {h.proposedTest}</p>}
@@ -380,7 +380,7 @@ function List({ items, empty }: { items: { id: string; title: string; meta: stri
       {items.map((i) => (
         <li key={i.id} className="px-4 py-3">
           <p className="text-sm font-medium">{i.title}</p>
-          <p className="text-[11px] text-muted-foreground">{i.meta}</p>
+          <p className="text-xs text-muted-foreground">{i.meta}</p>
           {i.body && <p className="mt-1 text-xs text-muted-foreground">{i.body}</p>}
         </li>
       ))}

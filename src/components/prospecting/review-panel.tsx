@@ -50,7 +50,7 @@ export function AnalysisBlock({ lead, compact = false }: { lead: Lead; compact?:
           <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{a.summary}</p>
         </div>
       )}
-      {!compact && a.analyzedBy && <p className="text-[11px] text-muted-foreground">Analisado por {a.analyzedBy}{a.analyzedAt ? ` · ${relative(a.analyzedAt)}` : ""}</p>}
+      {!compact && a.analyzedBy && <p className="text-xs text-muted-foreground">Analisado por {a.analyzedBy}{a.analyzedAt ? ` · ${relative(a.analyzedAt)}` : ""}</p>}
     </div>
   )
 }

@@ -1,5 +1,7 @@
 /** Produtos da operação. Regras puras (sem React/banco), testadas em products.test.ts. */
 import { isSameMonth, parseISO } from "date-fns"
+import { isDiscarded } from "./prospecting"
+import { isRealizedTransaction } from "./rules"
 import type { ISODate, Lead, Transaction } from "./types"
 
 export type ProductStatus = "ativo" | "desenvolvimento" | "pausado" | "arquivado"
@@ -61,10 +63,11 @@ export function safeUrl(raw: string): string | null {
 
 export function productStats(productId: string, leads: Lead[], txs: Transaction[], now: Date) {
   const pLeads = leads.filter((l) => l.productId === productId)
-  const open = pLeads.filter((l) => l.stage !== "ganho" && l.stage !== "perdido")
+  // Mesmas regras do resto do app (metrics.ts): descartado não é pipeline; previsto não é entrada.
+  const open = pLeads.filter((l) => l.stage !== "ganho" && l.stage !== "perdido" && !isDiscarded(l))
   const won = pLeads.filter((l) => l.stage === "ganho")
   const lost = pLeads.filter((l) => l.stage === "perdido")
-  const pTx = txs.filter((t) => t.productId === productId)
+  const pTx = txs.filter((t) => t.productId === productId && isRealizedTransaction(t))
   const sumOf = (list: Transaction[]) => list.reduce((acc, t) => acc + t.amountCents, 0)
   const income = pTx.filter((t) => t.type === "entrada")
   const expense = pTx.filter((t) => t.type === "saida")

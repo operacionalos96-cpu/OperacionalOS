@@ -21,7 +21,7 @@ export default function GoalsPage() {
   )
   return (
     <div className="flex flex-col">
-      <PageHeader title="Metas" description="Onde queremos chegar. O progresso anda sozinho com vendas, receita ou tarefas ligadas." actions={newButton} />
+      <PageHeader page="/metas" actions={newButton} />
       <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
         {goals.length === 0 ? (
           <EmptyState icon={TargetIcon} title="Nenhuma meta ainda" description="Crie uma meta de receita, de vendas ou ligada a tarefas." action={newButton} className="py-20" />

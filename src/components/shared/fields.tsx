@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ptBR as dayPickerPtBR } from "react-day-picker/locale"
 import { CalendarIcon } from "lucide-react"
-import { TEAM } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { TEMPERATURES } from "@/lib/domain/constants"
 import type { Temperature } from "@/lib/domain/types"
 import { dueShortcuts, parseMoney, toDateKey } from "@/lib/format"
@@ -55,6 +55,7 @@ export function Segmented<T extends string>({
 }
 
 export function OwnerToggle({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const TEAM = useTeam()
   return (
     <Segmented
       value={value}

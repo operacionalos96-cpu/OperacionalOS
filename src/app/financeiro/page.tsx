@@ -45,9 +45,7 @@ export default function FinancePage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title="Financeiro"
-        description="Caixa, meta do mês e cada lançamento. Tudo que entra e sai passa por aqui."
+      <PageHeader page="/financeiro"
         actions={
           <>
             <Button variant="outline" onClick={() => openTxForm({ prefill: { type: "saida" } })}>
@@ -72,12 +70,12 @@ export default function FinancePage() {
       </div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
         {tab === "visao" && <>
-        <p className="text-xs text-muted-foreground">Todos os indicadores desta página referem-se a {format(periodDate, "MMMM yyyy", { locale: ptBR })}: saldo ao fim do período, resultado, meta, gráficos e contas. Somente movimentações realizadas afetam o caixa; compromissos previstos aparecem separados em “Previsto vs realizado”.</p>
+        <p className="text-sm text-muted-foreground first-letter:uppercase">Mostrando {format(periodDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard
-            label={period < format(now, "yyyy-MM") ? "Saldo ao fim do período" : "Saldo em caixa atual"}
+            label={period < format(now, "yyyy-MM") ? `Saldo ao fim de ${format(periodDate, "MMMM", { locale: ptBR })}` : undefined}
             icon={WalletIcon}
-            info="Saldo inicial informado + entradas realizadas − saídas realizadas. Contas previstas não alteram o caixa."
+            metric="saldo-caixa"
             aside={<OpeningBalanceEditor />}
             style={{ "--i": 0 } as React.CSSProperties}
           >
@@ -94,7 +92,7 @@ export default function FinancePage() {
             label={`Resultado de ${format(periodDate, "MMMM yyyy", { locale: ptBR })}`}
             icon={ScaleIcon}
             accent="var(--chart-in)"
-            info="Entradas realizadas menos saídas realizadas no mês selecionado."
+            metric="resultado-mes"
             style={{ "--i": 1 } as React.CSSProperties}
           >
             <p className={cn("t-value mt-3", stats.month.net < 0 && "text-danger")}>
@@ -108,10 +106,9 @@ export default function FinancePage() {
           </StatCard>
 
           <StatCard
-            label="Meta de faturamento"
+            metric="meta-faturamento"
             icon={TargetIcon}
             accent={stats.goal.pct >= 1 ? "var(--success)" : stats.goal.atRisk ? "var(--warning)" : "var(--brand)"}
-            info="Entradas realizadas do período selecionado comparadas à meta daquele mês."
             aside={
               <GoalEditor
                 monthKey={monthKey(periodDate)}
@@ -329,7 +326,7 @@ function TransactionList({ transactions, periodLabel }: { transactions: Transact
         <div className="pb-2">
           {groups.map((g) => (
             <div key={g.key}>
-              <p className="sticky top-0 bg-card px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <p className="sticky top-0 bg-card px-4 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {format(parseISO(`${g.key}-01`), "MMMM yyyy", { locale: ptBR })}
               </p>
               <ul>
@@ -343,9 +340,9 @@ function TransactionList({ transactions, periodLabel }: { transactions: Transact
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t.category}
                           {t.dueDate && <span>· venc. {format(parseISO(t.dueDate), "dd/MM")}</span>}
-                          <span className="rounded bg-success/10 px-1 text-[10px] font-medium text-success">{t.type === "entrada" ? "Recebido" : "Pago"}</span>
+                          <span className="rounded bg-success/10 px-1 text-xs font-medium text-success">{t.type === "entrada" ? "Recebido" : "Pago"}</span>
                           {t.projectName && <span>· projeto: {t.projectName}</span>}
-                          {t.source && <span className="rounded bg-muted px-1 text-[10px] font-medium capitalize">via {t.source}</span>}
+                          {t.source && <span className="rounded bg-muted px-1 text-xs font-medium capitalize">via {t.source}</span>}
                           {lead && (
                             <Link href={`/pipeline/${lead.id}`} className="inline-flex items-center gap-0.5 hover:text-foreground hover:underline">
                               · <LinkIcon className="size-3" /> {lead.name}

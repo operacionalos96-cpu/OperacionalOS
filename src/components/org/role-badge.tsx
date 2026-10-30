@@ -28,7 +28,7 @@ export function RoleBadge({
       />
       {role.title}
       {isPrimary && (
-        <span className="text-[10px] font-semibold uppercase tracking-wider opacity-75">
+        <span className="text-xs font-semibold uppercase tracking-wider opacity-75">
           (Principal)
         </span>
       )}
