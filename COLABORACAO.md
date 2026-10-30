@@ -55,7 +55,7 @@ Depois, no GitHub, abra um **Pull Request** para a `main`:
 - O banco é compartilhado com outros apps (ver `docs/adr/0004-banco-compartilhado.md`): não use o
   histórico de migrações do Supabase CLI.
 
-**Última migration aplicada em produção:** `0018_org_seguranca.sql` (30/10/2026). A `0019` entra com o PR de permissões.
+**Última migration aplicada em produção:** `0020_automacoes_servidor.sql` (30/10/2026; a 0019 e a 0020 entraram depois do deploy do código).
 
 ## Se der conflito
 
