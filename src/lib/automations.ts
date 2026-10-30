@@ -6,6 +6,7 @@ import { planWonLead } from "@/lib/domain/won-lead"
 import { on } from "@/lib/events"
 import { useGoals, useRelations } from "@/lib/modules"
 import { useStore } from "@/lib/store"
+import { SANDBOX } from "@/lib/supabase/env"
 
 /**
  * Automações: reações aos eventos do negócio (src/lib/events.ts). Nova automação =
@@ -23,17 +24,26 @@ export function startAutomations(navigate: (href: string) => void) {
   if (started) return
   started = true
 
-  // Virou cliente.
+  // Virou cliente. A tarefa de onboarding e o recebimento previsto são criados NO SERVIDOR
+  // (evento lead.converted → fila → src/lib/server/automations.ts, ADR 0006) e chegam aqui pelo
+  // tempo real. O navegador só avisa e pede para a fila andar agora (sem esperar o agendador).
   on("lead.ganho", ({ leadId }) => {
     const lead = useStore.getState().leads.find((l) => l.id === leadId)
     if (!lead) return
-    // Piloto intersetorial: cria a tarefa de onboarding e o recebimento previsto (uma vez só por lead).
-    const st = useStore.getState()
-    const plan = planWonLead(lead, st.tasks, st.transactions, new Date())
-    if (plan.task) st.createTask(plan.task)
-    if (plan.transaction) st.createTransaction(plan.transaction)
-    const made = [plan.task && "tarefa de onboarding", plan.transaction && "recebimento previsto"].filter(Boolean).join(" e ")
-    toast.success(`${lead.name} virou cliente${made ? ` · criada(o): ${made}` : ""}`, { action: { label: "Ver clientes", onClick: () => navigate("/clientes") } })
+    if (SANDBOX) {
+      // Demonstração local não tem servidor nem fila: aplica a mesma regra aqui.
+      const st = useStore.getState()
+      const plan = planWonLead(lead, st.tasks, st.transactions, new Date())
+      if (plan.task) st.createTask(plan.task)
+      if (plan.transaction) st.createTransaction(plan.transaction)
+    } else {
+      // Pequena espera: o evento lead.converted precisa estar gravado antes de a fila ser processada.
+      setTimeout(() => void fetch("/api/automacoes/processar", { method: "POST" }).catch(() => {}), 1500)
+    }
+    toast.success(`${lead.name} virou cliente`, {
+      description: "Tarefa de onboarding e recebimento previsto a caminho.",
+      action: { label: "Ver clientes", onClick: () => navigate("/clientes") },
+    })
   })
 
   // Meta batida: olha os dados (vale também para o que o sócio fez em tempo real).
