@@ -6,8 +6,8 @@
 | --- | --- |
 | **Login obrigatório** | `src/middleware.ts` valida o token (assinatura) em toda página. Sem login, tudo redireciona para `/login`. Sem Supabase configurado, nada abre (falha fechada). |
 | **Lista de membros** | Só e-mails na tabela `members` acessam. Mesmo com conta criada, quem não está na lista é deslogado e o banco não entrega nada. |
-| **RLS no banco** | Todas as tabelas têm Row Level Security: anônimo não lê nada; logado só lê/escreve se for membro. A chave pública do app sozinha não abre nada. |
-| **Lista protegida** | `members` não pode ser alterada pela API — só pelo SQL Editor do Supabase. |
+| **RLS no banco** | Todas as tabelas têm Row Level Security: anônimo não lê nada; membro ativo lê; **gravar depende do cargo** (viewer só lê, operator grava dados, admin grava configurações). A chave pública do app sozinha não abre nada. Ver `docs/adr/0005-autorizacao-no-banco.md`. |
+| **Lista protegida** | O navegador não grava em `members`. Convites passam por `POST /api/equipe/convites` (servidor confere o cargo de quem convida). Só owner concede ou remove owner; ninguém altera o próprio nível (migration 0018). |
 | **Senhas** | Mínimo 12 caracteres com maiúscula, minúscula, número e símbolo. Trocar senha encerra todas as sessões. |
 | **Força bruta** | Limite de tentativas do Supabase + trava de 60s no formulário após 5 erros. Mensagens genéricas (não revelam se o e-mail existe). |
 | **Cabeçalhos HTTP** | CSP, anti-iframe (clickjacking), nosniff, HSTS em produção, sem `X-Powered-By`. |

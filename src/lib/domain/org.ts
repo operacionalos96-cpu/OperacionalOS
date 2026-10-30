@@ -62,6 +62,30 @@ export function isAtLeast(current: RoleLevel, required: RoleLevel): boolean {
   return rankOf(current) >= rankOf(required)
 }
 
+/**
+ * Matriz de permissões: o nível MÍNIMO para cada ação. Espelha exatamente as regras do
+ * banco (supabase/migrations/0019_permissoes_por_cargo.sql, ADR 0005). O banco é quem
+ * garante; a tela usa esta matriz só para esconder o que a pessoa não pode fazer.
+ * Mudou aqui? Mude a migration junto (e o teste em org-permissions.test.ts).
+ */
+export const PERMISSIONS = {
+  /** Ver qualquer dado do negócio (leads, tarefas, financeiro, mapas…). */
+  "data.read": "viewer",
+  /** Criar, editar e apagar dados do negócio e arquivos de conteúdo. */
+  "data.write": "operator",
+  /** Configurações da empresa (saldo inicial do financeiro, cargos, convites, membros). */
+  "settings.write": "admin",
+  /** Conceder, alterar ou remover o nível owner (trava da migration 0018). */
+  "owners.manage": "owner",
+} as const satisfies Record<string, RoleLevel>
+
+export type Permission = keyof typeof PERMISSIONS
+
+/** A pessoa com este nível pode fazer esta ação? */
+export function can(level: RoleLevel, permission: Permission): boolean {
+  return isAtLeast(level, PERMISSIONS[permission])
+}
+
 /** Retorna a lista de cargos atribuídos a um membro específico. */
 export function rolesOfMember(
   memberId: string,
