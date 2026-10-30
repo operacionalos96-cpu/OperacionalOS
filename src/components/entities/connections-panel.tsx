@@ -67,7 +67,7 @@ export function ConnectionsPanel({ entity, className, bare = false }: { entity: 
             <li key={`${refKey(p.ref)}-${p.via}`} className="group flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-accent/50">
               {/* Empilhado: "como está ligado" em cima, nome embaixo — cabe em colunas estreitas. */}
               <div className="grid min-w-0 flex-1">
-                <span className="truncate text-[11px] text-muted-foreground">{p.via}</span>
+                <span className="truncate text-xs text-muted-foreground">{p.via}</span>
                 <EntityChip entity={p.ref} />
               </div>
               {p.relationId && (
@@ -117,7 +117,7 @@ export function ConnectionsPanel({ entity, className, bare = false }: { entity: 
       title={
         <span className="flex items-center gap-2">
           <LinkIcon className="size-4 text-muted-foreground" /> Conexões
-          {presence.length > 0 && <span className="tabular rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{presence.length}</span>}
+          {presence.length > 0 && <span className="tabular rounded bg-muted px-1.5 text-xs text-muted-foreground">{presence.length}</span>}
         </span>
       }
       description="Onde isto aparece no OS e do que depende."

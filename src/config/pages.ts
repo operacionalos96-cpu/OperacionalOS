@@ -1,0 +1,221 @@
+import {
+  BotIcon,
+  CheckSquareIcon,
+  ClapperboardIcon,
+  HandshakeIcon,
+  HomeIcon,
+  KanbanIcon,
+  KeyRoundIcon,
+  NetworkIcon,
+  PackageIcon,
+  RadarIcon,
+  TargetIcon,
+  UsersIcon,
+  WalletIcon,
+  type LucideIcon,
+} from "lucide-react"
+import type { MetricId } from "@/lib/domain/metrics"
+import type { TermId } from "./glossary"
+
+/**
+ * Páginas do app — fonte ÚNICA de nome, ícone, propósito e "como usar" de cada uma.
+ * Daqui saem: o menu lateral, a barra do celular, a busca (Ctrl+K), o título de cada página e o
+ * painel "Como usar". Mudou o nome de uma área? Mude só aqui.
+ *
+ * Página nova = uma entrada aqui (o teste pages.test.ts falha se faltar). Regras de escrita:
+ * - `purpose`: uma frase, "para que serve", sem jargão.
+ * - `howTo`: 2 a 4 passos curtos, começando por um verbo ("Crie…", "Arraste…").
+ * - `terms` / `metrics`: palavras e números que a página usa (definidos em glossary.ts e metrics.ts).
+ */
+export interface PageInfo {
+  href: string
+  title: string
+  /** Rótulo curto da barra do celular. */
+  short?: string
+  icon: LucideIcon
+  section: string | null
+  purpose: string
+  howTo: string[]
+  terms?: TermId[]
+  metrics?: MetricId[]
+}
+
+export const PAGES = [
+  {
+    href: "/",
+    title: "Início",
+    icon: HomeIcon,
+    section: null,
+    purpose: "Seu resumo do dia: o que precisa de atenção, suas tarefas e como está o dinheiro.",
+    howTo: [
+      "Comece por \"Precisa de atenção\" e resolva cada item ali mesmo.",
+      "Veja em \"Minhas responsabilidades\" o que é seu hoje e nesta semana.",
+      "Clique num número para abrir a área com os detalhes.",
+    ],
+    metrics: ["saldo-caixa", "meta-faturamento", "pipeline-aberto"],
+  },
+  {
+    href: "/prospeccao",
+    title: "Prospecção",
+    icon: RadarIcon,
+    section: "Vendas",
+    purpose: "Analise empresas novas, uma de cada vez, e decida quem vale a pena chamar.",
+    howTo: [
+      "Leia a análise da empresa que está na fila.",
+      "Aprove para abrir a conversa no WhatsApp, ou descarte dizendo o motivo.",
+      "Depois de mandar a mensagem, confirme que enviou: o lead vai para \"Contato feito\".",
+    ],
+    terms: ["lead", "descartado"],
+  },
+  {
+    href: "/pipeline",
+    title: "Pipeline",
+    icon: KanbanIcon,
+    section: "Vendas",
+    purpose: "Seus negócios em andamento, do primeiro contato até o fechamento.",
+    howTo: [
+      "Crie um lead em \"Novo lead\": nome, valor estimado e a próxima ação.",
+      "Arraste o card para a etapa certa conforme a conversa avança.",
+      "Fechou? Arraste para \"Ganho\": a tarefa de começo do trabalho e o recebimento são criados sozinhos.",
+    ],
+    terms: ["lead", "etapa", "proxima-acao", "lead-parado"],
+    metrics: ["pipeline-aberto"],
+  },
+  {
+    href: "/clientes",
+    title: "Clientes",
+    icon: HandshakeIcon,
+    section: "Vendas",
+    purpose: "Quem já comprou: quanto pagou e quando foi a última compra.",
+    howTo: [
+      "Marque um lead como ganho no Pipeline e ele aparece aqui.",
+      "Clique num cliente para ver todo o histórico.",
+    ],
+    terms: ["lead"],
+  },
+  {
+    href: "/produtos",
+    title: "Produtos",
+    icon: PackageIcon,
+    section: "Vendas",
+    purpose: "O que a empresa vende, com os interessados e o dinheiro de cada produto.",
+    howTo: [
+      "Cadastre um produto com nome e links.",
+      "Ligue leads, lançamentos e conteúdos ao produto para ver os números dele.",
+      "Abra o produto para ver conversão, entradas e resultado.",
+    ],
+    metrics: ["leads-produto", "conversao", "entradas-produto", "resultado-produto"],
+  },
+  {
+    href: "/ai-office",
+    title: "AI Office",
+    short: "IA",
+    icon: BotIcon,
+    section: "Inteligência",
+    purpose: "Os assistentes de IA: o que estão fazendo, o que aprenderam e o que sugerem.",
+    howTo: [
+      "Veja o que cada assistente está fazendo agora.",
+      "Leia as sugestões e aprove ou recuse: nenhuma regra muda sem uma pessoa aprovar.",
+      "No monitor, refaça uma tarefa que falhou.",
+    ],
+    terms: ["hipotese"],
+  },
+  {
+    href: "/conteudos",
+    title: "Conteúdos",
+    short: "Conteúdo",
+    icon: ClapperboardIcon,
+    section: "Marketing",
+    purpose: "Do roteiro à publicação: produção, arquivos, contas e resultados de cada conteúdo.",
+    howTo: [
+      "Crie um conteúdo e avance pelas etapas (roteiro, gravação, edição…).",
+      "Anexe os arquivos de cada etapa no próprio conteúdo.",
+      "Depois de publicar, acompanhe os números em \"Métricas\".",
+    ],
+    metrics: ["publicacoes", "visualizacoes", "interacoes", "engajamento"],
+  },
+  {
+    href: "/financeiro",
+    title: "Financeiro",
+    short: "Finanças",
+    icon: WalletIcon,
+    section: "Gestão",
+    purpose: "Todo dinheiro que entra e sai, o saldo e a meta do mês.",
+    howTo: [
+      "Registre o que entrou ou saiu pelos botões \"Entrada\" e \"Saída\".",
+      "Em \"Contas a pagar\" e \"Contas a receber\", anote o que ainda vai acontecer.",
+      "Quando pagar ou receber, dê baixa: o valor passa a contar no saldo.",
+      "Troque o mês no seletor \"Período\" para ver meses anteriores.",
+    ],
+    terms: ["previsto", "realizado", "baixa"],
+    metrics: ["saldo-caixa", "resultado-mes", "meta-faturamento"],
+  },
+  {
+    href: "/tarefas",
+    title: "Tarefas & Notas",
+    short: "Tarefas",
+    icon: CheckSquareIcon,
+    section: "Gestão",
+    purpose: "O que cada pessoa precisa fazer, e as anotações da equipe.",
+    howTo: [
+      "Escreva a tarefa e aperte Enter. Dica: \"!alta\" marca como importante e \"#vendas\" põe uma etiqueta.",
+      "Clique na tarefa para escolher prazo, responsáveis e checklist.",
+      "Em \"Notas\", escreva e ligue a nota às tarefas relacionadas.",
+    ],
+  },
+  {
+    href: "/mapas",
+    title: "Mapas",
+    icon: NetworkIcon,
+    section: "Gestão",
+    purpose: "Um espaço para pensar e organizar ideias: lousa livre ou mapa em ramos.",
+    howTo: [
+      "Crie uma lousa para desenhar à vontade, ou um mapa para organizar ideias em ramos.",
+      "Ligue um balão a uma tarefa, lead ou produto para conectar a ideia ao trabalho.",
+      "Use o modo foco para esconder o resto da tela enquanto pensa.",
+    ],
+  },
+  {
+    href: "/metas",
+    title: "Metas",
+    icon: TargetIcon,
+    section: "Gestão",
+    purpose: "Onde a empresa quer chegar, com o progresso medido sozinho.",
+    howTo: [
+      "Crie uma meta de faturamento, de vendas ou ligada a tarefas.",
+      "O progresso anda sozinho com as vendas, entradas ou tarefas concluídas.",
+      "Abra a meta para ver os detalhes e editar.",
+    ],
+  },
+  {
+    href: "/equipe",
+    title: "Equipe",
+    icon: UsersIcon,
+    section: "Gestão",
+    purpose: "Quem faz parte da equipe, o cargo de cada um e quem responde a quem.",
+    howTo: [
+      "Convide uma pessoa pelo e-mail e escolha o nível de acesso dela.",
+      "Dê um cargo e defina a quem cada pessoa responde.",
+    ],
+    terms: ["nivel-acesso"],
+  },
+  {
+    href: "/cofre",
+    title: "Cofre",
+    icon: KeyRoundIcon,
+    section: "Gestão",
+    purpose: "Senhas e acessos da equipe, guardados com criptografia.",
+    howTo: [
+      "Abra o cofre com a senha do cofre.",
+      "Clique para ver uma senha: ela some sozinha depois de 30 segundos.",
+      "O cofre tranca sozinho depois de 5 minutos sem uso.",
+    ],
+  },
+] as const satisfies readonly PageInfo[]
+
+/** Informações da página (a mais específica que combina com o endereço). */
+export function pageFor(pathname: string): PageInfo | undefined {
+  return [...PAGES]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((p) => (p.href === "/" ? pathname === "/" : pathname === p.href || pathname.startsWith(`${p.href}/`)))
+}

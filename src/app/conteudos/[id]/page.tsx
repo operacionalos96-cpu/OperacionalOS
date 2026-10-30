@@ -7,7 +7,6 @@ import { toast } from "sonner"
 import {
   ArrowLeftIcon,
   CheckIcon,
-  ClapperboardIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FileVideoIcon,
@@ -43,7 +42,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, Field, OwnerToggle, ProductSelect } from "@/components/shared/fields"
-import { EmptyState, Panel } from "@/components/shared/layout"
+import { Panel, NotFound } from "@/components/shared/layout"
 import { PlatformIcon, accountLabel } from "@/components/content/content-bits"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
@@ -58,17 +57,7 @@ export default function ContentItemPage() {
 
   if (!item) {
     return (
-      <EmptyState
-        className="py-24"
-        icon={ClapperboardIcon}
-        title="Conteúdo não encontrado"
-        description="Ele pode ter sido excluído."
-        action={
-          <Button variant="outline" onClick={() => router.push("/conteudos")}>
-            <ArrowLeftIcon /> Voltar
-          </Button>
-        }
-      />
+      <NotFound title="Conteúdo não encontrado" backHref="/conteudos" backLabel="Voltar aos conteúdos" />
     )
   }
 
@@ -317,7 +306,7 @@ function AssetSlot({ item, kind, label, hint, className }: { item: ContentItem; 
           {a.url ? <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" /> : <FileVideoIcon className="size-3.5 shrink-0 text-muted-foreground" />}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-medium">{a.name}</span>
-            <span className="t-desc block text-[11px]">
+            <span className="t-desc block text-xs">
               {shortDate(a.uploadedAt)}
               {a.sizeBytes ? ` · ${(a.sizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}
             </span>
@@ -485,18 +474,18 @@ function PostRow({ post, onChange, onRemove }: { post: ContentPost; onChange: (p
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="grid gap-1">
-              <span className="t-label text-[10px]">{label}</span>
+              <span className="t-label text-xs">{label}</span>
               <Input value={m[key] ? String(m[key]) : ""} onChange={(e) => setMetric(key, e.target.value)} inputMode="numeric" placeholder="0" className="tabular h-8 text-xs" />
             </label>
           ))}
           <div className="grid gap-1">
-            <span className="t-label text-[10px]">Engaj.</span>
+            <span className="t-label text-xs">Engaj.</span>
             <span className="tabular flex h-8 items-center text-sm font-semibold">{eng === null ? "—" : `${(eng * 100).toFixed(1)}%`}</span>
           </div>
         </div>
       )}
       {post.metricsAt && (
-        <p className="t-desc text-[11px]">
+        <p className="t-desc text-xs">
           Números atualizados {dateTime(post.metricsAt)} · {post.source === "api" ? "automático (API)" : "manual"}
         </p>
       )}

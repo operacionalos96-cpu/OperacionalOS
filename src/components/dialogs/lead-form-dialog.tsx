@@ -8,7 +8,7 @@ import type { Temperature } from "@/lib/domain/types"
 import { dueShortcuts, moneyInputValue, parseMoney } from "@/lib/format"
 import { useStore } from "@/lib/store"
 import { nextOwner, openCounts } from "@/lib/domain/distribution"
-import { TEAM } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { safeUrl } from "@/lib/domain/products"
 import { useUI } from "@/lib/ui-store"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -23,6 +23,7 @@ import {
   submitOnModEnter, ProductSelect } from "@/components/shared/fields"
 
 export function LeadFormDialog() {
+  const TEAM = useTeam()
   const form = useUI((s) => s.leadForm)
   const setUI = useUI((s) => s.set)
   const meId = useStore((s) => s.meId)

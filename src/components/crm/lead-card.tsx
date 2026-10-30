@@ -48,7 +48,7 @@ export function LeadCard({ lead, dragging = false }: { lead: Lead; dragging?: bo
           <p className="line-clamp-2 text-xs leading-snug">{lead.nextAction.text}</p>
           <p
             className={cn(
-              "mt-1 flex items-center gap-1 text-[11px] font-medium",
+              "mt-1 flex items-center gap-1 text-xs font-medium",
               urgency === "vencida" ? "text-danger" : urgency === "hoje" ? "text-foreground" : "text-muted-foreground",
             )}
           >

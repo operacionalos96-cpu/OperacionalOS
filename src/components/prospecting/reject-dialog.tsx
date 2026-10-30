@@ -58,7 +58,7 @@ export function RejectLeadDialog({ lead, open, onOpenChange, onDone }: { lead: L
                 reason === r.id && "border-brand bg-accent font-medium",
               )}
             >
-              <kbd className="w-4 rounded border bg-muted text-center font-sans text-[10px] text-muted-foreground">{i + 1}</kbd>
+              <kbd className="w-4 rounded border bg-muted text-center font-sans text-xs text-muted-foreground">{i + 1}</kbd>
               {r.label}
             </button>
           ))}

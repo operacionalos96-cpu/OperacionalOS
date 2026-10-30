@@ -750,11 +750,11 @@ function Toolbox({ tool, setTool }: { tool: Tool; setTool: (t: Tool) => void }) 
                 className={cn("relative flex size-11 items-center justify-center rounded-lg text-foreground/85 transition-colors hover:bg-accent hover:text-foreground", tool === t.id && "bg-brand text-brand-foreground hover:bg-brand hover:text-brand-foreground")}
               >
                 <t.icon className="size-5" />
-                <span className={cn("absolute right-1 bottom-0.5 text-[10px] leading-none font-semibold opacity-60", tool === t.id && "opacity-90")}>{t.key}</span>
+                <span className={cn("absolute right-1 bottom-0.5 text-xs leading-none font-semibold opacity-60", tool === t.id && "opacity-90")}>{t.key}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {t.label} <kbd className="ml-1 rounded border px-1 text-[11px]">{t.key}</kbd>
+              {t.label} <kbd className="ml-1 rounded border px-1 text-xs">{t.key}</kbd>
             </TooltipContent>
           </Tooltip>
         </div>

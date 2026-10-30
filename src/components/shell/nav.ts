@@ -1,19 +1,5 @@
-import {
-  BotIcon,
-  RadarIcon,
-  CheckSquareIcon,
-  ClapperboardIcon,
-  HandshakeIcon,
-  HomeIcon,
-  KanbanIcon,
-  KeyRoundIcon,
-  NetworkIcon,
-  PackageIcon,
-  TargetIcon,
-  UsersIcon,
-  WalletIcon,
-  type LucideIcon,
-} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { PAGES } from "@/config/pages"
 
 export interface NavItem {
   href: string
@@ -24,43 +10,16 @@ export interface NavItem {
 }
 
 /**
- * Menu principal em SEÇÕES (evita a lista longa e sem hierarquia).
- * Módulo novo = um item na seção certa (e a pasta da página em src/app).
+ * Menu principal em SEÇÕES, derivado de src/config/pages.ts (fonte única de nome e ícone de cada
+ * página). Página nova = uma entrada em PAGES (e a pasta da página em src/app).
  */
-export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
-  {
-    title: null,
-    items: [{ href: "/", label: "Início", icon: HomeIcon }],
-  },
-  {
-    title: "Vendas",
-    items: [
-      { href: "/prospeccao", label: "Prospecção", icon: RadarIcon },
-      { href: "/pipeline", label: "Pipeline", icon: KanbanIcon },
-      { href: "/clientes", label: "Clientes", icon: HandshakeIcon },
-      { href: "/produtos", label: "Produtos", icon: PackageIcon },
-    ],
-  },
-  {
-    title: "Inteligência",
-    items: [{ href: "/ai-office", label: "AI Office", short: "IA", icon: BotIcon }],
-  },
-  {
-    title: "Marketing",
-    items: [{ href: "/conteudos", label: "Conteúdos", short: "Conteúdo", icon: ClapperboardIcon }],
-  },
-  {
-    title: "Gestão",
-    items: [
-      { href: "/financeiro", label: "Financeiro", short: "Finanças", icon: WalletIcon },
-      { href: "/tarefas", label: "Tarefas & Notas", short: "Tarefas", icon: CheckSquareIcon },
-      { href: "/mapas", label: "Mapas", icon: NetworkIcon },
-      { href: "/metas", label: "Metas", icon: TargetIcon },
-      { href: "/equipe", label: "Equipe", icon: UsersIcon },
-      { href: "/cofre", label: "Cofre", icon: KeyRoundIcon },
-    ],
-  },
-]
+export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = PAGES.reduce<{ title: string | null; items: NavItem[] }[]>((sections, p) => {
+  const item: NavItem = { href: p.href, label: p.title, short: "short" in p ? p.short : undefined, icon: p.icon }
+  const last = sections.at(-1)
+  if (last && last.title === p.section) last.items.push(item)
+  else sections.push({ title: p.section, items: [item] })
+  return sections
+}, [])
 
 /** Lista plana (barra do celular e busca). */
 export const NAV: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items)

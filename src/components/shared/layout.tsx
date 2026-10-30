@@ -2,31 +2,64 @@
 
 import Link from "next/link"
 import { InfoIcon } from "lucide-react"
+import { PAGES } from "@/config/pages"
+import { METRICS, type MetricId } from "@/lib/domain/metrics"
+import { PageHelp } from "./page-help"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
+/**
+ * Cabeçalho padrão de página. Use `page="/rota"`: título, descrição e o botão "Como usar" vêm de
+ * src/config/pages.ts (fonte única). `title`/`description` só para telas fora do menu (ex.: detalhe).
+ *
+ * Anatomia de toda página (nesta ordem): cabeçalho → filtros/abas → conteúdo → estado vazio que
+ * ensina o próximo passo (EmptyState). Explicações longas vão para o "Como usar", não para a tela.
+ */
 export function PageHeader({
+  page,
   title,
   description,
   actions,
   children,
 }: {
-  title: string
+  page?: (typeof PAGES)[number]["href"]
+  title?: string
   description?: string
   actions?: React.ReactNode
   children?: React.ReactNode
 }) {
+  const info = page ? PAGES.find((p) => p.href === page) : undefined
   return (
     <header className="flex flex-col gap-3 bg-background/80 px-4 pt-6 pb-3 backdrop-blur sm:px-8">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {description && <p className="t-desc mt-0.5">{description}</p>}
+          <h1 className="text-2xl font-semibold tracking-tight">{title ?? info?.title}</h1>
+          {(description ?? info?.purpose) && <p className="t-desc mt-0.5 text-sm">{description ?? info?.purpose}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {(info || actions) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {info && <PageHelp page={info} />}
+            {actions}
+          </div>
+        )}
       </div>
       {children}
     </header>
+  )
+}
+
+/** "Não encontrado" padrão das páginas de detalhe (o item pode ter sido apagado). */
+export function NotFound({ title, backHref, backLabel }: { title: string; backHref: string; backLabel: string }) {
+  return (
+    <EmptyState
+      title={title}
+      description="Pode ter sido apagado, ou o link está incompleto."
+      action={
+        <Link href={backHref} className="inline-flex h-10 items-center rounded-full border bg-card px-4 text-sm font-medium shadow-card hover:bg-accent">
+          {backLabel}
+        </Link>
+      }
+    />
   )
 }
 
@@ -113,10 +146,14 @@ export function InfoTip({ children }: { children: React.ReactNode }) {
  * Card de indicador: rótulo em caixa-alta, valor grande e uma linha de contexto.
  * Neutro por padrão; `accent` só quando a cor significa algo (ex.: meta batida).
  * Com `href`, o card inteiro navega.
+ *
+ * Use `metric`: o nome e a explicação ("?") vêm de src/lib/domain/metrics.ts, a fonte única de
+ * cada número. `label` só para dar contexto ao mesmo número (ex.: "Resultado de outubro").
  */
 export function StatCard({
-  label,
-  info,
+  metric,
+  label: labelOverride,
+  info: infoOverride,
   icon: Icon,
   accent,
   href,
@@ -125,7 +162,9 @@ export function StatCard({
   className,
   style,
 }: {
-  label: string
+  metric?: MetricId
+  label?: string
+  /** Só para indicadores que não são números do negócio (ex.: contagem local). Prefira `metric`. */
   info?: React.ReactNode
   icon?: React.ComponentType<{ className?: string }>
   accent?: string
@@ -135,6 +174,8 @@ export function StatCard({
   className?: string
   style?: React.CSSProperties
 }) {
+  const label = labelOverride ?? (metric ? METRICS[metric].label : "")
+  const info = metric ? METRICS[metric].help : infoOverride
   const body = (
     <>
       <div className="flex items-center gap-2">

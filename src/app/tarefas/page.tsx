@@ -32,7 +32,7 @@ function TasksAndNotes() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Tarefas & Notas">
+      <PageHeader page="/tarefas">
         <Segmented
           className="w-fit"
           value={tab}

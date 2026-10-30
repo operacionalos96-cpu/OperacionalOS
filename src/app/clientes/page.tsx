@@ -21,7 +21,7 @@ export default function ClientsPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Clientes" description="Leads ganhos: quanto cada um já pagou e quando foi a última compra." />
+      <PageHeader page="/clientes" />
       <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6">
         {rows.length === 0 ? (
           <EmptyState icon={HandshakeIcon} title="Nenhum cliente ainda" description="Quando um lead for marcado como ganho no Pipeline, ele aparece aqui." className="py-20" />
@@ -45,7 +45,7 @@ export default function ClientsPage() {
                       <span className="hidden w-28 text-right text-xs text-muted-foreground sm:block">{r.lastAt ? relative(r.lastAt) : ""}</span>
                       <span className="tabular w-28 text-right text-sm font-semibold">
                         {money(r.totalCents)}
-                        <span className="block text-[11px] font-normal text-muted-foreground">
+                        <span className="block text-xs font-normal text-muted-foreground">
                           {r.purchases} {r.purchases === 1 ? "entrada" : "entradas"}
                         </span>
                       </span>

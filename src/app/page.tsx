@@ -18,6 +18,8 @@ import {
   WalletIcon,
 } from "lucide-react"
 import { getUser } from "@/config/team"
+import { PAGES } from "@/config/pages"
+import { PageHelp } from "@/components/shared/page-help"
 import { stageColor, stageLabel } from "@/lib/domain/constants"
 import {
   type AgendaItem,
@@ -93,6 +95,7 @@ export default function DashboardPage() {
             )}
           </p>
         </div>
+        <PageHelp page={PAGES[0]} />
       </header>
 
       {/* Linha 1: os três números do negócio. */}
@@ -143,9 +146,8 @@ function CashCard({
   return (
     <StatCard
       href="/financeiro"
-      label="Saldo em caixa"
+      metric="saldo-caixa"
       icon={WalletIcon}
-      info="Saldo inicial + todas as entradas − todas as saídas. A linha mostra os últimos 30 dias."
       style={{ "--i": 0 } as React.CSSProperties}
     >
       {/* flex-wrap: sem espaço ao lado do valor, a linha desce em vez de vazar do card. */}
@@ -174,7 +176,7 @@ function CashCard({
 function GoalCard({ goal, monthKey }: { goal: ReturnType<typeof goalProgress>; monthKey: string }) {
   if (!goal.hasGoal) {
     return (
-      <StatCard label="Meta do mês" icon={TargetIcon} style={{ "--i": 1 } as React.CSSProperties} className="border-dashed">
+      <StatCard metric="meta-faturamento" icon={TargetIcon} style={{ "--i": 1 } as React.CSSProperties} className="border-dashed">
         <p className="t-desc mt-3">Defina quanto quer faturar este mês para acompanhar o ritmo.</p>
         <div className="mt-auto pt-4">
           <GoalEditor monthKey={monthKey} trigger={<Button size="sm" variant="outline"><TargetIcon /> Definir meta</Button>} />
@@ -186,10 +188,9 @@ function GoalCard({ goal, monthKey }: { goal: ReturnType<typeof goalProgress>; m
   const status = goal.pct >= 1 ? "batida" : goal.atRisk ? "risco" : "ritmo"
   return (
     <StatCard
-      label="Meta de faturamento"
+      metric="meta-faturamento"
       icon={TargetIcon}
       accent={status === "batida" ? "var(--success)" : status === "risco" ? "var(--warning)" : undefined}
-      info="Entradas do mês comparadas à meta. O traço na barra é onde você deveria estar hoje."
       aside={<GoalEditor monthKey={monthKey} trigger={<button className="text-xs text-muted-foreground hover:text-foreground">Editar</button>} />}
       style={{ "--i": 1 } as React.CSSProperties}
     >
@@ -220,9 +221,8 @@ function PipelineCard({ summary }: { summary: ReturnType<typeof pipelineSummary>
   return (
     <StatCard
       href="/pipeline"
-      label="Pipeline aberto"
+      metric="pipeline-aberto"
       icon={KanbanIcon}
-      info="Soma do valor dos leads que ainda não foram ganhos nem perdidos, por estágio."
       aside={<ArrowRightIcon className="size-3.5 text-muted-foreground" />}
       style={{ "--i": 2 } as React.CSSProperties}
     >
@@ -274,7 +274,7 @@ function AttentionPanel({ items, total, className }: { items: AttentionItem[]; t
       title={
         <span className="flex items-center gap-2">
           Precisa de atenção
-          {total > 0 && <span className="tabular rounded-md bg-danger-soft px-1.5 text-[11px] font-semibold text-danger">{total}</span>}
+          {total > 0 && <span className="tabular rounded-md bg-danger-soft px-1.5 text-xs font-semibold text-danger">{total}</span>}
         </span>
       }
       description="Do mais urgente ao menos urgente. Resolva aqui mesmo."
@@ -304,7 +304,7 @@ function AttentionPanel({ items, total, className }: { items: AttentionItem[]; t
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">{item.title}</span>
-                    <span className={cn("shrink-0 rounded px-1.5 py-px text-[10px] font-medium", critical ? "bg-danger-soft text-danger" : "bg-warning-soft text-warning")}>
+                    <span className={cn("shrink-0 rounded px-1.5 py-px text-xs font-medium", critical ? "bg-danger-soft text-danger" : "bg-warning-soft text-warning")}>
                       {meta.tag}
                     </span>
                   </span>
@@ -371,7 +371,7 @@ function AgendaPanel({ items, className }: { items: AgendaItem[]; className?: st
               <div key={b.id} className="px-4 py-3">
                 <GroupLabel tone={b.id === "atrasadas" ? "danger" : undefined} className="mb-2">
                   {BUCKET_LABEL[b.id]}
-                  <span className="tabular rounded bg-muted px-1.5 text-[10px] text-muted-foreground">{b.items.length}</span>
+                  <span className="tabular rounded bg-muted px-1.5 text-xs text-muted-foreground">{b.items.length}</span>
                 </GroupLabel>
                 <ul className="grid gap-2.5">
                   {b.items.map((item) => (

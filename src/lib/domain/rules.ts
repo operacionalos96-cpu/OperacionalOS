@@ -155,8 +155,13 @@ export function planSettlement(t: Transaction, date: string, amountCents?: numbe
   return { full: false as const, paid, remaining: t.amountCents - paid, originalCents: t.originalCents ?? t.amountCents, date }
 }
 
-export function balance(settings: FinanceSettings, txs: Transaction[]) {
-  return settings.openingBalanceCents + sum(txs.filter(isRealizedTransaction).map(signed))
+/**
+ * Saldo em caixa = o que já entrou menos o que já saiu, ATÉ HOJE (src/lib/domain/metrics.ts).
+ * Um cálculo só para todas as telas: antes, a Início somava também movimentos realizados com
+ * data futura e mostrava um saldo diferente do Financeiro.
+ */
+export function balance(settings: FinanceSettings, txs: Transaction[], asOf: Date = new Date()) {
+  return balanceAsOf(settings, txs, asOf)
 }
 
 export function monthStats(txs: Transaction[], now: Date) {
@@ -169,7 +174,8 @@ export function monthStats(txs: Transaction[], now: Date) {
 /** Variação do caixa no mês atual, em valor e % sobre o saldo do início do mês. */
 export function monthDelta(settings: FinanceSettings, txs: Transaction[], now: Date) {
   const { net } = monthStats(txs, now)
-  const current = balance(settings, txs)
+  // Saldo ao fim do mês de referência − resultado do mês = saldo no início do mês.
+  const current = balanceAsOf(settings, txs, endOfMonth(now))
   const startOfMonthBalance = current - net
   const pct = startOfMonthBalance !== 0 ? net / Math.abs(startOfMonthBalance) : null
   return { net, pct }

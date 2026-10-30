@@ -159,7 +159,7 @@ export function AssignRoleDialog({
                           <button
                             type="button"
                             onClick={() => setPrimaryRoleId(role.id)}
-                            className={`rounded px-1.5 py-0.5 text-[10px] uppercase font-bold transition-colors ${
+                            className={`rounded px-1.5 py-0.5 text-xs uppercase font-bold transition-colors ${
                               isPrimary
                                 ? "bg-primary text-primary-foreground"
                                 : "text-muted-foreground hover:bg-muted"
@@ -194,7 +194,7 @@ export function AssignRoleDialog({
                   )
                 })}
               </select>
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 O organograma usa essa ligação para desenhar a relação de subordinação direta.
               </p>
             </div>

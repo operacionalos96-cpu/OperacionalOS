@@ -79,16 +79,16 @@ export function WorkersPanel() {
                 <p className="font-medium">
                   {w.name} <span className="text-xs font-normal text-muted-foreground">· {agents.find((a) => a.id === w.agent_id)?.name ?? "qualquer agente"}{w.engine ? ` · ${w.engine}` : ""}</span>
                 </p>
-                <code className="text-[11px] text-muted-foreground">••••{w.token_hint}</code>
+                <code className="text-xs text-muted-foreground">••••{w.token_hint}</code>
               </div>
               <WorkerHealthLine w={w} />
               <p className="text-xs text-muted-foreground">Último job: {w.last_job_at ? relative(w.last_job_at) : "—"}</p>
               <div className="flex flex-wrap gap-1">
                 {w.capabilities.map((c) => (
-                  <code key={c} className="rounded bg-muted px-1 text-[10px]">{c}</code>
+                  <code key={c} className="rounded bg-muted px-1 text-xs">{c}</code>
                 ))}
                 {w.scopes.map((s) => (
-                  <code key={s} className="rounded border px-1 text-[10px] text-muted-foreground">{s}</code>
+                  <code key={s} className="rounded border px-1 text-xs text-muted-foreground">{s}</code>
                 ))}
               </div>
               <div className="flex gap-1">
@@ -180,7 +180,7 @@ function Chips({ title, all, value, onToggle, labels }: { title: string; all: st
       <p className="t-label">{title}</p>
       <div className="flex flex-wrap gap-1">
         {all.map((v) => (
-          <button key={v} type="button" onClick={() => onToggle(v)} className={cn("rounded-full border px-2 py-0.5 text-[11px]", value.includes(v) ? "border-brand bg-accent" : "text-muted-foreground")}>
+          <button key={v} type="button" onClick={() => onToggle(v)} className={cn("rounded-full border px-2 py-0.5 text-xs", value.includes(v) ? "border-brand bg-accent" : "text-muted-foreground")}>
             {labels?.[v] ? `${labels[v]} (${v})` : v}
           </button>
         ))}

@@ -56,7 +56,7 @@ export function MemberCard({
           </div>
 
           <div
-            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium border"
             title={levelMeta.description}
           >
             <ShieldIcon className="h-3 w-3 text-muted-foreground" />
@@ -66,7 +66,7 @@ export function MemberCard({
 
         {/* Cargos atribuídos */}
         <div className="space-y-1.5 pt-1">
-          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Cargos & Funções
           </div>
           <div className="flex flex-wrap gap-1.5">

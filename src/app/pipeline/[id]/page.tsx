@@ -9,7 +9,6 @@ import {
   ClockIcon,
   MoreHorizontalIcon,
   PlusIcon,
-  SearchXIcon,
   Trash2Icon,
   WalletIcon,
 } from "lucide-react"
@@ -34,7 +33,7 @@ import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } fro
 import { InlineText } from "@/components/shared/inline-edit"
 import { ReviewPanel } from "@/components/prospecting/review-panel"
 import { LeadVideoCard } from "@/components/prospecting/lead-video-card"
-import { EmptyState } from "@/components/shared/layout"
+import { NotFound } from "@/components/shared/layout"
 import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
@@ -47,17 +46,7 @@ export default function LeadPage() {
 
   if (!lead) {
     return (
-      <EmptyState
-        icon={SearchXIcon}
-        title="Lead não encontrado"
-        description="Ele pode ter sido excluído."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/pipeline">Voltar ao pipeline</Link>
-          </Button>
-        }
-        className="py-24"
-      />
+      <NotFound title="Lead não encontrado" backHref="/pipeline" backLabel="Voltar ao pipeline" />
     )
   }
   return <LeadDetail lead={lead} />
@@ -412,7 +401,7 @@ function LinkedTasks({ lead }: { lead: Lead }) {
               <Checkbox className="mt-0.5" checked={t.done} onCheckedChange={() => toggleTaskWithFeedback(t.id)} />
               <div className="min-w-0 flex-1">
                 <p className={cn("text-sm leading-tight", t.done && "text-muted-foreground line-through")}>{t.title}</p>
-                <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
                   <AvatarStack userIds={taskPeople(t)} size="xs" />
                   {t.dueDate && dueLabel(t.dueDate)}
                 </p>

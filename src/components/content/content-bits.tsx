@@ -19,7 +19,7 @@ const PLATFORM_CODE: Record<Platform, string> = { youtube: "YT", instagram: "IG"
 export function PlatformIcon({ platform, className }: { platform: Platform; className?: string }) {
   return (
     <span
-      className={cn("inline-flex h-4 min-w-5 items-center justify-center rounded-[4px] border border-current/30 px-0.5 text-[9px] leading-none font-bold tracking-tight", className)}
+      className={cn("inline-flex h-4 min-w-5 items-center justify-center rounded-[4px] border border-current/30 px-0.5 text-xs leading-none font-bold tracking-tight", className)}
       aria-label={platformLabel(platform)}
     >
       {PLATFORM_CODE[platform]}

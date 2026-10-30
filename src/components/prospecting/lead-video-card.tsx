@@ -86,7 +86,7 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
 
       {url && (
         <>
-          <p className="mb-1 text-[11px] font-medium text-muted-foreground">{url.n === 2 ? "Vídeo 2 — visão (2º passo de vídeo)" : "Vídeo 1 — diagnóstico (1º passo de vídeo)"}</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{url.n === 2 ? "Vídeo 2 — visão (2º passo de vídeo)" : "Vídeo 1 — diagnóstico (1º passo de vídeo)"}</p>
           <video key={url.src} src={url.src} controls playsInline className="mb-3 aspect-[9/16] max-h-[420px] w-full rounded-lg bg-black object-contain" />
         </>
       )}
@@ -123,7 +123,7 @@ export function LeadVideoCard({ lead }: { lead: Lead }) {
           </Button>
         )}
       </div>
-      {v?.status === "aprovado" && v.approvedAt && <p className="mt-2 text-[11px] text-muted-foreground">Aprovado {relative(v.approvedAt)}</p>}
+      {v?.status === "aprovado" && v.approvedAt && <p className="mt-2 text-xs text-muted-foreground">Aprovado {relative(v.approvedAt)}</p>}
     </section>
   )
 }

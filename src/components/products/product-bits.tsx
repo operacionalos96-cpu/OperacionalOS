@@ -6,7 +6,7 @@ export function ProductStatusBadge({ status, className }: { status: ProductStatu
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded px-1.5 py-px text-[11px] font-medium",
+        "inline-flex items-center gap-1.5 rounded px-1.5 py-px text-xs font-medium",
         meta.tone === "success" ? "bg-success-soft text-success" : meta.tone === "warning" ? "bg-warning-soft text-warning" : "bg-muted text-muted-foreground",
         className,
       )}

@@ -59,9 +59,7 @@ export default function EquipePage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title="Equipe & Cargos"
-        description="Gestão de membros, cargos dinâmicos e estrutura hierárquica da HZK Company."
+      <PageHeader page="/equipe"
         actions={headerActions}
       />
 

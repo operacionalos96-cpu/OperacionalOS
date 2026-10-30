@@ -9,6 +9,7 @@ import {
   CheckSquareIcon,
   DatabaseIcon,
   LogOutIcon,
+  MenuIcon,
   MonitorIcon,
   MoonIcon,
   PlusIcon,
@@ -20,7 +21,7 @@ import {
   WalletIcon,
   WifiOffIcon,
 } from "lucide-react"
-import { TEAM, getUser } from "@/config/team"
+import { getUser } from "@/config/team"
 import { isOverdue, isTaskFor, leadsNeedingAction } from "@/lib/domain/rules"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
@@ -35,6 +36,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { LeadFormDialog } from "@/components/dialogs/lead-form-dialog"
@@ -188,7 +190,7 @@ function Sidebar() {
                         />
                         <item.icon className="size-[18px] transition-transform duration-200 group-hover/nav:scale-110" />
                         {badge > 0 && (
-                          <span className="tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar">
+                          <span className="tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-xs font-semibold text-white ring-2 ring-sidebar">
                             {badge}
                           </span>
                         )}
@@ -325,7 +327,7 @@ function AccountCard() {
         <TooltipTrigger asChild>
           <span
             tabIndex={0}
-            className="mt-1 flex size-9 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-sidebar-border"
+            className="mt-1 flex size-9 items-center justify-center rounded-full text-xs font-semibold text-white ring-2 ring-sidebar-border"
             style={{ backgroundColor: me.color }}
           >
             {me.initials}
@@ -387,46 +389,74 @@ function ThemeSwitcher() {
   )
 }
 
+/** No celular: os destinos mais usados embaixo + "Menu" com todas as áreas (letra e toque grandes). */
+const MOBILE_MAIN = ["/", "/pipeline", "/tarefas", "/financeiro"]
+
 function MobileNav() {
   const pathname = usePathname()
   const meId = useStore((s) => s.meId)
   const signOut = useStore((s) => s.signOut)
-  const hydrated = useStore((s) => s.hydrated)
-  const me = TEAM.find((u) => u.id === meId) ?? TEAM[0]
+  const [menuOpen, setMenuOpen] = useState(false)
+  const me = getUser(meId)
+  const main = NAV.filter((i) => MOBILE_MAIN.includes(i.href))
+  const inMenu = !main.some((i) => isActive(pathname, i.href))
+  const tab = "flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground"
   return (
     <>
       <div className="fixed right-4 bottom-20 z-40 md:hidden">
         <NewMenu compact />
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t bg-background/90 backdrop-blur md:hidden">
-        {NAV.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground",
-              isActive(pathname, item.href) && "text-brand",
-            )}
-          >
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t bg-background/95 backdrop-blur md:hidden">
+        {main.map((item) => (
+          <Link key={item.href} href={item.href} className={cn(tab, isActive(pathname, item.href) && "text-brand")}>
             <item.icon className="size-5" />
             {item.short ?? item.label}
           </Link>
         ))}
-        <button
-          onClick={() => signOut()}
-          className="flex w-14 flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground"
-          aria-label={`Logado como ${me.name}. Sair`}
-        >
-          {hydrated ? (
-            <span className="flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white" style={{ backgroundColor: me.color }}>
-              {me.initials}
-            </span>
-          ) : (
-            <Skeleton className="size-5 rounded-full" />
-          )}
-          Sair
+        <button onClick={() => setMenuOpen(true)} className={cn(tab, inMenu && "text-brand")} aria-label="Abrir todas as áreas">
+          <MenuIcon className="size-5" />
+          Menu
         </button>
       </nav>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl">
+          <SheetHeader>
+            <SheetTitle>Todas as áreas</SheetTitle>
+          </SheetHeader>
+          <div className="grid gap-5 px-4 pb-6">
+            {NAV_SECTIONS.map((section, si) => (
+              <div key={si}>
+                {section.title && <p className="t-label mb-2">{section.title}</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  {section.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={cn(
+                        "flex h-12 items-center gap-2.5 rounded-2xl border bg-card px-3 text-sm font-medium",
+                        isActive(pathname, item.href) && "border-brand text-brand",
+                      )}
+                    >
+                      <item.icon className="size-5 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => signOut()}
+              className="flex h-12 items-center gap-2.5 rounded-2xl border bg-card px-3 text-sm font-medium text-muted-foreground"
+            >
+              <span className="flex size-7 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ backgroundColor: me.color }}>
+                {me.initials}
+              </span>
+              Sair ({me.name})
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

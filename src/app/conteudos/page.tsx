@@ -68,9 +68,7 @@ function Content() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Conteúdos"
-        description="Do roteiro ao post: produção, arquivos por etapa, contas e métricas."
+      <PageHeader page="/conteudos"
         actions={
           tab === "metricas" ? (
             <SyncMetricsButton onDone={reload} />
@@ -194,7 +192,7 @@ function Production({ onNew }: { onNew: () => void }) {
                 <span className="text-sm font-semibold">{stage.label}</span>
                 <span className="tabular text-xs text-muted-foreground">{list.length}</span>
               </div>
-              <p className="t-desc -mt-1 px-3 pb-2 text-[11px]">{stage.hint}</p>
+              <p className="t-desc -mt-1 px-3 pb-2 text-xs">{stage.hint}</p>
               <div className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
                 {list.map((item, i) => (
                   <ContentCard key={item.id} item={item} index={i} />
@@ -212,7 +210,7 @@ function Production({ onNew }: { onNew: () => void }) {
             return <div key={key} className={cn("min-h-28 rounded-lg border p-1.5 sm:min-h-36 sm:p-2", !isSameMonth(day, monthStart) && "bg-muted/30 opacity-60", formatDate(day, "yyyy-MM-dd") === formatDate(new Date(), "yyyy-MM-dd") && "border-brand")}>
               <p className="mb-1 text-xs font-medium text-muted-foreground">{formatDate(day, "d")}</p>
               <div className="grid gap-1">
-                {dayItems.map((item) => <Link key={item.id} href={`/conteudos/${item.id}`} className="rounded-md border bg-card px-1.5 py-1 text-[11px] leading-snug hover:border-brand" title={`${item.title} · ${CONTENT_STAGES.find((stage) => stage.id === item.stage)?.label ?? item.stage}`}>
+                {dayItems.map((item) => <Link key={item.id} href={`/conteudos/${item.id}`} className="rounded-md border bg-card px-1.5 py-1 text-xs leading-snug hover:border-brand" title={`${item.title} · ${CONTENT_STAGES.find((stage) => stage.id === item.stage)?.label ?? item.stage}`}>
                   <span className="line-clamp-2 font-medium">{item.title}</span><span className="block truncate text-muted-foreground">{item.brand ?? "Sem frente"} · {CONTENT_STAGES.find((stage) => stage.id === item.stage)?.label ?? item.stage}</span>
                 </Link>)}
               </div>
@@ -240,7 +238,7 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
           {formatLabel(item.format)}
           {product ? ` · ${product.name}` : ""}{item.brand ? ` · ${item.brand}` : ""}
         </p>
-        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
           {item.script?.trim() && (
             <span className="inline-flex items-center gap-1" title="Tem roteiro">
               <FileTextIcon className="size-3" /> roteiro
@@ -262,7 +260,7 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
         {next && (
           <button
             onClick={() => setContentStage(item, next.id as ContentStage)}
-            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             title={`Mover para ${next.label}`}
           >
             {next.label} <ChevronRightIcon className="size-3" />
@@ -373,8 +371,8 @@ function AccountRow({
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 truncate text-sm font-medium">
           {accountLabel(account)}
-          <span className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{account.brand || "Sem frente"}</span>
-          <span className={cn("rounded px-1.5 py-px text-[10px] font-medium", account.role === "principal" ? "bg-brand-soft text-brand" : "bg-muted text-muted-foreground")}>
+          <span className="rounded bg-muted px-1.5 py-px text-xs text-muted-foreground">{account.brand || "Sem frente"}</span>
+          <span className={cn("rounded px-1.5 py-px text-xs font-medium", account.role === "principal" ? "bg-brand-soft text-brand" : "bg-muted text-muted-foreground")}>
             {account.role === "principal" ? "Principal" : "Cortes"}
           </span>
         </p>
@@ -471,18 +469,18 @@ function Metrics() {
         <p className="ml-auto text-xs text-muted-foreground">{fromDate || toDate ? `Período ${fromDate || "início"} – ${toDate || "hoje"}` : "Todo o período disponível"}</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Publicações" icon={SendIcon} style={{ "--i": 0 } as React.CSSProperties}>
+        <StatCard metric="publicacoes" icon={SendIcon} style={{ "--i": 0 } as React.CSSProperties}>
           <p className="t-value mt-3">
             <CountUp value={posts} />
           </p>
         </StatCard>
-        <StatCard label="Visualizações" icon={BarChart3Icon} info="Definições variam entre plataformas. Selecione uma plataforma para ver um total comparável dentro dela." style={{ "--i": 1 } as React.CSSProperties}>
+        <StatCard metric="visualizacoes" icon={BarChart3Icon} style={{ "--i": 1 } as React.CSSProperties}>
           <p className="t-value mt-3">{platform === "todos" ? "Por plataforma" : <CountUp value={total.views} format={compact} />}</p>
         </StatCard>
-        <StatCard label="Interações" icon={UsersIcon} info="Curtidas + comentários + compartilhamentos + salvos; exibidas por plataforma para evitar somas de métricas com definições diferentes." style={{ "--i": 2 } as React.CSSProperties}>
+        <StatCard metric="interacoes" icon={UsersIcon} style={{ "--i": 2 } as React.CSSProperties}>
           <p className="t-value mt-3">{platform === "todos" ? "Por plataforma" : <CountUp value={total.likes + total.comments + total.shares + total.saves} format={compact} />}</p>
         </StatCard>
-        <StatCard label="Engajamento" icon={ClapperboardIcon} info="Interações ÷ visualizações, calculado apenas para a plataforma selecionada." style={{ "--i": 3 } as React.CSSProperties}>
+        <StatCard metric="engajamento" icon={ClapperboardIcon} style={{ "--i": 3 } as React.CSSProperties}>
           <p className="t-value mt-3">{platform === "todos" ? "Selecione uma plataforma" : eng === null ? "—" : `${(eng * 100).toFixed(1)}%`}</p>
         </StatCard>
       </div>
@@ -567,7 +565,7 @@ function Metrics() {
                         <span className="flex items-center gap-2">
                           {a && <PlatformIcon platform={a.platform} />}
                           <span className="truncate">{accountLabel(a)}</span>
-                          {a?.role === "cortes" && <GroupLabel className="text-[10px]">cortes</GroupLabel>}
+                          {a?.role === "cortes" && <GroupLabel className="text-xs">cortes</GroupLabel>}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right text-xs text-muted-foreground">

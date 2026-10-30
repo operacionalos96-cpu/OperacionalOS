@@ -31,9 +31,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title="Produtos"
-        description="O que a operação vende: links, leads e dinheiro de cada produto em um lugar."
+      <PageHeader page="/produtos"
         actions={
           <Button onClick={() => setFormOpen(true)}>
             <PlusIcon /> Novo produto

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { FileTextIcon, LinkIcon, PackageIcon, PlusIcon, SquareCheckIcon, TargetIcon, UserPlusIcon, VideoIcon, XIcon } from "lucide-react"
-import { TEAM } from "@/config/team"
+import { useTeam } from "@/lib/use-team"
 import { NODE_KIND, type NodeKind } from "@/lib/domain/mindmap"
 import type { MindMapNode } from "@/lib/domain/types"
 import type { EntityRef } from "@/lib/entities/types"
@@ -262,6 +262,7 @@ function ConvertItem({ icon: Icon, label, disabled, onClick }: { icon: React.Com
 type Decision = NonNullable<MindMapNode["decision"]>
 
 function DecisionFields({ value, onSave }: { value: Decision; onSave: (v: Decision) => void }) {
+  const TEAM = useTeam()
   const [d, setD] = useState<Decision>(value)
   const commit = (patch: Partial<Decision>) => {
     const next = { ...d, ...patch }

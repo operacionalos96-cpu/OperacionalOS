@@ -64,7 +64,7 @@ function Section({ icon: Icon, title, count, children }: { icon: React.Component
     <section className="grid gap-2">
       <p className="t-label flex items-center gap-1.5">
         <Icon className="size-3.5" /> {title}
-        {!!count && <span className="tabular rounded bg-muted px-1 text-[10px] font-medium normal-case">{count}</span>}
+        {!!count && <span className="tabular rounded bg-muted px-1 text-xs font-medium normal-case">{count}</span>}
       </p>
       {children}
     </section>
@@ -177,7 +177,7 @@ function Attachments({ entity, ctx, update, meId }: { entity: EntityRef; ctx: En
           >
             <DownloadIcon className="size-3.5 shrink-0 text-muted-foreground" /> {a.name}
           </button>
-          <span className="shrink-0 text-[11px] text-muted-foreground">{a.sizeBytes ? `${(a.sizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{a.sizeBytes ? `${(a.sizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}</span>
           <button onClick={() => remove(a.id, a.storagePath)} className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100" aria-label="Remover anexo">
             <XIcon className="size-3.5" />
           </button>
@@ -205,7 +205,7 @@ function Comments({ ctx, update, meId }: { ctx: EntityContext; update: Updater; 
         <div key={c.id} className="group flex gap-2">
           <AvatarDot userId={c.authorId} size="xs" className="mt-0.5" />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{getUser(c.authorId).name}</span> · {relative(c.createdAt)}
             </p>
             <p className="text-sm whitespace-pre-wrap">{c.text}</p>

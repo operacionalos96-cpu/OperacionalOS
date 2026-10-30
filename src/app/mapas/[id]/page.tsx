@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeftIcon, MaximizeIcon, MinimizeIcon, SearchXIcon } from "lucide-react"
+import { ArrowLeftIcon, MaximizeIcon, MinimizeIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store"
 import { deleteMapWithRows, migrateMap, restoreMapWithRows, useMindMap, useRowStorageReady } from "@/lib/maps"
@@ -15,7 +15,7 @@ import { WhiteboardEditor } from "@/components/board/whiteboard-editor"
 import { BoardMenu } from "@/components/board/board-menu"
 import { Button } from "@/components/ui/button"
 import { InlineText } from "@/components/shared/inline-edit"
-import { EmptyState } from "@/components/shared/layout"
+import { NotFound } from "@/components/shared/layout"
 import { MindMapEditor } from "@/components/mindmap/mind-map-editor"
 import { MapOutline } from "@/components/mindmap/map-outline"
 import { cn } from "@/lib/utils"
@@ -47,16 +47,7 @@ export default function MapPage() {
 
   if (!map) {
     return (
-      <EmptyState
-        icon={SearchXIcon}
-        title="Mapa não encontrado"
-        action={
-          <Button asChild variant="outline">
-            <Link href="/mapas">Voltar aos mapas</Link>
-          </Button>
-        }
-        className="py-24"
-      />
+      <NotFound title="Mapa não encontrado" backHref="/mapas" backLabel="Voltar aos mapas" />
     )
   }
 
@@ -147,7 +138,7 @@ function MapProgress({ progress }: { progress: ReturnType<typeof mapProgress> })
         <p className="tabular text-xs font-semibold whitespace-nowrap">
           {progress.feito} de {progress.total} feitos
         </p>
-        {progress.andamento > 0 && <p className="text-[11px] text-warning">{progress.andamento} em andamento</p>}
+        {progress.andamento > 0 && <p className="text-xs text-warning">{progress.andamento} em andamento</p>}
       </div>
       <div className="flex h-2 w-28 overflow-hidden rounded-full bg-muted">
         <div className="h-full bg-success transition-[width] duration-500" style={{ width: `${pct}%` }} />

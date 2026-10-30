@@ -24,7 +24,7 @@ export function EntityChip({ entity, className, showType = true }: { entity: Ent
     >
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span className={cn("truncate", sum?.done && "text-muted-foreground line-through")}>{sum ? sum.title : "item apagado"}</span>
-      {showType && <span className="shrink-0 text-[10px] text-muted-foreground">{ENTITY_LABEL[entity.type].one}</span>}
+      {showType && <span className="shrink-0 text-xs text-muted-foreground">{ENTITY_LABEL[entity.type].one}</span>}
     </button>
   )
 }
