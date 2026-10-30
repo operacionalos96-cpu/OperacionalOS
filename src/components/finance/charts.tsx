@@ -3,7 +3,7 @@
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useId, useMemo, useState } from "react"
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceDot, XAxis, YAxis } from "recharts"
+import { Area, CartesianGrid, ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "recharts"
 import type { FinanceSettings, Transaction } from "@/lib/domain/types"
 import { balanceSeries, expensesByCategory } from "@/lib/domain/rules"
 import { money, moneyCompact } from "@/lib/format"
@@ -13,10 +13,41 @@ import { EmptyState, Panel } from "@/components/shared/layout"
 import { PieChartIcon } from "lucide-react"
 
 /*
- * Regras de marca (skill dataviz): linha 2px, área = lavagem ~10%, ponto final
+ * Regras de marca (skill dataviz): linha 2px, área = lavagem suave, ponto final
  * ≥8px com anel da cor da superfície, grade hairline sólida, 1 eixo só,
  * texto sempre em cor de texto (nunca na cor da série), tooltip em tudo.
+ * Profundidade "4D": brilho suave sob a linha, área em degradê e um pulso no valor de hoje —
+ * tudo em SVG estático + 1 animação CSS leve (desligada com "reduzir movimento").
  */
+
+/** Degradê da área + brilho da linha. Ids únicos por gráfico (vários na mesma página). */
+function ChartDefs({ id, color }: { id: string; color: string }) {
+  return (
+    <defs>
+      <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={color} stopOpacity={0.26} />
+        <stop offset="55%" stopColor={color} stopOpacity={0.08} />
+        <stop offset="100%" stopColor={color} stopOpacity={0} />
+      </linearGradient>
+      <filter id={`${id}-glow`} x="-10%" y="-40%" width="120%" height="180%">
+        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor={color} floodOpacity="0.35" />
+      </filter>
+    </defs>
+  )
+}
+
+/** Ponto do valor de hoje: anel da superfície + pulso discreto ("ao vivo"). */
+function LiveDot({ cx, cy, color, r = 4.5 }: { cx?: number; cy?: number; color: string; r?: number }) {
+  if (cx === undefined || cy === undefined) return null
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill={color} className="beacon" />
+      <circle cx={cx} cy={cy} r={r} fill={color} stroke="var(--card)" strokeWidth={2} />
+    </g>
+  )
+}
+
+const LINE_ANIMATION = { animationDuration: 1100, animationEasing: "ease-out" as const }
 
 const axisFormat = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 })
 
@@ -49,18 +80,13 @@ export function BalanceChart({ settings, transactions, className, asOf }: { sett
       }
     >
       <ChartContainer config={balanceConfig} className="aspect-auto h-60 w-full px-2 pt-3 pb-2">
-        <AreaChart data={data} margin={{ top: 16, right: 84, left: 4, bottom: 0 }}>
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-saldo)" stopOpacity={0.16} />
-              <stop offset="100%" stopColor="var(--color-saldo)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <ComposedChart data={data} margin={{ top: 16, right: 84, left: 4, bottom: 0 }}>
+          <ChartDefs id={gradId} color="var(--color-saldo)" />
           <CartesianGrid vertical={false} stroke="var(--border)" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} />
           <YAxis tickLine={false} axisLine={false} width={52} tickFormatter={(v: number) => axisFormat.format(v / 100)} domain={["auto", "auto"]} />
           <ChartTooltip
-            cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "0" }}
+            cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 4" }}
             content={({ active, payload }) =>
               active && payload?.length ? (
                 <TooltipCard title={String(payload[0].payload.label)}>
@@ -69,27 +95,27 @@ export function BalanceChart({ settings, transactions, className, asOf }: { sett
               ) : null
             }
           />
-          <Area
+          {/* Área (só preenchimento) + linha com brilho por cima. Linha reta: o saldo muda por dia, sem curva inventada. */}
+          <Area type="linear" dataKey="saldo" stroke="none" fill={`url(#${gradId}-fill)`} isAnimationActive {...LINE_ANIMATION} activeDot={false} tooltipType="none" />
+          <Line
             type="linear"
             dataKey="saldo"
             stroke="var(--color-saldo)"
             strokeWidth={2}
-            fill={`url(#${gradId})`}
+            dot={false}
+            style={{ filter: `url(#${gradId}-glow)` }}
             activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--card)", fill: "var(--color-saldo)" }}
-            animationDuration={900}
-            animationEasing="ease-out"
+            {...LINE_ANIMATION}
           />
           {/* Rótulo direto só no ponto final (o valor que importa: hoje). */}
           <ReferenceDot
             x={last.label}
             y={last.saldo}
             r={4.5}
-            fill="var(--color-saldo)"
-            stroke="var(--card)"
-            strokeWidth={2}
-            label={{ value: moneyCompact(last.saldo), position: "right", fill: "var(--foreground)", fontSize: 12, fontWeight: 600, offset: 8 }}
+            shape={(p: { cx?: number; cy?: number }) => <LiveDot cx={p.cx} cy={p.cy} color="var(--color-saldo)" />}
+            label={{ value: moneyCompact(last.saldo), position: "right", fill: "var(--foreground)", fontSize: 12, fontWeight: 600, offset: 10 }}
           />
-        </AreaChart>
+        </ComposedChart>
       </ChartContainer>
     </Panel>
   )
@@ -99,13 +125,17 @@ export function BalanceChart({ settings, transactions, className, asOf }: { sett
 export function Sparkline({ values, color = "var(--brand)", className }: { values: number[]; color?: string; className?: string }) {
   const data = values.map((v, i) => ({ i, v }))
   const config = { v: { label: "Valor", color } } satisfies ChartConfig
+  const id = useId().replace(/:/g, "")
   return (
     <ChartContainer config={config} className={className ?? "aspect-auto h-10 w-full"}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+      <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 4, left: 4 }}>
+        <ChartDefs id={id} color="var(--color-v)" />
         <YAxis hide domain={["dataMin", "dataMax"]} />
-        <Line type="monotone" dataKey="v" stroke="var(--color-v)" strokeWidth={2} dot={false} isAnimationActive animationDuration={900} />
-        <ReferenceDot x={data.length - 1} y={values[values.length - 1]} r={3.5} fill="var(--color-v)" stroke="var(--card)" strokeWidth={2} />
-      </LineChart>
+        <XAxis hide dataKey="i" />
+        <Area type="linear" dataKey="v" stroke="none" fill={`url(#${id}-fill)`} isAnimationActive {...LINE_ANIMATION} />
+        <Line type="linear" dataKey="v" stroke="var(--color-v)" strokeWidth={2} dot={false} style={{ filter: `url(#${id}-glow)` }} isAnimationActive {...LINE_ANIMATION} />
+        <ReferenceDot x={data.length - 1} y={values[values.length - 1]} r={3.5} shape={(p: { cx?: number; cy?: number }) => <LiveDot cx={p.cx} cy={p.cy} color="var(--color-v)" r={3.5} />} />
+      </ComposedChart>
     </ChartContainer>
   )
 }
@@ -135,7 +165,7 @@ export function ExpensesByCategory({ transactions, className, period }: { transa
               </div>
               <div className="h-2.5 rounded-full bg-muted">
                 <div
-                  className="h-full grow-x rounded-full bg-chart-out transition-[filter] group-hover:brightness-110"
+                  className="h-full grow-x rounded-full bg-gradient-to-r from-chart-out/70 to-chart-out shadow-[0_2px_6px_-3px_var(--chart-out)] transition-[filter] group-hover:brightness-110"
                   style={{ width: `${(r.cents / max) * 100}%`, animationDelay: `${i * 70}ms` }}
                 />
               </div>
