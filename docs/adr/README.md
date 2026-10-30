@@ -24,3 +24,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0004](0004-banco-compartilhado.md) | Banco Supabase compartilhado com outros apps | Aceito (provisório) |
 | [0005](0005-autorizacao-no-banco.md) | Autorização por cargo aplicada no banco | Aceito |
 | [0006](0006-automacoes-no-servidor.md) | Fatos de negócio no servidor: Outbox + consumidor idempotente | Aceito |
+| [0007](0007-frontend-modular.md) | Frontend guiado, uma fonte só para cada informação, rumo a apps independentes | Aceito |
