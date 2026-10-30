@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="HZK Company">
+  <circle cx="50" cy="50" r="50" fill="#1B2432"/>
+  <polygon points="18.57,9.05 82.02,9.05 82.02,26.19 42.74,73.21 82.02,73.21 82.02,89.88 15.0,89.88 15.0,75.36 57.26,26.19 18.57,26.19" fill="#fff"/>
+  <line x1="21.79" y1="83.45" x2="75.6" y2="15.48" stroke="#EA5B25" stroke-width="2.62"/>
+  <circle cx="21.79" cy="83.45" r="6.55" fill="#EA5B25"/>
+  <circle cx="48.21" cy="51.07" r="6.55" fill="#EA5B25"/>
+  <circle cx="75.6" cy="15.48" r="6.55" fill="#EA5B25"/>
+</svg>

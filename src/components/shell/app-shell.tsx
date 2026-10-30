@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { LeadFormDialog } from "@/components/dialogs/lead-form-dialog"
 import { TaskFormDialog } from "@/components/dialogs/task-form-dialog"
 import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dialog"
@@ -145,65 +146,68 @@ function Sidebar() {
   const hydrated = useStore((s) => s.hydrated)
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r bg-sidebar md:flex">
-      <div className="flex h-14 items-center gap-2.5 px-4">
-        <div className="btn-depth flex size-7 items-center justify-center rounded-lg text-xs font-extrabold">O</div>
-        <p className="text-sm font-bold tracking-tight">Operacional OS</p>
-      </div>
+    // Pílula escura flutuante, só ícones; o nome aparece no balão ao passar o mouse.
+    <aside className="hidden shrink-0 p-3 pr-0 md:flex">
+      <div className="flex w-16 flex-col items-center gap-3 rounded-[28px] bg-sidebar py-4 text-sidebar-foreground shadow-lift">
+        {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
+        <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 rounded-full ring-2 ring-sidebar-border" />
 
-      <div className="flex flex-col gap-1 px-2 pb-2">
-        <NewMenu />
-        <button
-          onClick={() => useUI.getState().set({ paletteOpen: true })}
-          className="flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <SearchIcon className="size-4" />
-          Buscar
-          <kbd className="ml-auto rounded border bg-background px-1 text-[10px] font-medium">Ctrl K</kbd>
-        </button>
-      </div>
+        <div className="flex flex-col items-center gap-1.5">
+          <NewMenu compact />
+          <RailButton label="Buscar (Ctrl K)" onClick={() => useUI.getState().set({ paletteOpen: true })}>
+            <SearchIcon className="size-[18px]" />
+          </RailButton>
+        </div>
 
-      <nav className="flex flex-col gap-4 px-2 pt-2">
-        {NAV_SECTIONS.map((section, si) => (
-          <div key={si} className="flex flex-col gap-0.5">
-            {section.title && <p className="t-label px-2.5 pb-1">{section.title}</p>}
-            {section.items.map((item) => {
-              const active = isActive(pathname, item.href)
-              const badge = hydrated ? badges[item.href] : 0
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "group/nav relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:bg-sidebar-accent hover:text-foreground",
-                    active && "bg-sidebar-accent text-foreground shadow-card",
-                  )}
-                >
-                  {/* Ativo = 3 sinais: barra de marca, fundo elevado e ícone colorido. */}
-                  <span
-                    className={cn(
-                      "absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-brand transition-transform duration-300",
-                      active ? "scale-y-100" : "scale-y-0",
-                    )}
-                  />
-                  <item.icon className={cn("size-4 transition-transform duration-200 group-hover/nav:scale-110", active && "text-brand")} />
-                  {item.label}
-                  {badge > 0 && (
-                    <span className="tabular ml-auto rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white shadow-[0_2px_6px_-1px_var(--danger)]">{badge}</span>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
-      </nav>
+        {/* w-full: a rolagem corta o que sai da largura; o marcador laranja fica na borda da pílula. */}
+        <nav className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none]">
+          {NAV_SECTIONS.map((section, si) => (
+            <div key={si} className="flex flex-col items-center gap-1">
+              {si > 0 && <span className="my-1.5 h-px w-6 bg-sidebar-border" aria-hidden />}
+              {section.items.map((item) => {
+                const active = isActive(pathname, item.href)
+                const badge = hydrated ? badges[item.href] : 0
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={item.href}
+                        aria-label={item.label}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "group/nav relative flex size-10 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                          active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+                        )}
+                      >
+                        {/* Ativo = círculo claro + marcador laranja na borda da pílula. */}
+                        <span
+                          className={cn(
+                            "absolute top-1/2 -left-3 h-4 w-1 -translate-y-1/2 rounded-r-full bg-highlight transition-transform duration-300",
+                            active ? "scale-y-100" : "scale-y-0",
+                          )}
+                        />
+                        <item.icon className="size-[18px] transition-transform duration-200 group-hover/nav:scale-110" />
+                        {badge > 0 && (
+                          <span className="tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar">
+                            {badge}
+                          </span>
+                        )}
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={10}>
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
 
-      {/* grid-cols-[minmax(0,1fr)]: sem isso o e-mail longo estica o card para fora da barra. */}
-      <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-3 border-t p-3">
-        <AccountCard />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-center gap-1.5">
           <DataMenu />
           <ThemeSwitcher />
+          <AccountCard />
         </div>
       </div>
     </aside>
@@ -233,11 +237,11 @@ function DataMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground">
-            <DatabaseIcon className="size-3" /> Dados
+          <button aria-label="Dados" title="Dados" className={RAIL_BUTTON}>
+            <DatabaseIcon className="size-[18px]" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-72">
+        <DropdownMenuContent align="end" side="right" className="w-72">
           <DropdownMenuItem
             onSelect={() => {
               const c = localSnapshotCounts()
@@ -278,7 +282,7 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {compact ? (
-          <Button size="icon" className="size-10 rounded-full shadow-lg" aria-label="Novo">
+          <Button size="icon" className="size-10 rounded-full shadow-lg [--btn-bg:var(--brand)] [--btn-fg:white]" aria-label="Novo" title="Novo">
             <PlusIcon className="size-5" />
           </Button>
         ) : (
@@ -287,7 +291,7 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={compact ? "end" : "start"} className="w-52">
+      <DropdownMenuContent align={compact ? "end" : "start"} side={compact ? "right" : undefined} className="w-52">
         <DropdownMenuItem onSelect={() => openLeadForm()}>
           <UserPlusIcon /> Lead
           <DropdownMenuShortcut>mais usado</DropdownMenuShortcut>
@@ -311,30 +315,46 @@ function AccountCard() {
   const hydrated = useStore((s) => s.hydrated)
   const me = getUser(meId)
   // Antes do login carregar, meId ainda é o valor padrão: mostrar um nome agora seria mentira.
-  if (!hydrated) {
-    return (
-      <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2" aria-label="Carregando conta">
-        <Skeleton className="size-7 rounded-full" />
-        <div className="grid flex-1 gap-1.5">
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="h-2.5 w-24" />
-        </div>
-      </div>
-    )
-  }
+  if (!hydrated) return <Skeleton className="size-10 rounded-full bg-sidebar-accent" aria-label="Carregando conta" />
   return (
-    <div className="flex min-w-0 items-center gap-2.5 overflow-hidden rounded-lg border bg-card px-2.5 py-2" title={meEmail}>
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: me.color }}>
-        {me.initials}
-      </span>
-      <div className="min-w-0 flex-1 leading-tight">
-        <p className="truncate text-xs font-semibold">{me.name}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{meEmail}</p>
-      </div>
-      <Button variant="ghost" size="icon-sm" onClick={() => signOut()} aria-label="Sair" title="Sair">
-        <LogOutIcon />
-      </Button>
-    </div>
+    <>
+      <RailButton label="Sair" onClick={() => signOut()}>
+        <LogOutIcon className="size-[18px]" />
+      </RailButton>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="mt-1 flex size-9 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-sidebar-border"
+            style={{ backgroundColor: me.color }}
+          >
+            {me.initials}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={10}>
+          {me.name} · {meEmail}
+        </TooltipContent>
+      </Tooltip>
+    </>
+  )
+}
+
+const RAIL_BUTTON =
+  "flex size-10 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+
+/** Botão redondo da barra lateral, com o nome no balão à direita. */
+function RailButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button onClick={onClick} aria-label={label} className={RAIL_BUTTON}>
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={10}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -348,24 +368,22 @@ function ThemeSwitcher() {
     { id: "dark", icon: MoonIcon, label: "Escuro" },
     { id: "system", icon: MonitorIcon, label: "Automático" },
   ] as const
+  const current = options.find((o) => mounted && o.id === theme) ?? options[0]
   return (
-    <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="Tema">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          role="radio"
-          aria-checked={mounted && theme === o.id}
-          title={o.label}
-          onClick={() => setTheme(o.id)}
-          className={cn(
-            "flex size-6 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:text-foreground",
-            mounted && theme === o.id && "bg-card text-foreground shadow-[0_1px_2px_oklch(0_0_0/12%)]",
-          )}
-        >
-          <o.icon className="size-3.5" />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button aria-label={`Tema: ${current.label}`} title={`Tema: ${current.label}`} className={RAIL_BUTTON}>
+          <current.icon className="size-[18px]" />
         </button>
-      ))}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="right" className="w-40">
+        {options.map((o) => (
+          <DropdownMenuItem key={o.id} onSelect={() => setTheme(o.id)} className={cn(theme === o.id && "font-semibold")}>
+            <o.icon /> {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

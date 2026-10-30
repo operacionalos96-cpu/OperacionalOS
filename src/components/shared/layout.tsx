@@ -17,10 +17,10 @@ export function PageHeader({
   children?: React.ReactNode
 }) {
   return (
-    <header className="flex flex-col gap-3 border-b bg-background/80 px-4 py-4 backdrop-blur sm:px-6">
+    <header className="flex flex-col gap-3 bg-background/80 px-4 pt-6 pb-3 backdrop-blur sm:px-8">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {description && <p className="t-desc mt-0.5">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

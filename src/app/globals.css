@@ -44,6 +44,8 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
   --color-chart-in: var(--chart-in);
   --color-chart-out: var(--chart-out);
   --color-success: var(--success);
@@ -74,35 +76,46 @@
 }
 
 /*
- * Direção visual: SaaS premium, dark por padrão. 90% neutro (preto, grafite,
- * cinza, branco) + 10% de verde. Profundidade vem da diferença de tons, não de
- * sombra. O verde só marca positivo/crescimento e pequenos destaques.
- * O tema claro segue as mesmas regras, invertidas.
+ * Direção visual "Dashboard V18": claro e arejado por padrão. Fundo cinza-azulado,
+ * cards brancos que flutuam (sombra longa e suave, quase sem borda), cantos bem
+ * arredondados e barra lateral em pílula escura só com ícones.
+ * Identidade HZK: grafite azulado = base (barra lateral, botões principais, texto);
+ * laranja = ação (item ativo, links, foco, destaques). Verde só marca positivo.
+ * O tema escuro segue as mesmas regras, invertidas.
  */
 :root {
   color-scheme: light;
-  --background: oklch(0.975 0 0);
-  --foreground: oklch(0.2 0 0);
+  /* Paleta oficial HZK Company (manual "HZK Company projeto base"):
+   * grafite azulado = base, estrutura e confiança; laranja = ação e movimento;
+   * cinza grafite = equilíbrio e suporte. */
+  --hzk-navy: #1b2432;
+  --hzk-orange: #ea5b25;
+  --hzk-orange-soft: rgb(234 91 37 / 11%);
+  --hzk-gray: #535353;
+  --highlight: var(--hzk-orange);
+  --highlight-soft: var(--hzk-orange-soft);
+  --background: oklch(0.972 0.004 255);
+  --foreground: oklch(0.19 0.01 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0 0);
-  --primary: oklch(0.21 0 0);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.955 0 0);
+  --primary: var(--hzk-navy);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.006 255);
   --secondary-foreground: oklch(0.21 0 0);
-  --muted: oklch(0.95 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.945 0 0);
+  --muted: oklch(0.955 0.006 255);
+  --muted-foreground: oklch(0.52 0.012 255);
+  --accent: oklch(0.95 0.012 255);
   --accent-foreground: oklch(0.21 0 0);
   --destructive: oklch(0.58 0.19 25);
-  --border: oklch(0.905 0 0);
-  --input: oklch(0.88 0 0);
-  --ring: oklch(0.55 0.14 152);
+  --border: oklch(0.925 0.006 255);
+  --input: oklch(0.9 0.008 255);
+  --ring: var(--hzk-orange);
 
-  --brand: oklch(0.55 0.14 152);
+  --brand: var(--hzk-orange);
   --brand-foreground: oklch(0.99 0 0);
-  --brand-soft: oklch(0.55 0.14 152 / 10%);
+  --brand-soft: var(--hzk-orange-soft);
   --success: oklch(0.55 0.14 152);
   --success-soft: oklch(0.55 0.14 152 / 10%);
   --warning: oklch(0.64 0.14 70);
@@ -118,8 +131,8 @@
   --stage-proposta: oklch(0.52 0 0);
   --stage-negociacao: oklch(0.34 0 0);
 
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 4%);
-  --shadow-lift: 0 6px 20px -8px oklch(0 0 0 / 14%);
+  --shadow-card: 0 1px 2px oklch(0.3 0.04 255 / 4%), 0 10px 30px -14px oklch(0.3 0.06 255 / 14%);
+  --shadow-lift: 0 2px 4px oklch(0.3 0.04 255 / 4%), 0 22px 44px -18px oklch(0.3 0.08 255 / 26%);
 
   /* Entradas = verde (positivo), saídas = neutro. Validado com dataviz. */
   --chart-in: oklch(0.55 0.14 152);
@@ -129,19 +142,21 @@
   --chart-3: oklch(0.45 0 0);
   --chart-4: oklch(0.6 0 0);
   --chart-5: oklch(0.82 0 0);
-  --radius: 0.4rem;
-  --sidebar: oklch(0.955 0 0);
-  --sidebar-foreground: oklch(0.2 0 0);
-  --sidebar-primary: oklch(0.55 0.14 152);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(1 0 0);
-  --sidebar-accent-foreground: oklch(0.2 0 0);
-  --sidebar-border: oklch(0.905 0 0);
-  --sidebar-ring: oklch(0.55 0.14 152);
+  --radius: 0.7rem;
+  --sidebar: var(--hzk-navy);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-primary: oklch(0.97 0.006 255);
+  --sidebar-primary-foreground: var(--hzk-navy);
+  --sidebar-accent: oklch(1 0 0 / 9%);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: var(--hzk-orange);
 }
 
 .dark {
   color-scheme: dark;
+  --highlight: #f06a36;
+  --highlight-soft: rgb(240 106 54 / 15%);
   --background: #171717;
   --foreground: #ececec;
   --card: #202020;
@@ -159,11 +174,11 @@
   --destructive: oklch(0.66 0.17 24);
   --border: #2c2c2c;
   --input: #333333;
-  --ring: oklch(0.7 0.15 152);
+  --ring: #f06a36;
 
-  --brand: oklch(0.7 0.15 152);
+  --brand: #f06a36;
   --brand-foreground: #0f0f0f;
-  --brand-soft: oklch(0.7 0.15 152 / 12%);
+  --brand-soft: rgb(240 106 54 / 15%);
   --success: oklch(0.7 0.15 152);
   --success-soft: oklch(0.7 0.15 152 / 12%);
   --warning: oklch(0.78 0.12 75);
@@ -178,7 +193,7 @@
   --stage-proposta: #9a9a9a;
   --stage-negociacao: #d4d4d4;
 
-  --shadow-card: 0 0 0 transparent;
+  --shadow-card: 0 10px 30px -16px rgb(0 0 0 / 60%);
   --shadow-lift: 0 8px 24px -12px rgb(0 0 0 / 70%);
 
   --chart-in: oklch(0.7 0.15 152);
@@ -188,14 +203,23 @@
   --chart-3: #a3a3a3;
   --chart-4: #7a7a7a;
   --chart-5: #d4d4d4;
-  --sidebar: #111111;
+  --sidebar: #121923;
   --sidebar-foreground: #ececec;
-  --sidebar-primary: oklch(0.7 0.15 152);
-  --sidebar-primary-foreground: #0f0f0f;
-  --sidebar-accent: #1c1c1c;
+  --sidebar-primary: oklch(0.95 0.008 255);
+  --sidebar-primary-foreground: #121923;
+  --sidebar-accent: rgb(255 255 255 / 8%);
   --sidebar-accent-foreground: #ececec;
   --sidebar-border: #1f1f1f;
-  --sidebar-ring: oklch(0.7 0.15 152);
+  --sidebar-ring: #f06a36;
+}
+
+/* Cards flutuantes: todo bloco "border bg-card" vira superfície branca com sombra
+ * longa e borda quase invisível (padrão do app inteiro, sem mexer em cada tela). */
+@layer components {
+  :where(.bg-card.border, [data-slot="card"]) {
+    border-color: color-mix(in oklch, var(--border) 55%, transparent);
+    box-shadow: var(--shadow-card);
+  }
 }
 
 @layer base {
@@ -251,11 +275,10 @@
   animation: grow-x 700ms var(--ease-out) both;
 }
 @utility lift {
-  transition: box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out), border-color 200ms;
+  transition: box-shadow 260ms var(--ease-out), transform 260ms var(--ease-out), border-color 200ms;
   &:hover {
-    border-color: color-mix(in oklch, var(--foreground) 18%, var(--border));
     box-shadow: var(--shadow-lift);
-    transform: translateY(-1px);
+    transform: translateY(-4px);
   }
 }
 @utility check-burst {
