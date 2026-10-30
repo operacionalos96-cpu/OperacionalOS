@@ -3,6 +3,8 @@ import { appUrl } from "@/lib/server/auth"
 import { supabaseServer } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import type { RoleLevel } from "@/lib/domain/org"
+import { makeEvent } from "@/lib/domain/ai-office"
+import { publicId } from "@/lib/domain/jobs"
 
 const noStore = { "Cache-Control": "no-store" }
 const allowedLevels = new Set<RoleLevel>(["admin", "operator", "viewer"])
@@ -93,9 +95,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A conta foi criada, mas não foi possível registrar o membro. A operação foi revertida; tente novamente." }, { status: 500, headers: noStore })
   }
 
+  // Auditoria registrada pelo servidor (não pelo navegador): quem convidou, quem e com que nível.
+  const { data: inviterRow } = await admin.from("members").select("team_id").eq("email", user.email.toLowerCase()).maybeSingle()
+  const event = makeEvent(
+    {
+      type: "member.invited",
+      entity: { type: "member", id: teamId },
+      actor: { type: "human", id: String(inviterRow?.team_id ?? user.id) },
+      metadata: { name: displayName || email.split("@")[0], email, roleLevel },
+    },
+    publicId("evt"),
+    new Date().toISOString(),
+  )
+  await admin.from("events").insert(event)
+
   return NextResponse.json({
     ok: true,
     email,
+    teamId,
     message: "Convite enviado. A pessoa deverá abrir o e-mail e definir uma senha para entrar.",
   }, { status: 201, headers: noStore })
 }

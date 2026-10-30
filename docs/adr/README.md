@@ -22,3 +22,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0002](0002-camadas.md) | Camadas: domínio puro, serviços, infraestrutura, interface | Aceito |
 | [0003](0003-empresa-unica.md) | Sistema de uma empresa só (sem multiempresa) | Aceito |
 | [0004](0004-banco-compartilhado.md) | Banco Supabase compartilhado com outros apps | Aceito (provisório) |
+| [0005](0005-autorizacao-no-banco.md) | Autorização por cargo aplicada no banco | Aceito |

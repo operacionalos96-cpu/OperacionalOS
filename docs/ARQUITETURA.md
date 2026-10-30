@@ -26,7 +26,6 @@ chamam essas funções.
 
 | Passo | Por quê | Referência |
 |---|---|---|
-| Permissões por cargo no banco (RLS) | Hoje qualquer membro grava em tudo; a tela não é barreira | Saltzer & Schroeder (1975) |
 | Automações no servidor | "Lead ganho → onboarding" roda no navegador: sem ninguém online não roda, com dois online pode duplicar | Transactional Outbox (Richardson, 2018) |
 | Colunas reais + índices para campos consultados | Cada registro é um jsonb `data`; consultas e totais grandes precisam de coluna | Kleppmann, *DDIA* (2017) |
 | Paginação no servidor | Hoje cada tabela é carregada inteira no navegador | — |

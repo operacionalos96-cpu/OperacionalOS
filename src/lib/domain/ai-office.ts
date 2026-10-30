@@ -110,6 +110,7 @@ export const EVENT_TYPES = [
   "agent.failed",
   "learning.created",
   "hypothesis.created",
+  "member.invited",
 ] as const
 
 export type BusinessEventType = (typeof EVENT_TYPES)[number]
@@ -174,6 +175,7 @@ const VERB: Record<BusinessEventType, string> = {
   "agent.failed": "falhou",
   "learning.created": "novo aprendizado",
   "hypothesis.created": "nova hipótese",
+  "member.invited": "convidado para a equipe",
 }
 
 /** Frase do feed: "Lead Costa Lion aprovado", "Web Analyst concluiu análise". */
@@ -182,6 +184,7 @@ export function describeEvent(e: Pick<BusinessEvent, "event_type" | "entity_id" 
   const extra = typeof e.metadata.task === "string" ? ` ${e.metadata.task}` : typeof e.metadata.reasonLabel === "string" ? ` · ${e.metadata.reasonLabel}` : ""
   if (e.event_type.startsWith("agent.")) return `${label} ${VERB[e.event_type]}${extra}`
   if (e.event_type === "learning.created" || e.event_type === "hypothesis.created") return `${VERB[e.event_type]}: ${label}`
+  if (e.event_type === "member.invited") return `${label} ${VERB[e.event_type]}`
   return `Lead ${label} ${VERB[e.event_type]}${extra}`
 }
 

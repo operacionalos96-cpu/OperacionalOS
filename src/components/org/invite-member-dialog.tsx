@@ -4,10 +4,8 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { ROLE_LEVELS, type RoleLevel } from "@/lib/domain/org"
 import { uid } from "@/lib/format"
-import { recordEvent } from "@/lib/event-service"
 import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"
-import { supabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -40,26 +38,19 @@ export function InviteMemberDialog({
 
     setSaving(true)
     try {
-      const sb = supabaseBrowser()
-      const newTeamId = `u_${uid().slice(0, 8)}`
-
-      // 1. Inserir na tabela members
-      const { error: insertError } = await sb.from("members").insert({
-        email: cleanEmail,
-        team_id: newTeamId,
-        display_name: displayName.trim() || undefined,
-        role_level: roleLevel,
-        active: true,
+      // 1. O servidor confere a permissão, envia o convite por e-mail, cadastra o membro e registra
+      //    a auditoria (/api/equipe/convites). O navegador não grava em `members` (ADR 0005).
+      const res = await fetch("/api/equipe/convites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, displayName: displayName.trim(), roleLevel }),
       })
-
-      if (insertError) {
-        if (insertError.code === "23505") {
-          toast.error("Este e-mail já está cadastrado na equipe")
-        } else {
-          toast.error("Erro ao cadastrar membro", { description: insertError.message })
-        }
+      const body = (await res.json().catch(() => ({}))) as { error?: string; teamId?: string; message?: string }
+      if (!res.ok || !body.teamId) {
+        toast.error("Não foi possível convidar", { description: body.error ?? "Tente de novo em instantes." })
         return
       }
+      const newTeamId = body.teamId
 
       // 2. Se um cargo inicial foi selecionado, atribuir
       if (initialRoleId) {
@@ -73,23 +64,9 @@ export function InviteMemberDialog({
         })
       }
 
-      // 3. Registrar no log de auditoria
-      recordEvent({
-        type: "lead.created", // utilizando o event_type padrão com metadado
-        entity: { type: "lead", id: newTeamId },
-        actor: { type: "human", id: meId },
-        metadata: {
-          action: "member_added",
-          email: cleanEmail,
-          displayName,
-          roleLevel,
-          teamId: newTeamId,
-        },
-      })
-
       await refreshOrgMembers()
-      toast.success("Membro cadastrado com sucesso", {
-        description: `${cleanEmail} agora tem acesso ao OperacionalOS.`,
+      toast.success("Convite enviado", {
+        description: body.message ?? `${cleanEmail} vai receber um e-mail para definir a senha.`,
       })
       onOpenChange(false)
     } catch {
@@ -139,7 +116,8 @@ export function InviteMemberDialog({
                 onChange={(e) => setRoleLevel(e.target.value as RoleLevel)}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
               >
-                {ROLE_LEVELS.map((rl) => (
+                {/* Owner não é concedido por convite (só por outro owner, depois): a rota recusa. */}
+                {ROLE_LEVELS.filter((rl) => rl.id !== "owner").map((rl) => (
                   <option key={rl.id} value={rl.id}>
                     {rl.label} — {rl.description}
                   </option>
