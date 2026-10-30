@@ -90,9 +90,15 @@ function Login() {
       setBusy(false)
       return
     }
-    // Conta existe, mas precisa estar na lista de membros do banco.
-    const { data: member } = await sb.from("members").select("team_id").maybeSingle()
-    if (!member) {
+    // Conta existe, mas precisa estar na lista de membros ATIVOS do banco. Filtra pelo próprio
+    // e-mail: todo membro enxerga a equipe inteira (migration 0017), então sem o filtro vinham
+    // várias linhas e o login recusava todo mundo.
+    const { data: member } = await sb
+      .from("members")
+      .select("team_id, active")
+      .eq("email", email.trim().toLowerCase())
+      .maybeSingle()
+    if (!member || member.active === false) {
       await sb.auth.signOut()
       setError("Esta conta não tem acesso ao Operacional OS.")
       setBusy(false)
