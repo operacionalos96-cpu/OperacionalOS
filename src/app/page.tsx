@@ -148,8 +148,9 @@ function CashCard({
       info="Saldo inicial + todas as entradas − todas as saídas. A linha mostra os últimos 30 dias."
       style={{ "--i": 0 } as React.CSSProperties}
     >
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <p className={cn("t-value", balance < 0 && "text-danger")}>
+      {/* flex-wrap: sem espaço ao lado do valor, a linha desce em vez de vazar do card. */}
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+        <p className={cn("t-value min-w-0", balance < 0 && "text-danger")}>
           <CountUp value={balance} format={money} />
         </p>
         <Sparkline values={trend} color={up ? "var(--success)" : "var(--muted-foreground)"} className="aspect-auto h-9 w-24 shrink-0" />
