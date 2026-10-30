@@ -26,7 +26,6 @@ chamam essas funções.
 
 | Passo | Por quê | Referência |
 |---|---|---|
-| Automações no servidor | "Lead ganho → onboarding" roda no navegador: sem ninguém online não roda, com dois online pode duplicar | Transactional Outbox (Richardson, 2018) |
 | Colunas reais + índices para campos consultados | Cada registro é um jsonb `data`; consultas e totais grandes precisam de coluna | Kleppmann, *DDIA* (2017) |
 | Paginação no servidor | Hoje cada tabela é carregada inteira no navegador | — |
 | Observabilidade (erros, logs, saúde) | Saber que algo quebrou antes do usuário avisar | Beyer et al., *Site Reliability Engineering* (2016) |
@@ -120,8 +119,13 @@ No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "
 
 - **Eventos** (`src/lib/events.ts`): `lead.ganho`, `lead.perdido`, `tarefa.concluida`, `entrada.lancada`,
   `conteudo.etapa`. Saem da store/ações; qualquer módulo reage com `on(tipo, fn)`.
-- **Automações** (`src/lib/automations.ts`): "Meta batida" e "Virou cliente". Nova automação = item em
-  `AUTOMATIONS` + um `on(...)` em `startAutomations`.
+- **Automações de negócio (no servidor, ADR 0006)**: o fato gravado em `events` vira um job `auto_*` pelo
+  gatilho `private.on_event_automations` (SQL 0020); `src/lib/server/automations.ts` executa com a regra pura
+  do domínio e ids estáveis (não duplica). Roda pelo agendador (`/api/runner/tick`) e logo após a ação
+  (`POST /api/automacoes/processar`). Hoje: "Virou cliente" (`auto_won_lead`).
+  **Nova automação** = um `if` no gatilho da 0020 (em migration nova) + um handler em `HANDLERS` + regra e teste no domínio.
+- **Reações de tela** (`src/lib/automations.ts`): só avisos e comemorações ("Meta batida", toast de "Virou cliente").
+  Nada aqui grava dados de negócio.
 - **Vendas automáticas** (`src/lib/server/sales-webhooks.ts` + `POST /api/webhooks/<plataforma>`):
   Hotmart e Kiwify viram **entrada** no financeiro (produto casado pelo nome, sem duplicar a mesma venda).
   Na Vercel: `SUPABASE_SECRET_KEY`, `HOTMART_HOTTOK` e/ou `KIWIFY_TOKEN` (opcional `WEBHOOK_OWNER_ID`).

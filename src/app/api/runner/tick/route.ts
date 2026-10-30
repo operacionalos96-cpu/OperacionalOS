@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { deliverDue } from "@/lib/server/webhooks"
+import { runSystemJobs } from "@/lib/server/automations"
 
 /**
  * Agendador (pg_cron do Supabase chama a cada minuto, com Authorization: Bearer CRON_SECRET):
@@ -34,7 +35,9 @@ export async function POST(req: Request) {
   const { data: reaped, error } = await supabaseAdmin().rpc("reap_expired_leases")
   if (error) return NextResponse.json({ erro: "fila indisponível (rodou o SQL 0011?)" }, { status: 500 })
   const webhooks = await deliverDue(25).catch((e) => ({ attempted: 0, delivered: 0, erro: e instanceof Error ? e.message.slice(0, 120) : "falha" }))
-  return NextResponse.json({ reaped, webhooks, ms: Date.now() - started })
+  // Automações de negócio (ADR 0006): garante que rodam mesmo sem ninguém com o app aberto.
+  const automations = await runSystemJobs(undefined, 20).catch((e) => ({ done: 0, failed: 0, erro: e instanceof Error ? e.message.slice(0, 120) : "falha" }))
+  return NextResponse.json({ reaped, webhooks, automations, ms: Date.now() - started })
 }
 
 export const GET = POST
