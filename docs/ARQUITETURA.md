@@ -1,5 +1,38 @@
 # Arquitetura — como o Operacional OS cresce
 
+Este guia diz **como** fazer as coisas. O **porquê** de cada decisão estrutural está nos ADRs em
+[`docs/adr/`](adr/README.md). Para o fluxo de trabalho (branch, PR, CI, migrations), veja
+[`COLABORACAO.md`](../COLABORACAO.md).
+
+## Camadas (ADR 0002)
+
+A dependência só aponta para dentro. O lint barra o domínio de importar tela ou banco.
+
+```
+Interface        src/app/  ·  src/components/  ·  rotas src/app/api/
+   ↓
+Serviços         src/lib/services/  ·  src/lib/actions.ts  ·  src/lib/server/* (casos de uso)
+   ↓
+Domínio (puro)   src/lib/domain/   ← regras de negócio + testes, sem React/Supabase
+   ↑
+Infraestrutura   src/lib/repositories/  ·  src/lib/supabase/  ·  src/lib/server/supabase-admin.ts
+```
+
+Regra prática: se é uma **regra do negócio** ("lead parado = 7 dias", "lead ganho gera onboarding"),
+ela é uma função pura em `src/lib/domain/` e recebe os dados por parâmetro. Tela, store e rotas só
+chamam essas funções.
+
+## Próximos passos de estrutura (ainda não feitos)
+
+| Passo | Por quê | Referência |
+|---|---|---|
+| Permissões por cargo no banco (RLS) | Hoje qualquer membro grava em tudo; a tela não é barreira | Saltzer & Schroeder (1975) |
+| Automações no servidor | "Lead ganho → onboarding" roda no navegador: sem ninguém online não roda, com dois online pode duplicar | Transactional Outbox (Richardson, 2018) |
+| Colunas reais + índices para campos consultados | Cada registro é um jsonb `data`; consultas e totais grandes precisam de coluna | Kleppmann, *DDIA* (2017) |
+| Paginação no servidor | Hoje cada tabela é carregada inteira no navegador | — |
+| Observabilidade (erros, logs, saúde) | Saber que algo quebrou antes do usuário avisar | Beyer et al., *Site Reliability Engineering* (2016) |
+| Banco Supabase próprio | Hoje é compartilhado com outros apps (ADR 0004) | — |
+
 ## Princípio fractal: tudo é uma Entidade
 
 Lead, tarefa, produto, conteúdo, lançamento, nota, mapa, balão do mapa e meta são

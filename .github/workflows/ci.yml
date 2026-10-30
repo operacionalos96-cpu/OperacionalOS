@@ -1,0 +1,38 @@
+# Integração contínua: todo PR e todo push na main passam pelas mesmas checagens.
+# Se alguma falhar, o PR fica vermelho e não deve ser juntado (ver COLABORACAO.md).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores falsos: o build não fala com o banco. Segredos reais ficam só na Vercel.
+      NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_000000
+      NEXT_PUBLIC_SANDBOX: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx eslint src
+      - name: Testes
+        run: npx vitest run
+      - name: Build
+        run: npm run build
