@@ -40,6 +40,14 @@ export const GLOSSARY = {
     term: "Nível de acesso",
     meaning: "O que cada pessoa pode fazer: Visualizador só vê; Colaborador cria e edita; Gestão também muda configurações; Founder controla tudo.",
   },
+  status: {
+    term: "Status",
+    meaning: "Onde a pessoa está agora: ausente, em reunião, em compromisso, em foco (pela agenda), online (com o app aberto), no expediente (fez check-in) ou offline.",
+  },
+  "check-in": {
+    term: "Check-in",
+    meaning: "Ao abrir o app no dia, você diz seu horário e o foco de hoje. Assim o time sabe que você está trabalhando, mesmo com o app fechado.",
+  },
   "caixa-de-entrada": {
     term: "Caixa de entrada",
     meaning: "Onde cai tudo o que foi capturado e ainda não tem destino. Fica ali até alguém triar.",

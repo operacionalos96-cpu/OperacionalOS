@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
   BriefcaseIcon,
+  CalendarDaysIcon,
   ClipboardListIcon,
   CrownIcon,
   GitForkIcon,
@@ -22,9 +23,10 @@ import { RoleDialog } from "@/components/org/role-dialog"
 import { InviteMemberDialog } from "@/components/org/invite-member-dialog"
 import { OrgTreeView } from "@/components/org/org-tree-view"
 import { TeamOverview } from "@/components/hzk/team-overview"
+import { TeamAgenda } from "@/components/hzk/team-agenda"
 import type { OrgRole } from "@/lib/domain/org"
 
-type TabType = "responsabilidades" | "membros" | "cargos" | "hierarquia"
+type TabType = "responsabilidades" | "agenda" | "membros" | "cargos" | "hierarquia"
 
 export default function EquipePage() {
   const { canAdmin } = useAccess()
@@ -117,6 +119,19 @@ export default function EquipePage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("agenda")}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              activeTab === "agenda"
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <CalendarDaysIcon className="h-3.5 w-3.5" />
+            Agenda e reuniões
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("membros")}
             className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               activeTab === "membros"
@@ -157,6 +172,9 @@ export default function EquipePage() {
 
         {/* Aba 0 (HZK OS): responsabilidades e feitos de cada pessoa */}
         {activeTab === "responsabilidades" && <TeamOverview />}
+
+        {/* Aba HZK OS: agenda do time, reuniões e compromissos (alimenta o status de cada um) */}
+        {activeTab === "agenda" && <TeamAgenda />}
 
         {/* Aba 1: Membros */}
         {activeTab === "membros" && (

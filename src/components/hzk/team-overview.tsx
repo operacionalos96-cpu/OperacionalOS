@@ -10,6 +10,7 @@ import { useStore } from "@/lib/store"
 import { useAreaList, usePeople } from "@/lib/use-hzk"
 import { useTeam } from "@/lib/use-team"
 import { Segmented } from "@/components/shared/fields"
+import { PresenceBadge } from "./presence-badge"
 
 export const DONE_ICON: Record<DoneEntry["kind"], typeof CheckCircle2Icon> = {
   tarefa: CheckCircle2Icon,
@@ -73,6 +74,7 @@ function PersonCard({ id, name, color, initials, days }: { id: string; name: str
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{name}</p>
           <p className="t-desc truncate text-xs">{titles.length ? titles.join(" · ") : "Membro da equipe"}</p>
+          <PresenceBadge memberId={id} className="mt-1" showDetail />
         </div>
         <Link href={`/equipe/${id}`} className="inline-flex h-10 items-center gap-1 rounded-full px-3 text-sm font-medium text-brand hover:bg-brand-soft">
           Ver tudo <ArrowRightIcon className="size-4" />

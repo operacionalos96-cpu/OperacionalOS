@@ -122,3 +122,21 @@ describe("HZK OS — fase 1 (migration 0021)", () => {
     expect(await attempt("viewer", `insert into public.notifications (id, user_id, data) values ('n2', 'u4', '{}')`)).toBe("negado")
   })
 })
+
+describe("agenda e check-in (migration 0022)", () => {
+  const evento = (id: string) => `insert into public.calendar_events (id, data) values ('${id}', '{"id":"${id}","title":"Call","kind":"reuniao","ownerId":"u4","participantIds":[]}')`
+  const checkin = (id: string, memberId: string) => `insert into public.daily_plans (id, data) values ('${id}', '{"id":"${id}","memberId":"${memberId}","date":"2026-11-02","checkedInAt":"2026-11-02T09:00:00"}')`
+
+  it("operator agenda; viewer não agenda, mas vê a agenda", async () => {
+    expect(await attempt("operator", evento("ev1"))).toBe("ok")
+    expect(await attempt("viewer", evento("ev2"))).toBe("negado")
+    expect(await rows("viewer", `select id from public.calendar_events`)).toHaveLength(1)
+  })
+
+  it("check-in: cada um grava só o próprio (até quem só visualiza); todos veem o do time", async () => {
+    expect(await attempt("viewer", checkin("u5:2026-11-02", "u5"))).toBe("ok")
+    expect(await attempt("viewer", checkin("u4:2026-11-02", "u4"))).toBe("negado")
+    expect(await attempt("viewer", checkin("u4:2026-11-03", "u5"))).toBe("negado")
+    expect(await rows("operator", `select id from public.daily_plans`)).toHaveLength(1)
+  })
+})
