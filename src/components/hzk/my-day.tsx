@@ -22,6 +22,7 @@ import { useFunnel } from "@/lib/funnel-store"
 import { useStore } from "@/lib/store"
 import { useTeam } from "@/lib/use-team"
 import { useAreaList } from "@/lib/use-hzk"
+import { useVisiblePages } from "@/lib/use-access-pages"
 import { dayRow, useDoing } from "@/lib/use-my-day"
 import { useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -299,8 +300,8 @@ function PlanRow({ item, first, index }: { item: PlanItem; first?: boolean; inde
       await new Promise((ok) => setTimeout(ok, 900))
       await el.animate([{ opacity: 1, height: `${el.offsetHeight}px` }, { opacity: 0, height: "0px", marginTop: "-6px" }], { duration: 420, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" }).finished
     }
+    // A ação de sempre: conclui a tarefa, fecha o tempo e oferece "Desfazer".
     complete(t)
-    toast.success("Feito!", { description: t.title, action: { label: "Desfazer", onClick: () => useStore.getState().toggleTask(t.id) } })
   }
 
   return (
@@ -443,10 +444,13 @@ export function SectorStepsPanel() {
   useEffect(() => void loadFunnel(), [loadFunnel])
   const now = useMinute()
   const work = usePersonWork(meId, 1)
+  const can = useVisiblePages()
   const steps = useMemo(
-    () => sectorSteps(meId, now, { leads, funnel, content, transactions, myAreaIds: work.areas.map((a) => a.id) }),
-    [meId, now, leads, funnel, content, transactions, work.areas],
+    // Só os setores cujas abas a pessoa vê (ADR 0012).
+    () => sectorSteps(meId, now, { leads, funnel, content, transactions, myAreaIds: work.areas.map((a) => a.id) }).filter((x) => can(x.href.split("?")[0])),
+    [meId, now, leads, funnel, content, transactions, work.areas, can],
   )
+  if (!steps.length) return null
   return (
     <Panel title="Próximo passo de cada setor" description="O que está esperando você em cada setor, e o botão que leva direto para lá.">
       <ul className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2">

@@ -70,3 +70,13 @@ export function minutesText(min: number): string {
   const m = min % 60
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`
 }
+
+/**
+ * Fase da tarefa (sistema de sempre: a fazer → em andamento → feita) e tempo andam juntos, por uma
+ * regra só: entrar em "andamento" abre o tempo (e pausa o anterior); concluir ou voltar para "a
+ * fazer" fecha o tempo desta tarefa. A fase continua na tarefa; o tempo, na linha do dia.
+ */
+export function syncWithStatus(plan: DailyPlan, task: Pick<Task, "id" | "title" | "areaId">, next: "afazer" | "andamento" | "feito", now: Date): DailyPlan {
+  if (next === "andamento") return startTask(plan, task, now)
+  return doingNow(plan)?.taskId === task.id ? stopTask(plan, now) : plan
+}

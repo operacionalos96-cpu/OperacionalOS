@@ -355,12 +355,16 @@ export function parseQuickAdd(input: string): { title: string; priority?: Priori
   return { title: words.join(" ").trim(), priority, labels }
 }
 
-/** Progresso do dia: tarefas com prazo hoje (ou atrasadas) já concluídas vs. total. */
+/**
+ * Progresso do dia (fonte única: Tarefas, Início e Guia do dia): o que é de hoje — prazo até hoje
+ * ou planejada para hoje — já concluído vs. total.
+ */
 export function dayProgress(tasks: Task[], userId: string | null, now: Date) {
   const todayKey = format(now, "yyyy-MM-dd")
-  const mine = tasks.filter((t) => (userId === null || isTaskFor(t, userId)) && t.dueDate)
-  const doneToday = mine.filter((t) => t.done && t.doneAt && daysSince(t.doneAt, now) === 0 && t.dueDate! <= todayKey).length
-  const pending = mine.filter((t) => !t.done && t.dueDate! <= todayKey).length
+  const ofToday = (t: Task) => (!!t.dueDate && t.dueDate <= todayKey) || t.plannedFor === todayKey
+  const mine = tasks.filter((t) => (userId === null || isTaskFor(t, userId)) && ofToday(t))
+  const doneToday = mine.filter((t) => t.done && t.doneAt && daysSince(t.doneAt, now) === 0).length
+  const pending = mine.filter((t) => !t.done).length
   const total = doneToday + pending
   return { done: doneToday, total, pct: total ? doneToday / total : 0 }
 }

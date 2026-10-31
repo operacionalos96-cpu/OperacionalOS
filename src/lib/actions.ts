@@ -9,6 +9,7 @@ import { useContentItems, useRelations } from "@/lib/modules"
 import { uid } from "@/lib/format"
 import { emit } from "@/lib/events"
 import { NODE_STATUS, nodeStatus, resolveLinkedTask, taskStatus, type NodeStatus } from "@/lib/domain/mindmap"
+import { syncDoing } from "@/lib/use-my-day"
 
 /**
  * Ações com feedback + "Desfazer". Use estas na UI em vez de chamar a store
@@ -20,6 +21,7 @@ export function toggleTaskWithFeedback(id: string) {
   const task = s.tasks.find((t) => t.id === id)
   if (!task) return
   const next = s.toggleTask(id)
+  syncDoing(id, task.done ? "afazer" : "feito")
   if (!task.done) {
     toast.success("Tarefa concluída", {
       description: next?.dueDate ? `${task.title} · próxima: ${dueLabel(next.dueDate)}` : task.title,
@@ -40,6 +42,7 @@ export function deleteTaskWithUndo(id: string) {
   const task = s.tasks.find((t) => t.id === id)
   if (!task) return
   s.deleteTask(id)
+  syncDoing(id, "afazer")
   toast("Tarefa excluída", { action: { label: "Desfazer", onClick: () => useStore.getState().restoreTask(task) } })
 }
 
@@ -77,6 +80,7 @@ export function setTaskStatus(id: string, next: NodeStatus) {
     if (!task.done) toggleTaskWithFeedback(id)
     return
   }
+  syncDoing(id, next)
   if (task.done && task.recurrence && task.doneAt) {
     const series = task.seriesId ?? task.id
     const autoNext = s.tasks.find((t) => t.id !== id && !t.done && t.seriesId === series && t.createdAt >= task.doneAt!)
@@ -122,7 +126,10 @@ export function setContentStage(item: ContentItem, stage: ContentStage) {
   const ref = { type: "content" as const, id: item.id }
   const generated = rels.items.filter((r) => r.kind === "gera" && sameRef(r.from, ref) && r.to.type === "task").map((r) => r.to.id)
   const closed = generated.filter((id) => s.tasks.some((t) => t.id === id && !t.done))
-  for (const id of closed) s.toggleTask(id)
+  for (const id of closed) {
+    s.toggleTask(id)
+    syncDoing(id, "feito")
+  }
   if (stage === "ideia" || stage === "publicado") return
   const label = CONTENT_STAGES.find((x) => x.id === stage)?.label ?? stage
   const task = s.createTask({ title: `${label}: ${item.title}`, ownerId: item.ownerId, dueDate: item.dueDate, labels: ["conteúdo"] })

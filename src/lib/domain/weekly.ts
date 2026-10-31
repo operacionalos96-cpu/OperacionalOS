@@ -6,9 +6,8 @@
  * guardadas (tabela checkins, 0024). Regras puras, testadas em weekly.test.ts.
  */
 import { addDays, differenceInMinutes, format, getDay, parseISO, startOfWeek } from "date-fns"
-import { kindOf } from "./items"
 import type { DailyPlan } from "./presence"
-import { isTaskFor } from "./rules"
+import { doneBetween } from "./team-work"
 import type { Task } from "./types"
 
 export type CheckinKind = "segunda" | "sexta"
@@ -79,12 +78,13 @@ export function weekSummary(memberIds: string[], week: string, src: { tasks: Tas
         minutes += m
       }
     }
+    const done = doneBetween(memberId, src, start, end)
     return {
       memberId,
       monday: src.checkins.find((c) => c.id === checkinId(memberId, week, "segunda")),
       friday: src.checkins.find((c) => c.id === checkinId(memberId, week, "sexta")),
-      done: src.tasks.filter((t) => t.done && isTaskFor(t, memberId) && inWeek(t.doneAt)).sort((a, b) => b.doneAt!.localeCompare(a.doneAt!)),
-      decided: src.items.filter((t) => kindOf(t) === "decision" && t.decision?.decidedBy === memberId && (t.decision.status === "decidida" || t.decision.status === "recusada") && inWeek(t.decision.decidedAt)),
+      done: done.tasks,
+      decided: done.decisions,
       minutesByArea,
       minutes,
     }

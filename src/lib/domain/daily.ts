@@ -12,6 +12,8 @@ export interface TeamSettings {
   id: string
   /** Reunião diária: horário ("09:30") e link (Meet, Zoom…). */
   daily?: { time?: string; link?: string }
+  /** Abas de cada pessoa ajustadas pelo owner (ADR 0012). Sem entrada = padrão pelas áreas. */
+  pagesByMember?: Record<string, string[]>
   updatedAt?: string
 }
 export const TEAM_SETTINGS_ID = "time"

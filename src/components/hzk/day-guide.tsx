@@ -5,14 +5,17 @@ import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
-import { ArrowRightIcon, CalendarClockIcon, CheckIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, MoonIcon, ScaleIcon, SunriseIcon, TriangleAlertIcon } from "lucide-react"
+import { ArrowRightIcon, CalendarClockIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, MoonIcon, ScaleIcon, StickyNoteIcon, SunriseIcon, TriangleAlertIcon, VideoIcon } from "lucide-react"
 import { getUser } from "@/config/team"
-import { BECAME_LABEL, checkInStreak, dayPlan, dayProgress, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
+import { BECAME_LABEL, checkInStreak, dayPlan, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
 import { needsCheckIn, planId, type DailyPlan } from "@/lib/domain/presence"
-import { useCheckins, useDailyPlans } from "@/lib/modules"
+import { useCalendarEvents, useCheckins, useDailyPlans } from "@/lib/modules"
+import { dailyState } from "@/lib/domain/daily"
+import { useTeam } from "@/lib/use-team"
 import { weeklyAsk } from "@/lib/domain/weekly"
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
+import { dayProgress } from "@/lib/domain/rules"
 import { useDoing, useMyDay } from "@/lib/use-my-day"
 import { useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
@@ -42,6 +45,8 @@ const write = (k: string, v: string) => {
 }
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
+type Screen = "ola" | "direcao" | "lista" | "fecho" | "fechar" | "planejar"
+
 const STEP_ICON: Record<StepKind, typeof CheckIcon> = {
   atrasada: TriangleAlertIcon,
   decisao: ScaleIcon,
@@ -61,7 +66,6 @@ export function DayGuide() {
   const hydrated = useStore((s) => s.hydrated)
   const tasks = useStore((s) => s.tasks)
   const items = useStore((s) => s.items)
-  const toggleTask = useStore((s) => s.toggleTask)
   const doingActions = useDoing()
   const loaded = useDailyPlans((s) => s.loaded)
   const checkins = useCheckins((s) => s.items)
@@ -74,7 +78,7 @@ export function DayGuide() {
   const mine = plans.find((p) => p.id === planId(meId, now))
   const day = useMyDay()
   const steps = useMemo(() => dayPlan(day, now), [day, now])
-  const progress = useMemo(() => dayProgress(meId, now, tasks), [meId, now, tasks])
+  const progress = useMemo(() => dayProgress(tasks, meId, now), [meId, now, tasks])
   const streak = useMemo(() => checkInStreak(meId, now, plans), [meId, now, plans])
   const captures = useMemo(() => lastDayCaptures(meId, now, [...tasks, ...items]), [meId, now, tasks, items])
 
@@ -87,8 +91,14 @@ export function DayGuide() {
   const [flight, setFlight] = useState<{ from: DOMRect; to: DOMRect } | null>(null)
   const [hint, setHint] = useState(false)
   const [focus, setFocus] = useState("")
-  /** O que o painel mostra: o dia (padrão), o ritual Fechar o dia, ou Planejar hoje. */
-  const [mode, setMode] = useState<"dia" | "fechar" | "planejar">("dia")
+  /** As telas do guia (como no Workspace): olá → direção do dia → por onde começar → fecho; e os rituais. */
+  const [screen, setScreen] = useState<Screen>("ola")
+  const [dir, setDir] = useState<1 | -1>(1)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [autoPaused, setAutoPaused] = useState(false)
+  const team = useTeam()
+  const events = useCalendarEvents((s) => s.items)
+  const panelHeight = useRef<number | null>(null)
   const request = useUI((s) => s.guide)
   const panelRef = useRef<HTMLDivElement>(null)
   const orbRef = useRef<HTMLSpanElement>(null)
@@ -115,13 +125,14 @@ export function DayGuide() {
   // A Início pede para abrir ("Planejar meu dia" / "Fechar o dia").
   useEffect(() => {
     if (!request || !started.current) return
-    open()
-    setMode(request.mode === "fechar" ? "fechar" : "dia")
+    open(false, request.mode === "fechar" ? "fechar" : "direcao")
   }, [request])
 
   /** `intro`: a abertura automática do dia passa pelas etapas; reabrir pela bolinha vai direto à lista. */
-  function open(intro = false) {
-    setMode("dia")
+  function open(intro = false, start?: Screen) {
+    setScreen(start ?? (intro ? "ola" : "lista"))
+    setDir(1)
+    setOpenId(null)
     setHint(false)
     setView("open")
     setWaving(true)
@@ -144,6 +155,26 @@ export function DayGuide() {
     const id = setTimeout(() => setTyped((n) => n + 1), 24)
     return () => clearTimeout(id)
   }, [stage, typed])
+
+  /**
+   * Trocar de tela (Movimento 1 do Workspace): a tela atual sai desfocando e deslizando, a nova entra
+   * em sequência (CSS .guide-pane) e o painel acompanha a altura nova, suave.
+   */
+  function go(next: Screen, direction: 1 | -1 = 1) {
+    setDir(direction)
+    setOpenId(null)
+    panelHeight.current = panelRef.current?.offsetHeight ?? null
+    setScreen(next)
+  }
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    const h0 = panelHeight.current
+    panelHeight.current = null
+    if (!el || h0 == null || reducedMotion()) return
+    const h1 = el.offsetHeight
+    if (Math.abs(h1 - h0) < 2) return
+    el.animate([{ height: `${h0}px` }, { height: `${h1}px` }], { duration: 640, easing: "cubic-bezier(0.32, 0.72, 0, 1)" })
+  }, [screen])
 
   /** Minimizar: o painel encolhe no orbe, que voa em arco até o canto (como no Workspace). */
   function minimize() {
@@ -188,6 +219,7 @@ export function DayGuide() {
     toast.success("Check-in feito", { description: s > 1 ? `${s} dias seguidos. O time vê você no expediente.` : "O time vê você no expediente." })
     setWaving(true)
     setTimeout(() => setWaving(false), 1800)
+    go("lista")
   }
 
   function skip() {
@@ -199,7 +231,6 @@ export function DayGuide() {
     const task = taskOf(step.taskId)
     if (!task) return
     doingActions.complete(task)
-    toast.success("Feito!", { description: step.title, action: { label: "Desfazer", onClick: () => toggleTask(step.taskId!) } })
   }
 
   const yesterday = plans.find((p) => p.id === planId(meId, new Date(+now - 864e5)))
@@ -210,173 +241,269 @@ export function DayGuide() {
 
   const capturedDay = captures && (captures.day === format(new Date(+now - 864e5), "yyyy-MM-dd") ? "ontem" : format(parseISO(captures.day), "EEEE", { locale: ptBR }))
 
+  const SCREENS: Screen[] = ["ola", "direcao", "lista", "fecho"]
+  const idx = SCREENS.indexOf(screen)
+  const planned = day.planItems.filter((x) => x.task.plannedFor === today)
+  const daily = dailyState(
+    team.map((u) => u.id),
+    plans,
+    events,
+    now,
+  )
+  const names = (ids: string[]) => ids.map((id) => getUser(id).name).join(", ")
+  const step = (k: number) => ({ "--i": k }) as React.CSSProperties
+
   return (
     <>
       {view === "open" && (
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-label="Guia do dia"
-          onClick={() => stage !== "body" && setStage("body")}
-          className="fixed right-4 bottom-20 z-50 flex max-h-[min(40rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] origin-bottom-right animate-enter flex-col overflow-hidden rounded-3xl border bg-card shadow-lift md:right-6 md:bottom-6"
-        >
-          <header className="flex items-start gap-3 p-4 pb-3">
-            <span ref={orbRef} className="size-12 shrink-0">
-              <GuideOrb mood={mood} className="size-12" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Guia do dia</p>
-              <p className="animate-enter text-lg leading-tight font-semibold">{g.title}</p>
-              {/* Leitor de tela recebe a frase inteira; a digitação é só visual. Um toque pula a abertura. */}
-              <p className="t-desc mt-0.5 min-h-10 text-sm">
-                <span className="sr-only">{line}</span>
-                {stage !== "title" && (
-                  <span aria-hidden>
-                    {stage === "line" ? line.slice(0, typed) : line}
-                    {stage === "line" && <span className="ml-px inline-block h-3.5 w-0.5 translate-y-0.5 animate-pulse bg-highlight" />}
-                  </span>
-                )}
-              </p>
-            </div>
-            <button type="button" onClick={minimize} aria-label="Minimizar o guia" className="-mt-1 -mr-1 rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
-              <MinusIcon className="size-4" />
-            </button>
-          </header>
-
-          {stage === "body" && mode !== "dia" && (
-            <div className="animate-enter overflow-y-auto px-4 pb-4">
-              <CloseDay day={day} target={mode === "fechar" ? "amanha" : "hoje"} onDone={() => setMode("dia")} />
-            </div>
-          )}
-          {stage === "body" && mode === "dia" && (
-          <div className="grid animate-enter gap-4 overflow-y-auto px-4 pb-4">
-            {work.areas.length > 0 && (
-              <p className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                Suas áreas:
-                {work.areas.map((a) => (
-                  <span key={a.id} className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
-                    {a.name}
-                  </span>
-                ))}
-              </p>
-            )}
-
-            {needs ? (
-              <form onSubmit={checkIn} className="grid gap-2 rounded-2xl bg-highlight-soft p-3">
-                <label htmlFor="guide-focus" className="text-sm font-medium">
-                  Foco de hoje <span className="font-normal text-muted-foreground">(opcional)</span>
-                </label>
-                <Input id="guide-focus" value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Ex.: fechar o roteiro do lançamento" maxLength={140} autoFocus />
-                <Button type="submit" size="lg" className="w-full">
-                  Fazer check-in
-                </Button>
-                <button type="button" onClick={skip} className="justify-self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
-                  Agora não
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onKeyDown={(e) => e.key === "Escape" && minimize()}>
+          {/* Fundo desfocado (como o guia do Workspace): o dia aparece por trás, sem distrair. */}
+          <div className="guide-scrim absolute inset-0" onClick={minimize} aria-hidden />
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Guia do dia"
+            onClick={() => stage !== "body" && setStage("body")}
+            className="relative flex max-h-[min(44rem,92dvh)] w-full flex-col overflow-hidden rounded-t-3xl border bg-card shadow-lift sm:m-4 sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-3xl"
+          >
+            <header className="flex items-center gap-2 px-5 pt-4 pb-2">
+              <span ref={orbRef} className="size-8 shrink-0">
+                <GuideOrb mood={mood} className="size-8" />
+              </span>
+              <p className="flex-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Guia do dia</p>
+              {idx > 0 && (
+                <button type="button" onClick={() => go(SCREENS[idx - 1], -1)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent">
+                  <ChevronLeftIcon className="size-3.5" /> Voltar
                 </button>
-              </form>
-            ) : (
-              <div className="grid gap-2 rounded-2xl border p-3">
-                {mine?.checkedInAt && (
-                  <p className="text-sm">
-                    <span className="font-medium">Check-in às {format(new Date(mine.checkedInAt), "HH:mm")}</span>
-                    {mine.focus && <span className="text-muted-foreground"> · Foco: {mine.focus}</span>}
-                  </p>
-                )}
-                <div className="flex items-center gap-3">
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done} aria-label="Entregas de hoje">
-                    <div className={cn("h-full rounded-full transition-[width] duration-500", allDone ? "bg-success" : "bg-brand")} style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
-                  </div>
-                  <span className="tabular text-xs text-muted-foreground">
-                    {progress.done} de {progress.total} hoje
-                  </span>
-                </div>
-                {streak > 0 && (
-                  <p className="inline-flex items-center gap-1 text-xs font-medium text-highlight">
-                    <FlameIcon className="size-3.5" /> {streak} {streak === 1 ? "dia" : "dias seguidos"} de check-in
-                  </p>
-                )}
-              </div>
-            )}
-
-            {weekly && <WeeklyCheckinCard kind={weekly} />}
-
-            {(canPlanToday || canClose) && (
-              <div className="flex flex-wrap gap-2">
-                {canPlanToday && (
-                  <Button size="sm" variant="outline" onClick={() => setMode("planejar")}>
-                    <SunriseIcon /> Planejar hoje
-                  </Button>
-                )}
-                {canClose && (
-                  <Button size="sm" variant="outline" onClick={() => setMode("fechar")}>
-                    <MoonIcon /> Fechar o dia
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <section className="grid gap-2">
-              <p className="font-semibold">Por onde vamos começar?</p>
-              {steps.length ? (
-                <ol className="grid grid-cols-1 gap-1.5">
-                  {steps.slice(0, 6).map((s, i) => {
-                    const Icon = STEP_ICON[s.kind]
-                    return (
-                      <li key={s.id} className="stagger flex items-center gap-2 rounded-xl border bg-background p-2" style={{ "--i": i } as React.CSSProperties}>
-                        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold", s.kind === "atrasada" ? "bg-highlight-soft text-highlight" : "bg-muted")}>{i + 1}</span>
-                        <Link href={s.href} onClick={minimize} className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{s.title}</span>
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Icon className="size-3" /> {s.hint}
-                          </span>
-                        </Link>
-                        {taskOf(s.taskId) && <DoingButton task={taskOf(s.taskId)!} compact />}
-                        {s.taskId ? (
-                          <button type="button" onClick={() => complete(s)} aria-label={`Concluir: ${s.title}`} title="Concluir" className="flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground hover:border-success hover:bg-success/10 hover:text-success">
-                            <CheckIcon className="size-4" />
-                          </button>
-                        ) : (
-                          <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                        )}
-                      </li>
-                    )
-                  })}
-                  {steps.length > 6 && (
-                    <li>
-                      <Link href="/tarefas" onClick={minimize} className="text-xs font-medium text-brand">
-                        + {steps.length - 6} na sua lista
-                      </Link>
-                    </li>
-                  )}
-                </ol>
-              ) : (
-                <p className="t-desc text-sm">Nada pendente agora. Bom momento para adiantar algo ou anotar uma ideia.</p>
               )}
-            </section>
+              {idx >= 0 && (
+                <span className="tabular text-xs text-muted-foreground">
+                  {idx + 1} / {SCREENS.length}
+                </span>
+              )}
+              <button type="button" onClick={minimize} aria-label="Minimizar o guia" className="rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
+                <MinusIcon className="size-4" />
+              </button>
+            </header>
 
-            {captures && (
-              <details className="group rounded-2xl border p-3">
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
-                  <LightbulbIcon className="size-4 text-highlight" />
-                  O que você anotou {capturedDay} ({captures.list.length})
-                </summary>
-                <ul className="mt-2 grid grid-cols-1 gap-1.5">
-                  {captures.list.map(({ item, became }) => (
-                    <li key={item.id} className="flex items-baseline justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate">{item.title}</span>
-                      <span className={cn("shrink-0 text-xs", became === "caixa" ? "text-highlight" : "text-muted-foreground")}>{BECAME_LABEL[became]}</span>
-                    </li>
-                  ))}
-                </ul>
-                {captures.list.some((c) => c.became === "caixa") && (
-                  <Link href="/caixa-de-entrada" onClick={minimize} className="mt-2 inline-block text-xs font-medium text-brand">
-                    Decidir o que fica na caixa de entrada
-                  </Link>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+              <div key={screen} className={cn("grid gap-4", stage === "body" && "guide-pane")} style={{ "--dir": dir } as React.CSSProperties}>
+                {screen === "ola" && (
+                  <div className="grid justify-items-center gap-3 py-4 text-center">
+                    <GuideOrb mood={mood} className="size-20" />
+                    <p className="animate-enter text-2xl leading-tight font-semibold">{g.title}</p>
+                    {/* Leitor de tela recebe a frase inteira; a digitação é só visual. Um toque pula a abertura. */}
+                    <p className="t-desc min-h-10 max-w-sm text-sm">
+                      <span className="sr-only">{line}</span>
+                      {stage !== "title" && (
+                        <span aria-hidden>
+                          {stage === "line" ? line.slice(0, typed) : line}
+                          {stage === "line" && <span className="ml-px inline-block h-3.5 w-0.5 translate-y-0.5 animate-pulse bg-highlight" />}
+                        </span>
+                      )}
+                    </p>
+                    {stage === "body" && (
+                      <div className="grid w-full max-w-xs gap-2" onPointerEnter={() => setAutoPaused(true)} onPointerLeave={() => setAutoPaused(false)}>
+                        <Button size="lg" onClick={() => go("direcao")}>
+                          Vamos lá <ArrowRightIcon />
+                        </Button>
+                        {/* Avança sozinho, como no Workspace; passar o mouse pausa. */}
+                        <span className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                          <span className={cn("guide-timer block h-full bg-highlight", autoPaused && "[animation-play-state:paused]")} onAnimationEnd={() => go("direcao")} />
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </details>
-            )}
+
+                {screen === "direcao" && (
+                  <>
+                    <h2 className="text-xl font-semibold">Direção do dia</h2>
+                    {needs ? (
+                      <form onSubmit={checkIn} className="grid gap-2 rounded-2xl bg-highlight-soft p-3">
+                        <label htmlFor="guide-focus" className="text-sm font-medium">
+                          Foco de hoje <span className="font-normal text-muted-foreground">{mine?.focus ? "(você deixou planejado ontem)" : "(opcional)"}</span>
+                        </label>
+                        <Input id="guide-focus" value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Ex.: fechar o roteiro do lançamento" maxLength={140} autoFocus />
+                        <Button type="submit" size="lg" className="w-full">
+                          Fazer check-in
+                        </Button>
+                        <button type="button" onClick={skip} className="justify-self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
+                          Agora não
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="grid gap-2 rounded-2xl border p-3">
+                        <p className="text-sm">
+                          <span className="font-medium">Check-in às {mine?.checkedInAt ? format(new Date(mine.checkedInAt), "HH:mm") : "—"}</span>
+                          {mine?.focus && <span className="text-muted-foreground"> · Foco: {mine.focus}</span>}
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done} aria-label="Entregas de hoje">
+                            <div className={cn("h-full rounded-full transition-[width] duration-500", allDone ? "bg-success" : "bg-brand")} style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+                          </div>
+                          <span className="tabular text-xs text-muted-foreground">
+                            {progress.done} de {progress.total} hoje
+                          </span>
+                        </div>
+                        {streak > 0 && (
+                          <p className="inline-flex items-center gap-1 text-xs font-medium text-highlight">
+                            <FlameIcon className="size-3.5" /> {streak} {streak === 1 ? "dia" : "dias seguidos"} de check-in
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {mine?.noteFromYesterday && (
+                      <div className="flex gap-3 rounded-2xl border border-highlight/30 bg-highlight-soft px-3 py-2.5">
+                        <StickyNoteIcon className="mt-0.5 size-4 shrink-0 text-highlight" />
+                        <div>
+                          <p className="text-sm font-semibold">Sua nota de ontem</p>
+                          <p className="text-sm whitespace-pre-line">{mine.noteFromYesterday}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(planned.length > 0 || captures) && (
+                      <section className="grid gap-2">
+                        <p className="text-sm font-semibold">O que você organizou {capturedDay ?? "ontem"}</p>
+                        {planned.length > 0 && (
+                          <ul className="grid grid-cols-1 gap-1">
+                            {planned.map(({ task }) => (
+                              <li key={task.id} className="flex items-center gap-2 text-sm">
+                                <CheckIcon className="size-3.5 shrink-0 text-highlight" /> <span className="truncate">{task.title}</span>
+                                <span className="ml-auto shrink-0 text-xs text-muted-foreground">para hoje</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {captures?.list.map(({ item, became }) => (
+                          <p key={item.id} className="flex items-baseline justify-between gap-2 text-sm">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <LightbulbIcon className="size-3.5 shrink-0 text-highlight" /> <span className="truncate">{item.title}</span>
+                            </span>
+                            <span className={cn("shrink-0 text-xs", became === "caixa" ? "text-highlight" : "text-muted-foreground")}>{BECAME_LABEL[became]}</span>
+                          </p>
+                        ))}
+                      </section>
+                    )}
+
+                    {work.areas.length > 0 && (
+                      <p className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                        Suas áreas:
+                        {work.areas.map((a) => (
+                          <span key={a.id} className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
+                            {a.name}
+                          </span>
+                        ))}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {canPlanToday && (
+                        <Button variant="outline" onClick={() => go("planejar")}>
+                          <SunriseIcon /> Planejar hoje
+                        </Button>
+                      )}
+                      {!needs && (
+                        <Button onClick={() => go("lista")}>
+                          Por onde começar <ArrowRightIcon />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {screen === "lista" && (
+                  <>
+                    <h2 className="text-xl font-semibold">Por onde vamos começar?</h2>
+                    {steps.length ? (
+                      <ol className="grid grid-cols-1 gap-1.5">
+                        {steps.map((s, i) => {
+                          const Icon = STEP_ICON[s.kind]
+                          const task = taskOf(s.taskId)
+                          const isOpen = openId === s.id
+                          return (
+                            <li key={s.id} className={cn("overflow-hidden rounded-xl border bg-background", i === 0 && "border-highlight/70", isOpen && "shadow-card")}>
+                              <button type="button" onClick={() => setOpenId(isOpen ? null : s.id)} aria-expanded={isOpen} className="flex w-full items-center gap-2 p-2 text-left">
+                                <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold", s.kind === "atrasada" ? "bg-highlight-soft text-highlight" : "bg-muted")}>{i + 1}</span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium">{s.title}</span>
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Icon className="size-3" /> {s.hint}
+                                  </span>
+                                </span>
+                                <ChevronDownIcon className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+                              </button>
+                              {/* O item se expande no detalhe, a partir dele mesmo (Movimento 2 do Workspace). */}
+                              <div className="expand-rows" data-open={isOpen ? "" : undefined}>
+                                <div>
+                                  {isOpen && (
+                                    <div className="flex flex-wrap gap-2 border-t px-3 pt-2 pb-3">
+                                      {task && (
+                                        <>
+                                          <DoingButton task={task} className="success-in" />
+                                          <Button size="sm" variant="outline" className="success-in" style={step(1)} onClick={() => complete(s)}>
+                                            <CheckIcon /> Concluir
+                                          </Button>
+                                        </>
+                                      )}
+                                      <Button asChild size="sm" variant="ghost" className="success-in" style={step(2)}>
+                                        <Link href={s.href} onClick={minimize}>
+                                          Abrir <ArrowRightIcon />
+                                        </Link>
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    ) : (
+                      <p className="t-desc text-sm">Nada pendente agora. Bom momento para adiantar algo ou anotar uma ideia.</p>
+                    )}
+                    <div className="flex justify-end">
+                      <Button onClick={() => go("fecho")}>
+                        Próximo <ArrowRightIcon />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {screen === "fecho" && (
+                  <>
+                    <h2 className="text-xl font-semibold">{allDone ? "Tudo entregue. Mandou bem!" : "Pronto para o dia"}</h2>
+                    {weekly && <WeeklyCheckinCard kind={weekly} />}
+                    <p className="flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm">
+                      <VideoIcon className="size-4 shrink-0 text-highlight" />
+                      {daily.phase === "checkin"
+                        ? `Reunião diária: falta o check-in de ${names(daily.missingCheckIn)}.`
+                        : daily.phase === "todos"
+                          ? "Reunião diária: todos prontos."
+                          : "Reunião diária liberada: marque que está pronto na Início."}
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {canClose && (
+                        <Button variant="outline" onClick={() => go("fechar")}>
+                          <MoonIcon /> Fechar o dia
+                        </Button>
+                      )}
+                      <Button onClick={minimize}>
+                        Bom trabalho! <ArrowRightIcon />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {(screen === "fechar" || screen === "planejar") && (
+                  <CloseDay day={day} target={screen === "fechar" ? "amanha" : "hoje"} onDone={() => (screen === "fechar" ? minimize() : go("lista"))} />
+                )}
+              </div>
+            </div>
           </div>
-          )}
         </div>
       )}
 

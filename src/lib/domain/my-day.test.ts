@@ -4,7 +4,7 @@ import { dailyState } from "./daily"
 import { myDay, planCandidates, reorder } from "./my-day"
 import { presenceOf, type DailyPlan } from "./presence"
 import type { Task } from "./types"
-import { doingNow, minutesText, periodOfDay, startTask, stopTask } from "./work-sessions"
+import { doingNow, minutesText, periodOfDay, startTask, stopTask, syncWithStatus } from "./work-sessions"
 
 // Segunda-feira, 2 de novembro de 2026, horário local.
 const at = (hhmm: string, day = "2026-11-02") => new Date(`${day}T${hhmm}:00`)
@@ -115,5 +115,27 @@ describe("fechar o dia: monte o amanhã", () => {
       ["semana", false],
       ["semData", false],
     ])
+  })
+})
+
+describe("fase da tarefa e tempo: uma regra só", () => {
+  const t1 = { id: "t1", title: "Roteiro" }
+  const t2 = { id: "t2", title: "Proposta" }
+  it("em andamento abre o tempo (e pausa o anterior); concluir ou voltar para a fazer fecha", () => {
+    let p = syncWithStatus(plan(), t1, "andamento", at("09:00"))
+    expect(doingNow(p)?.taskId).toBe("t1")
+    p = syncWithStatus(p, t2, "andamento", at("10:00"))
+    expect(doingNow(p)?.taskId).toBe("t2")
+    expect(p.sessions?.[0].end).toBe(at("10:00").toISOString())
+    p = syncWithStatus(p, t2, "feito", at("11:00"))
+    expect(doingNow(p)).toBeUndefined()
+    expect(p.sessions?.[1].end).toBe(at("11:00").toISOString())
+    p = syncWithStatus(p, t1, "andamento", at("14:00"))
+    expect(syncWithStatus(p, t1, "afazer", at("14:30")).sessions?.at(-1)?.end).toBe(at("14:30").toISOString())
+  })
+
+  it("concluir outra tarefa não mexe no tempo de quem está rodando", () => {
+    const p = syncWithStatus(plan(), t1, "andamento", at("09:00"))
+    expect(syncWithStatus(p, t2, "feito", at("09:30"))).toBe(p)
   })
 })
