@@ -55,7 +55,7 @@ Depois, no GitHub, abra um **Pull Request** para a `main`:
 - O banco é compartilhado com outros apps (ver `docs/adr/0004-banco-compartilhado.md`): não use o
   histórico de migrações do Supabase CLI.
 
-**Última migration aplicada em produção:** `0021_hzk_os_fundacao.sql` (31/10/2026, depois do deploy da Fase 1 do HZK OS).
+**Última migration aplicada em produção:** `0022_agenda_presenca.sql` (31/10/2026, depois do deploy da agenda, presença e Guia do dia).
 
 ## Se der conflito
 
