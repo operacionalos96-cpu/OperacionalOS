@@ -135,6 +135,57 @@ export interface Task {
   seriesId?: string
   /** Nome do projeto para agrupamento transversal sem exigir cadastro de projeto novo. */
   projectName?: string
+
+  // ---- HZK OS: item único (docs/hzk-os-blueprint.md, src/lib/domain/items.ts) ----
+  // A tabela de tarefas guarda todos os tipos de item. Sem `kind` = tarefa (dados antigos valem).
+  /** Tipo do item: tarefa, ideia, decisão ou nota rápida. */
+  kind?: "task" | "idea" | "decision" | "note"
+  /** Área da empresa (src/lib/domain/areas.ts); define o dono automaticamente. */
+  areaId?: string
+  /** Na caixa de entrada: capturado e ainda não triado. */
+  inbox?: boolean
+  /** Quem capturou/criou (o dono pode ser outra pessoa). */
+  createdById?: string
+  /** Dia em que a pessoa planejou fazer (rituais, fase 2). */
+  plannedFor?: ISODate
+  /** Tempo estimado, em minutos. */
+  estimateMin?: number
+  /** Posição no plano do dia. */
+  order?: number
+  /** De onde veio: captura rápida, triagem, automação… */
+  origin?: "captura" | "triagem" | "automacao" | "manual"
+  /** Arquivado na triagem (sai das listas, fica no histórico). */
+  archivedAt?: ISODate
+  /** Quando foi triado (saiu da caixa de entrada). */
+  triagedAt?: ISODate
+  /** Só para kind = "decision". */
+  decision?: DecisionData
+}
+
+/** Decisão (tarefa = algo a fazer; decisão = algo a escolher). Regras em src/lib/domain/items.ts. */
+export interface DecisionData {
+  context?: string
+  options: { id: string; label: string }[]
+  /** Opção recomendada por quem propõe. */
+  recommendation?: string
+  /** Porta de mão dupla (reversível) ou de mão única (irreversível). */
+  door: "reversivel" | "irreversivel"
+  /** O que a decisão envolve — define se vai para a CEO. */
+  involves: ("dinheiro" | "contrato" | "contratacao" | "estrategia")[]
+  amountCents?: number
+  /** Áreas de outros donos que a decisão afeta (precisam dar ok). */
+  affectsAreaIds?: string[]
+  /** Quem decide (o primeiro, para exibir). */
+  deciderId?: string
+  /** Todos que podem decidir (ex.: os dois founders enquanto não há CEO). */
+  deciderIds?: string[]
+  deciderReason?: string
+  status: "pendente" | "decidida" | "recusada" | "mais_contexto"
+  /** Opção escolhida (id) ou texto livre. */
+  outcome?: string
+  reason?: string
+  decidedAt?: ISODate
+  decidedBy?: string
 }
 
 export interface Note {
@@ -177,6 +228,8 @@ export interface FinanceSettings {
   openingBalanceCents: number
   /** chave "YYYY-MM" → meta de faturamento (entradas) em centavos */
   monthlyGoals: Record<string, number>
+  /** Gasto acima deste valor vai para a CEO decidir. Vazio = valor não define (só a natureza da decisão). */
+  ceoApprovalLimitCents?: number | null
 }
 
 export interface MindMapNode {

@@ -8,6 +8,7 @@ import type { MapEdgeRow, MapNodeRow } from "@/lib/domain/map-rows"
 import type { Goal } from "@/lib/domain/insights"
 import type { Agent, Hypothesis, Learning } from "@/lib/domain/ai-office"
 import type { MemberRole, OrgRole } from "@/lib/domain/org"
+import type { Area } from "@/lib/domain/areas"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -32,6 +33,9 @@ export const useGoals = createCollection<Goal>("goals")
 export const useAgents = createCollection<Agent>("agents")
 export const useLearnings = createCollection<Learning>("learnings")
 export const useHypotheses = createCollection<Hypothesis>("hypotheses")
+
+// HZK OS (SQL 0021): áreas da empresa, cada uma com dono (src/lib/domain/areas.ts).
+export const useAreas = createCollection<Area & { updatedAt?: string }>("areas")
 
 // Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
 export const useOrgRoles = createCollection<OrgRole>("org_roles")

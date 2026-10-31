@@ -35,4 +35,9 @@ describe("pessoas da equipe: uma fonte só", () => {
     syncTeamMembers([gabriel])
     expect(TEAM.map((u) => u.id)).toEqual(["u1"])
   })
+
+  it("sem id (item sem dono) mostra Ninguém em vez de quebrar a tela", () => {
+    expect(getUser(undefined).name).toBe("Ninguém")
+    expect(getUser("").initials).toBe("?")
+  })
 })

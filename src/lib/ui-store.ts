@@ -10,6 +10,8 @@ import type { NewLeadInput, NewTaskInput, NewTransactionInput } from "@/lib/stor
  */
 interface UIState {
   paletteOpen: boolean
+  /** Captura rápida (HZK OS): aberta pelo "+" ou pelo Ctrl+K, com o tipo já escolhido. */
+  capture: { kind?: "task" | "idea" | "decision" | "note"; title?: string } | null
   leadForm: { prefill?: Partial<NewLeadInput>; onCreated?: (lead: Lead) => void } | null
   taskForm: { prefill?: Partial<NewTaskInput>; onCreated?: (task: Task) => void } | null
   txForm: { prefill?: Partial<NewTransactionInput>; onCreated?: (tx: Transaction) => void } | null
@@ -29,6 +31,7 @@ interface UIState {
 
 export const useUI = create<UIState>((set) => ({
   paletteOpen: false,
+  capture: null,
   leadForm: null,
   taskForm: null,
   txForm: null,
@@ -41,6 +44,7 @@ export const useUI = create<UIState>((set) => ({
 }))
 
 export const openTaskDetail = (id: string) => useUI.getState().set({ taskDetail: id })
+export const openCapture = (opts: NonNullable<UIState["capture"]> = {}) => useUI.getState().set({ capture: opts })
 
 export const openLeadForm = (opts: UIState["leadForm"] = {}) => useUI.getState().set({ leadForm: opts })
 export const openTaskForm = (opts: UIState["taskForm"] = {}) => useUI.getState().set({ taskForm: opts })

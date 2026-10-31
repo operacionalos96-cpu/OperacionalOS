@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import {
   CheckSquareIcon,
   DatabaseIcon,
+  InboxIcon,
   LogOutIcon,
   MenuIcon,
   MonitorIcon,
@@ -25,7 +26,8 @@ import { getUser } from "@/config/team"
 import { isOverdue, isTaskFor, leadsNeedingAction } from "@/lib/domain/rules"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
-import { openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
+import { openCapture, openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
+import { inInbox } from "@/lib/domain/items"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -45,6 +47,7 @@ import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dia
 import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/lead-flow-dialogs"
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
+import { QuickCapture } from "@/components/hzk/quick-capture"
 import { startAutomations } from "@/lib/automations"
 import { startEventFeed } from "@/lib/event-service"
 import { NAV, NAV_SECTIONS, isActive } from "./nav"
@@ -102,6 +105,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
       {hydrated && (
         <>
           <CommandPalette />
+          <QuickCapture />
           <LeadFormDialog />
           <TaskFormDialog />
           <TransactionFormDialog />
@@ -132,14 +136,16 @@ function useGlobalShortcuts() {
 function useBadges() {
   const leads = useStore((s) => s.leads)
   const tasks = useStore((s) => s.tasks)
+  const items = useStore((s) => s.items)
   const meId = useStore((s) => s.meId)
   return useMemo(() => {
     const now = new Date()
     return {
+      "/caixa-de-entrada": [...items, ...tasks].filter((t) => inInbox(t) && (t.ownerId === meId || t.createdById === meId || !t.ownerId)).length,
       "/pipeline": leadsNeedingAction(leads, now).length,
       "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length,
     } as Record<string, number>
-  }, [leads, tasks, meId])
+  }, [leads, tasks, items, meId])
 }
 
 function Sidebar() {
@@ -293,7 +299,12 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={compact ? "end" : "start"} side={compact ? "right" : undefined} className="w-52">
+      <DropdownMenuContent align={compact ? "end" : "start"} side={compact ? "right" : undefined} className="w-60">
+        {/* HZK OS: captura em uma linha vai para a caixa de entrada; a triagem decide depois. */}
+        <DropdownMenuItem onSelect={() => openCapture()}>
+          <InboxIcon /> Captura rápida
+          <DropdownMenuShortcut>Ctrl K</DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openLeadForm()}>
           <UserPlusIcon /> Lead
           <DropdownMenuShortcut>mais usado</DropdownMenuShortcut>

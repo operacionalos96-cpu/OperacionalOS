@@ -40,6 +40,22 @@ export const GLOSSARY = {
     term: "Nível de acesso",
     meaning: "O que cada pessoa pode fazer: Visualizador só vê; Colaborador cria e edita; Gestão também muda configurações; Founder controla tudo.",
   },
+  "caixa-de-entrada": {
+    term: "Caixa de entrada",
+    meaning: "Onde cai tudo o que foi capturado e ainda não tem destino. Fica ali até alguém triar.",
+  },
+  area: {
+    term: "Área",
+    meaning: "Parte da empresa com um dono (ex.: Comercial). Ao escolher a área, a tarefa vai para o dono dela.",
+  },
+  decisao: {
+    term: "Decisão",
+    meaning: "Algo a escolher (tarefa é algo a fazer). Tem pergunta, opções, quem decide e o motivo da escolha.",
+  },
+  porta: {
+    term: "Dá para desfazer?",
+    meaning: "Decisão fácil de desfazer o dono da área toma rápido. Difícil de desfazer, ou com contrato, contratação ou estratégia, vai para a CEO.",
+  },
   hipotese: {
     term: "Hipótese",
     meaning: "Uma sugestão de melhoria feita a partir do que aconteceu. Só vira regra se uma pessoa aprovar.",

@@ -102,3 +102,23 @@ describe("banco e tela usam a mesma matriz", () => {
     expect(can("viewer", "data.write")).toBe(false)
   })
 })
+
+describe("HZK OS — fase 1 (migration 0021)", () => {
+  it("áreas: todos leem as 9 áreas semeadas; só gestão muda o dono", async () => {
+    expect(await rows("viewer", `select id from public.areas`)).toHaveLength(9)
+    const owner = `update public.areas set data = jsonb_set(data, '{owner}', '{"memberId":"u5"}') where id = 'conteudo'`
+    await attempt("operator", owner)
+    expect((await db.sql<{ o: string }>(`select data->'owner'->>'memberId' as o from public.areas where id = 'conteudo'`))[0].o).toBe("u1")
+    expect(await attempt("admin", owner)).toBe("ok")
+    expect((await db.sql<{ o: string }>(`select data->'owner'->>'memberId' as o from public.areas where id = 'conteudo'`))[0].o).toBe("u5")
+  })
+
+  it("avisos: cada um só vê e marca os seus; quem age cria para os outros", async () => {
+    expect(await attempt("operator", `insert into public.notifications (id, user_id, data) values ('n1', 'u5', '{"kind":"decisao"}')`)).toBe("ok")
+    expect(await rows("viewer", `select id from public.notifications`)).toHaveLength(1)
+    expect(await rows("operator", `select id from public.notifications`)).toHaveLength(0)
+    await attempt("operator", `update public.notifications set read_at = now() where id = 'n1'`)
+    expect((await db.sql<{ r: string | null }>(`select read_at as r from public.notifications where id = 'n1'`))[0].r).toBeNull()
+    expect(await attempt("viewer", `insert into public.notifications (id, user_id, data) values ('n2', 'u4', '{}')`)).toBe("negado")
+  })
+})
