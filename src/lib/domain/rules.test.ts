@@ -158,6 +158,8 @@ describe("tarefas personalizadas", () => {
     ]
     expect(dayProgress(tasks, "u1", NOW)).toEqual({ done: 1, total: 2, pct: 0.5 })
     expect(dayProgress(tasks, null, NOW).total).toBe(3)
+    // Planejada para hoje (Fechar o dia / Plano do dia) também conta, mesmo com prazo depois.
+    expect(dayProgress([...tasks, t({ id: "5", dueDate: "2025-10-20", plannedFor: "2025-10-15" })], "u1", NOW).total).toBe(3)
   })
 })
 

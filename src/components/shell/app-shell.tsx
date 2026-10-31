@@ -56,6 +56,8 @@ import { startPresence } from "@/lib/presence"
 import { startAutomations } from "@/lib/automations"
 import { startEventFeed } from "@/lib/event-service"
 import { NAV, NAV_SECTIONS, isActive } from "./nav"
+import { pageOf } from "@/lib/domain/access-pages"
+import { useVisiblePages } from "@/lib/use-access-pages"
 
 /** Telas sem barra lateral e sem dados (login, redefinir senha). */
 const BARE_PATHS = ["/login", "/redefinir-senha"]
@@ -102,7 +104,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         {/* key por rota: cada página entra com um fade curto. */}
         {hydrated ? (
           <div key={pathname} className="flex min-h-0 flex-1 animate-enter flex-col">
-            {children}
+            <PageGate pathname={pathname}>{children}</PageGate>
           </div>
         ) : (
           <PageSkeleton />
@@ -156,8 +158,33 @@ function useBadges() {
   }, [leads, tasks, items, meId])
 }
 
+/** Menu em seções, só com as abas que esta pessoa vê (ADR 0012); seção vazia some. */
+function useNavSections() {
+  const can = useVisiblePages()
+  return useMemo(() => NAV_SECTIONS.map((s) => ({ ...s, items: s.items.filter((i) => can(i.href)) })).filter((s) => s.items.length), [can])
+}
+
+/** Aba fora do menu da pessoa, aberta por link: explica em vez de mostrar uma tela que não é dela. */
+function PageGate({ pathname, children }: { pathname: string; children: React.ReactNode }) {
+  const can = useVisiblePages()
+  const page = pageOf(pathname, NAV.map((i) => i.href))
+  if (!page || can(page)) return <>{children}</>
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <div className="w-full max-w-sm animate-enter rounded-2xl border bg-card p-6 text-center shadow-card">
+        <p className="t-title">Esta aba não está no seu menu</p>
+        <p className="t-desc mt-1 text-sm">Cada pessoa vê as abas da sua área, para o dia ficar mais simples. Se precisar desta, peça ao Igor para liberar.</p>
+        <Button asChild className="mt-5 w-full">
+          <Link href="/">Voltar ao Início</Link>
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function Sidebar() {
   const pathname = usePathname()
+  const sections = useNavSections()
   const badges = useBadges()
   const hydrated = useStore((s) => s.hydrated)
 
@@ -178,7 +205,7 @@ function Sidebar() {
         {/* w-full: a rolagem corta o que sai da largura; o marcador laranja fica na borda da pílula.
             Em tela baixa, ScrollHint mostra que há mais itens embaixo (antes ficavam escondidos sem aviso). */}
         <ScrollHint>
-          {NAV_SECTIONS.map((section, si) => (
+          {sections.map((section, si) => (
             <div key={si} className="flex flex-col items-center gap-1">
               {si > 0 && <span className="my-1 h-px w-6 bg-sidebar-border" aria-hidden />}
               {section.items.map((item) => {
@@ -425,7 +452,10 @@ function MobileNav() {
   const signOut = useStore((s) => s.signOut)
   const [menuOpen, setMenuOpen] = useState(false)
   const me = getUser(meId)
-  const main = NAV.filter((i) => MOBILE_MAIN.includes(i.href))
+  const sections = useNavSections()
+  const visible = sections.flatMap((s) => s.items)
+  // Barra do celular: as 4 de sempre que a pessoa vê; faltando, completa com as próximas do menu dela.
+  const main = [...visible.filter((i) => MOBILE_MAIN.includes(i.href)), ...visible.filter((i) => !MOBILE_MAIN.includes(i.href))].slice(0, 4)
   const inMenu = !main.some((i) => isActive(pathname, i.href))
   const tab = "flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground"
   return (
@@ -451,7 +481,7 @@ function MobileNav() {
             <SheetTitle>Todas as áreas</SheetTitle>
           </SheetHeader>
           <div className="grid gap-5 px-4 pb-6">
-            {NAV_SECTIONS.map((section, si) => (
+            {sections.map((section, si) => (
               <div key={si}>
                 {section.title && <p className="t-label mb-2">{section.title}</p>}
                 <div className="grid grid-cols-2 gap-2">

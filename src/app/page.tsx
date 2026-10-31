@@ -6,7 +6,8 @@ import { ptBR } from "date-fns/locale"
 import { MoonIcon, StickyNoteIcon, SunriseIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { PAGES } from "@/config/pages"
-import { dayPlan, dayProgress, guideMood, helloFor } from "@/lib/domain/day-guide"
+import { dayPlan, guideMood, helloFor } from "@/lib/domain/day-guide"
+import { dayProgress } from "@/lib/domain/rules"
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
 import { useUI } from "@/lib/ui-store"
@@ -32,7 +33,7 @@ export default function HomePage() {
   const checkedIn = !!day.plan?.checkedInAt
   const closed = !!day.plan?.closedAt
   const tasks = useStore((s) => s.tasks)
-  const progress = useMemo(() => dayProgress(meId, now, tasks), [meId, now, tasks])
+  const progress = useMemo(() => dayProgress(tasks, meId, now), [meId, now, tasks])
   const mood = guideMood(dayPlan(day, now), progress)
   const allDone = progress.total > 0 && progress.done === progress.total
   // Ordem de chegada dos blocos (entrada guiada, como no guia do Workspace).

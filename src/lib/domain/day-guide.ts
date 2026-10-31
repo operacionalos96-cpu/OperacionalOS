@@ -131,15 +131,6 @@ export function checkInStreak(memberId: string, now: Date, plans: DailyPlan[]): 
   return streak
 }
 
-/** Quanto do dia já foi entregue: concluídas hoje x o que vence até hoje e ainda está aberto. */
-export function dayProgress(memberId: string, now: Date, tasks: Task[]): { done: number; total: number } {
-  const today = format(now, "yyyy-MM-dd")
-  const mine = tasks.filter((t) => isTaskFor(t, memberId))
-  const done = mine.filter((t) => t.done && t.doneAt?.slice(0, 10) === today).length
-  const open = mine.filter((t) => !t.done && ((t.dueDate && t.dueDate <= today) || t.plannedFor === today)).length
-  return { done, total: done + open }
-}
-
 /** O humor do orbe: atrasada = foco; tudo entregue = festa; senão aponta para a lista. */
 export function guideMood(steps: GuideStep[], progress: { done: number; total: number }): GuideMood {
   if (steps.some((s) => s.kind === "atrasada")) return "focus"

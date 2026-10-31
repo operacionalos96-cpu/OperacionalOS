@@ -658,3 +658,30 @@
   animation: success-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(260ms + var(--i, 0) * 70ms);
 }
+
+/* ---------- Guia do dia em telas (como o .g-scrim / morph do HZK Workspace) ---------- */
+@keyframes scrim-in { from { opacity: 0; } }
+.guide-scrim {
+  background: rgb(15 20 30 / 0.42);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+  animation: scrim-in 320ms ease-out both;
+}
+/* Cada tela entra em sequência: desfoque + deslize na direção do passo (--dir: 1 avança, -1 volta). */
+@keyframes pane-in {
+  from { opacity: 0; translate: calc(var(--dir, 1) * 16px) 10px; filter: blur(6px); }
+  to { opacity: 1; translate: none; filter: blur(0); }
+}
+.guide-pane > * { animation: pane-in 560ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.guide-pane > :nth-child(1) { animation-delay: 120ms; }
+.guide-pane > :nth-child(2) { animation-delay: 180ms; }
+.guide-pane > :nth-child(3) { animation-delay: 240ms; }
+.guide-pane > :nth-child(4) { animation-delay: 300ms; }
+.guide-pane > :nth-child(5) { animation-delay: 360ms; }
+.guide-pane > :nth-child(n + 6) { animation-delay: 420ms; }
+/* "Vamos lá" avança sozinho em 7s; passar o mouse pausa (animation-play-state). */
+@keyframes guide-timer { from { width: 0%; } to { width: 100%; } }
+.guide-timer { animation: guide-timer 7s linear forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .guide-timer { animation: none; width: 0; }
+}

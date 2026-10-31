@@ -8,6 +8,10 @@ import type { Area, PersonRef } from "@/lib/domain/areas"
 import { moneyInputValue } from "@/lib/format"
 import { useAreas, useTeamSettings } from "@/lib/modules"
 import { TEAM_SETTINGS_ID } from "@/lib/domain/daily"
+import { ROLE_PAGES, canSee, visiblePages } from "@/lib/domain/access-pages"
+import { isAtLeast } from "@/lib/domain/org"
+import { PAGES } from "@/config/pages"
+import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
 import { useAccess } from "@/lib/use-access"
 import { useAreaList, useCeoLimit, usePeople } from "@/lib/use-hzk"
@@ -20,7 +24,7 @@ import { ownerLabel } from "@/components/hzk/item-bits"
 
 /** Configurações (HZK OS): áreas com dono, apoio e aprovador, e o limite de gasto que vai para a CEO. */
 export default function SettingsPage() {
-  const { canAdmin } = useAccess()
+  const { canAdmin, isOwner } = useAccess()
   const areas = useAreaList()
   const people = usePeople()
 
@@ -42,6 +46,7 @@ export default function SettingsPage() {
         </Panel>
         <CeoLimitPanel editable={canAdmin} />
         <DailyMeetingPanel editable={canAdmin} />
+        <PagesByMemberPanel editable={isOwner} />
       </div>
     </div>
   )
@@ -182,6 +187,85 @@ function DailyMeetingPanel({ editable }: { editable: boolean }) {
           Salvar
         </Button>
       </form>
+    </Panel>
+  )
+}
+
+/**
+ * O que cada um vê (ADR 0012): começa no padrão das áreas de cada pessoa; o owner marca ou desmarca.
+ * É só o menu (organização), não permissão: o banco continua decidindo o que cada um lê e grava.
+ */
+function PagesByMemberPanel({ editable }: { editable: boolean }) {
+  const members = useStore((s) => s.orgMembers)
+  const current = useTeamSettings((s) => s.items.find((x) => x.id === TEAM_SETTINGS_ID))
+  const save = useTeamSettings((s) => s.save)
+  const areas = useAreaList()
+  const people = usePeople()
+  const overrides = current?.pagesByMember ?? {}
+  const pages = PAGES.filter((p) => p.href !== "/")
+  const others = members.filter((m) => m.active && m.roleLevel !== "owner")
+
+  function set(memberId: string, list: string[] | undefined) {
+    const next = { ...overrides }
+    if (list) next[memberId] = list
+    else delete next[memberId]
+    save({ ...(current ?? { id: TEAM_SETTINGS_ID }), pagesByMember: next })
+  }
+
+  return (
+    <Panel title="O que cada um vê" description="As abas do menu de cada pessoa. Começa pelas áreas dela; quem é owner vê tudo.">
+      {others.length === 0 ? (
+        <p className="t-desc p-4 text-sm">Ninguém além de você por enquanto.</p>
+      ) : (
+        <ul className="divide-y">
+          {others.map((m) => {
+            const visible = visiblePages(m.teamId, m.roleLevel, { areas, people, overrides })
+            const custom = !!overrides[m.teamId]
+            return (
+              <li key={m.teamId} className="grid gap-2 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">
+                    {getUser(m.teamId).name}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">{custom ? "ajustado por você" : "padrão das áreas"}</span>
+                  </p>
+                  {editable && custom && (
+                    <Button size="sm" variant="ghost" onClick={() => set(m.teamId, undefined)}>
+                      Voltar ao padrão
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {pages.map((p) => {
+                    const on = canSee(visible, p.href)
+                    const blocked = !!ROLE_PAGES[p.href] && !isAtLeast(m.roleLevel, ROLE_PAGES[p.href])
+                    return (
+                      <button
+                        key={p.href}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={!editable || blocked}
+                        title={blocked ? "Exige um nível de acesso maior" : undefined}
+                        onClick={() => {
+                          const base = visible === "all" ? pages.map((x) => x.href) : [...visible]
+                          set(m.teamId, on ? base.filter((h) => h !== p.href) : [...base, p.href])
+                        }}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs",
+                          on ? "border-brand bg-brand-soft font-medium text-brand" : "bg-card text-muted-foreground",
+                          (blocked || !editable) && "opacity-60",
+                        )}
+                      >
+                        <p.icon className="size-3.5" /> {p.title}
+                      </button>
+                    )
+                  })}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {!editable && <p className="t-desc px-4 pb-4 text-xs">Só o owner ajusta o menu de cada pessoa.</p>}
     </Panel>
   )
 }

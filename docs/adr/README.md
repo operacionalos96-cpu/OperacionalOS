@@ -29,3 +29,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0009](0009-presenca-do-time.md) | Presença do time: agenda, app aberto e check-in do dia | Aceito |
 | [0010](0010-meu-dia.md) | Meu Dia: uma lista do dia, "fazendo agora", daily e agenda | Aceito |
 | [0011](0011-check-in-semanal.md) | Check-in semanal e Semana do time | Aceito |
+| [0012](0012-abas-por-pessoa.md) | Abas por pessoa e fase da tarefa junto com o tempo | Aceito |

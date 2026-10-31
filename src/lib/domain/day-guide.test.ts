@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { CalendarEvent } from "./calendar"
 import { myDay } from "./my-day"
-import { became, checkInStreak, dayPlan, dayProgress, greeting, guideMood, lastDayCaptures } from "./day-guide"
+import { became, checkInStreak, dayPlan, greeting, guideMood, lastDayCaptures } from "./day-guide"
 import type { DailyPlan } from "./presence"
 import type { Task } from "./types"
 
@@ -43,10 +43,6 @@ describe("guia do dia: por onde começar", () => {
     expect(guideMood([], { done: 0, total: 0 })).toBe("calm")
   })
 
-  it("progresso do dia: concluídas hoje x o que vence até hoje", () => {
-    const tasks = [task({ done: true, doneAt: "2026-11-02T10:00:00" }), task({ dueDate: "2026-11-02" }), task({ dueDate: "2026-11-09" }), task({ ownerId: "u1", dueDate: "2026-11-01" })]
-    expect(dayProgress("u2", at("12:00"), tasks)).toEqual({ done: 1, total: 2 })
-  })
 })
 
 describe("guia do dia: o que você anotou no último dia", () => {

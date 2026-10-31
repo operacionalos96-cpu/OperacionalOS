@@ -20,9 +20,11 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 import { NAV } from "./nav"
+import { useVisiblePages } from "@/lib/use-access-pages"
 
 export function CommandPalette() {
   const open = useUI((s) => s.paletteOpen)
+  const canSee = useVisiblePages()
   const setUI = useUI((s) => s.set)
   const snap = useEntitySnapshot()
   const groups = useMemo(() => {
@@ -83,7 +85,7 @@ export function CommandPalette() {
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Ir para">
-          {NAV.map((item) => (
+          {NAV.filter((item) => canSee(item.href)).map((item) => (
             <CommandItem key={item.href} onSelect={() => run(() => router.push(item.href))}>
               <item.icon /> {item.label}
             </CommandItem>
