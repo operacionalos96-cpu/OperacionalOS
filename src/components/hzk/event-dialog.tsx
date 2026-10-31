@@ -10,6 +10,7 @@ import { uid } from "@/lib/format"
 import { useCalendarEvents } from "@/lib/modules"
 import { notify } from "@/lib/notifications"
 import { useStore } from "@/lib/store"
+import { AreaSelect } from "./item-bits"
 import { useTeam } from "@/lib/use-team"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -23,7 +24,20 @@ const DURATIONS = [15, 30, 45, 60, 90, 120]
  * Agendar reunião (ou compromisso, foco, ausência). Antes de salvar, mostra quem já está ocupado
  * no horário (src/lib/domain/calendar.ts › conflictsFor). Participantes recebem um aviso.
  */
-export function EventDialog({ event, defaultKind = "reuniao", open, onOpenChange }: { event?: CalendarEvent; defaultKind?: EventKind; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function EventDialog({
+  event,
+  defaultKind = "reuniao",
+  defaultStart,
+  open,
+  onOpenChange,
+}: {
+  event?: CalendarEvent
+  defaultKind?: EventKind
+  /** Novo evento começando aqui (clique num horário vazio da Agenda). */
+  defaultStart?: Date
+  open: boolean
+  onOpenChange: (o: boolean) => void
+}) {
   const meId = useStore((s) => s.meId)
   const team = useTeam()
   const events = useCalendarEvents((s) => s.items)
@@ -38,10 +52,11 @@ export function EventDialog({ event, defaultKind = "reuniao", open, onOpenChange
   const [endTime, setEndTime] = useState("18:00")
   const [people, setPeople] = useState<string[]>([])
   const [location, setLocation] = useState("")
+  const [areaId, setAreaId] = useState<string | undefined>()
 
   useEffect(() => {
     if (!open) return
-    const start = event ? new Date(event.start) : null
+    const start = event ? new Date(event.start) : (defaultStart ?? null)
     setTitle(event?.title ?? "")
     setKind(event?.kind ?? defaultKind)
     setDay(start ? format(start, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"))
@@ -50,7 +65,8 @@ export function EventDialog({ event, defaultKind = "reuniao", open, onOpenChange
     setEndTime(event ? format(new Date(event.end), "HH:mm") : "18:00")
     setPeople(event?.participantIds ?? [])
     setLocation(event?.location ?? "")
-  }, [open, event, defaultKind])
+    setAreaId(event?.areaId)
+  }, [open, event, defaultKind, defaultStart])
 
   const allDay = kind === "ausencia"
   const draft = useMemo(() => {
@@ -73,11 +89,12 @@ export function EventDialog({ event, defaultKind = "reuniao", open, onOpenChange
       ownerId: draft.ownerId,
       participantIds: draft.participantIds,
       location: location.trim() || undefined,
+      areaId: kind === "foco" ? areaId : undefined,
       createdBy: event?.createdBy ?? meId,
       createdAt: event?.createdAt ?? new Date().toISOString(),
     }
     save(saved)
-    if (kind === "reuniao") notify(saved.participantIds, { kind: "mencao", title: `Reunião: ${saved.title} · ${format(new Date(saved.start), "dd/MM")} ${timeRange(saved)}`, href: "/equipe", fromId: meId })
+    if (kind === "reuniao") notify(saved.participantIds, { kind: "mencao", title: `Reunião: ${saved.title} · ${format(new Date(saved.start), "dd/MM")} ${timeRange(saved)}`, href: "/agenda", fromId: meId })
     toast.success(event ? "Agenda atualizada" : kind === "reuniao" ? "Reunião agendada" : "Adicionado à agenda")
     onOpenChange(false)
   }
@@ -156,6 +173,11 @@ export function EventDialog({ event, defaultKind = "reuniao", open, onOpenChange
                     )
                   })}
               </div>
+            </Field>
+          )}
+          {kind === "foco" && (
+            <Field label="Sessão de (opcional)" htmlFor="ev-area" hint="Ex.: sessão comercial. Durante a sessão, as tarefas dessa área sobem no seu Plano do dia.">
+              <AreaSelect id="ev-area" value={areaId} onChange={setAreaId} />
             </Field>
           )}
           {(kind === "reuniao" || kind === "compromisso") && (

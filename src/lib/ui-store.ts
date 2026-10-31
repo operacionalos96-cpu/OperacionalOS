@@ -25,6 +25,8 @@ interface UIState {
   taskDetail: string | null
   /** Modo foco (mapas): esconde a barra lateral para dar a tela toda ao quadro. */
   focusMode: boolean
+  /** Pedido para o Guia do dia abrir (Início: "Planejar meu dia" / "Fechar o dia"). `at` repete o pedido. */
+  guide: { mode: "dia" | "fechar"; at: number } | null
 
   set(patch: Partial<Omit<UIState, "set">>): void
 }
@@ -38,6 +40,7 @@ export const useUI = create<UIState>((set) => ({
   nextActionFor: null,
   wonFor: null,
   lostFor: null,
+  guide: null,
   taskDetail: null,
   focusMode: false,
   set: (patch) => set(patch),

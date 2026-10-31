@@ -10,6 +10,7 @@ import { dateTime, dueLabel, uid } from "@/lib/format"
 import { cycleTaskStatus, deleteTaskWithUndo, setTaskStatus } from "@/lib/actions"
 import { taskStatus } from "@/lib/domain/mindmap"
 import { StatusButton } from "@/components/shared/status-button"
+import { DoingButton } from "@/components/hzk/doing-now"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
 import { useStore } from "@/lib/store"
@@ -71,6 +72,7 @@ function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }
             Criada {dateTime(task.createdAt)}
             {task.doneAt && <> · concluída {dateTime(task.doneAt)}</>}
           </SheetDescription>
+          <DoingButton task={task} className="mt-2" />
         </div>
       </div>
 

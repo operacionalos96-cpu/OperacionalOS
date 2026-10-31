@@ -6,13 +6,15 @@ import { LockIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import type { Area, PersonRef } from "@/lib/domain/areas"
 import { moneyInputValue } from "@/lib/format"
-import { useAreas } from "@/lib/modules"
+import { useAreas, useTeamSettings } from "@/lib/modules"
+import { TEAM_SETTINGS_ID } from "@/lib/domain/daily"
 import { useStore } from "@/lib/store"
 import { useAccess } from "@/lib/use-access"
 import { useAreaList, useCeoLimit, usePeople } from "@/lib/use-hzk"
 import { useTeam } from "@/lib/use-team"
 import { Button } from "@/components/ui/button"
 import { Field, MoneyInput } from "@/components/shared/fields"
+import { Input } from "@/components/ui/input"
 import { PageHeader, Panel } from "@/components/shared/layout"
 import { ownerLabel } from "@/components/hzk/item-bits"
 
@@ -39,6 +41,7 @@ export default function SettingsPage() {
           </ul>
         </Panel>
         <CeoLimitPanel editable={canAdmin} />
+        <DailyMeetingPanel editable={canAdmin} />
       </div>
     </div>
   )
@@ -146,6 +149,39 @@ function CeoLimitPanel({ editable }: { editable: boolean }) {
           </Button>
         )}
       </div>
+    </Panel>
+  )
+}
+
+/** Reunião diária: horário e link. O botão "Entrar na reunião" da Início usa este link (ADR 0010). */
+function DailyMeetingPanel({ editable }: { editable: boolean }) {
+  const current = useTeamSettings((s) => s.items.find((x) => x.id === TEAM_SETTINGS_ID))
+  const save = useTeamSettings((s) => s.save)
+  const [time, setTime] = useState(current?.daily?.time ?? "09:30")
+  const [link, setLink] = useState(current?.daily?.link ?? "")
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const url = link.trim()
+    if (url && !/^https?:\/\//.test(url)) {
+      toast.error("O link precisa começar com https://")
+      return
+    }
+    save({ ...(current ?? { id: TEAM_SETTINGS_ID }), daily: { time, link: url || undefined } })
+    toast.success("Reunião diária salva")
+  }
+  return (
+    <Panel title="Reunião diária" description="Quando todos fizerem o check-in, o Pronto libera na Início; com todos prontos, o botão abre este link.">
+      <form id="daily" onSubmit={submit} className="grid gap-3 p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
+        <Field label="Horário" htmlFor="daily-time">
+          <Input id="daily-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!editable} />
+        </Field>
+        <Field label="Link da reunião (Meet, Zoom…)" htmlFor="daily-link">
+          <Input id="daily-link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://meet.google.com/…" disabled={!editable} />
+        </Field>
+        <Button type="submit" disabled={!editable}>
+          Salvar
+        </Button>
+      </form>
     </Panel>
   )
 }

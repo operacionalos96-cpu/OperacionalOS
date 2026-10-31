@@ -5,11 +5,11 @@
  * itens, agenda, check-ins) — nada guardado à parte. Regras puras, testadas em day-guide.test.ts.
  */
 import { differenceInMinutes, format, isWeekend, parseISO, subDays } from "date-fns"
-import { eventsOfDay, timeRange, type CalendarEvent } from "./calendar"
+import { timeRange } from "./calendar"
 import { inInbox, kindOf } from "./items"
+import type { MyDay } from "./my-day"
 import type { DailyPlan } from "./presence"
 import { isTaskFor } from "./rules"
-import type { PersonWork } from "./team-work"
 import type { Task } from "./types"
 
 export type GuideMood = "hello" | "point" | "focus" | "calm" | "party" | "rest"
@@ -56,41 +56,30 @@ export interface GuideStep {
   taskId?: string
 }
 
-/** Itens da caixa de entrada que são desta pessoa (capturados por ela ou com ela como dona). */
-export function inboxOf(memberId: string, items: Task[]): Task[] {
-  return items.filter((t) => inInbox(t) && (t.ownerId === memberId || (!t.ownerId && t.createdById === memberId)))
-}
 
 /**
- * "Por onde vamos começar?": atrasadas → decisões esperando a pessoa → próximas reuniões de hoje →
- * tarefas de hoje → triar a caixa de entrada. É a mesma ordem do "foco" do Workspace: primeiro o que
- * já passou do prazo, depois o que trava os outros, depois o que tem hora marcada.
+ * "Por onde vamos começar?": a mesma lista da Início (myDay), na ordem do "foco" do Workspace:
+ * atrasadas → decisões esperando a pessoa → próximas reuniões de hoje → tarefas de hoje → triar a
+ * caixa de entrada. Primeiro o que já passou do prazo, depois o que trava os outros, depois o que
+ * tem hora marcada.
  */
-export function dayPlan(memberId: string, now: Date, src: { work: PersonWork; events: CalendarEvent[]; items: Task[] }): GuideStep[] {
-  const today = format(now, "yyyy-MM-dd")
-  const overdue = src.work.overdue.map<GuideStep>((t) => ({
-    id: t.id,
-    kind: "atrasada",
-    title: t.title,
-    hint: `Atrasada desde ${format(parseISO(t.dueDate!), "dd/MM")}`,
-    href: "/tarefas",
-    taskId: t.id,
-  }))
-  const decisions = src.work.decisionsWaiting.map<GuideStep>((t) => ({ id: t.id, kind: "decisao", title: t.title, hint: "Esperando a sua decisão", href: "/decisoes" }))
-  const meetings = eventsOfDay(memberId, src.events, now)
-    .filter((e) => e.kind !== "ausencia" && new Date(e.end) > now)
-    .map<GuideStep>((e) => {
-      const mins = differenceInMinutes(new Date(e.start), now)
-      return { id: e.id, kind: "reuniao", title: e.title, hint: mins > 0 && mins <= 60 ? `Começa em ${mins} min · ${timeRange(e)}` : timeRange(e), href: "/equipe?aba=agenda" }
-    })
-  const dueToday = src.work.open
-    .filter((t) => t.dueDate === today || t.plannedFor === today)
-    .map<GuideStep>((t) => ({ id: t.id, kind: "hoje", title: t.title, hint: t.dueDate === today ? "Prazo hoje" : "Planejada para hoje", href: "/tarefas", taskId: t.id }))
-  const inbox = inboxOf(memberId, src.items)
-  const triage: GuideStep[] = inbox.length
-    ? [{ id: "caixa", kind: "caixa", title: `Triar ${inbox.length} ${inbox.length === 1 ? "item" : "itens"} da caixa de entrada`, hint: "Decidir o que cada um vira", href: "/caixa-de-entrada" }]
-    : []
-  return [...overdue, ...decisions, ...meetings, ...dueToday, ...triage]
+export function dayPlan(day: MyDay, now: Date): GuideStep[] {
+  const steps: GuideStep[] = []
+  for (const i of day.planItems.filter((x) => x.group === "atrasado")) {
+    steps.push({ id: i.task.id, kind: "atrasada", title: i.task.title, hint: `Atrasada desde ${format(parseISO(i.task.dueDate!), "dd/MM")}`, href: "/tarefas", taskId: i.task.id })
+  }
+  for (const t of day.waiting) steps.push({ id: t.id, kind: "decisao", title: t.title, hint: "Esperando a sua decisão", href: "/decisoes" })
+  for (const e of day.agenda.filter((x) => x.kind !== "ausencia" && new Date(x.end) > now)) {
+    const mins = differenceInMinutes(new Date(e.start), now)
+    steps.push({ id: e.id, kind: "reuniao", title: e.title, hint: mins > 0 && mins <= 60 ? `Começa em ${mins} min · ${timeRange(e)}` : timeRange(e), href: "/agenda" })
+  }
+  for (const i of day.planItems.filter((x) => x.group === "hoje")) {
+    steps.push({ id: i.task.id, kind: "hoje", title: i.task.title, hint: i.badges.includes("fazendo") ? "Fazendo agora" : i.task.dueDate === format(now, "yyyy-MM-dd") ? "Prazo hoje" : "Planejada para hoje", href: "/tarefas", taskId: i.task.id })
+  }
+  if (day.inboxCount) {
+    steps.push({ id: "caixa", kind: "caixa", title: `Triar ${day.inboxCount} ${day.inboxCount === 1 ? "item" : "itens"} da caixa de entrada`, hint: "Decidir o que cada um vira", href: "/caixa-de-entrada" })
+  }
+  return steps
 }
 
 // ---------- o que virou o que foi anotado ontem ----------

@@ -33,6 +33,11 @@ export default function ProspectingPage() {
   const leads = useStore((s) => s.leads)
   const meId = useStore((s) => s.meId)
   const [tab, setTab] = useState<"fila" | "aguardando" | "funil" | "descartados">("fila")
+  // Link direto para uma aba (ex.: a Início abre /prospeccao?aba=funil).
+  useEffect(() => {
+    const aba = new URLSearchParams(window.location.search).get("aba")
+    if (aba === "aguardando" || aba === "funil" || aba === "descartados") setTab(aba)
+  }, [])
   const steps = useFunnel((s) => s.steps)
   const loadFunnel = useFunnel((s) => s.load)
   useEffect(() => void loadFunnel(), [loadFunnel])

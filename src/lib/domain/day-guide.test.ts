@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest"
 import type { CalendarEvent } from "./calendar"
+import { myDay } from "./my-day"
 import { became, checkInStreak, dayPlan, dayProgress, greeting, guideMood, lastDayCaptures } from "./day-guide"
 import type { DailyPlan } from "./presence"
-import type { PersonWork } from "./team-work"
 import type { Task } from "./types"
 
 // Segunda-feira, 2 de novembro de 2026, horário local.
 const at = (hhmm: string, day = "2026-11-02") => new Date(`${day}T${hhmm}:00`)
 const task = (over: Partial<Task>): Task => ({ id: Math.random().toString(36).slice(2), title: "T", ownerId: "u2", done: false, createdAt: "2026-10-01T10:00:00", ...over })
-const work = (over: Partial<PersonWork> = {}): PersonWork => ({ areas: [], open: [], overdue: [], decisionsWaiting: [], done: [], ...over })
 
 describe("guia do dia: saudação", () => {
   const base = { firstTime: false, seenToday: false, pending: 2 }
@@ -30,11 +29,9 @@ describe("guia do dia: por onde começar", () => {
     const reuniao: CalendarEvent = { id: "e1", title: "Call", kind: "reuniao", start: at("14:00").toISOString(), end: at("15:00").toISOString(), ownerId: "u1", participantIds: ["u2"], createdBy: "u1", createdAt: "x" }
     const jaPassou: CalendarEvent = { ...reuniao, id: "e0", title: "Daily", start: at("08:00").toISOString(), end: at("08:30").toISOString() }
     const captura = task({ kind: "idea", inbox: true, createdById: "u2" })
-    const steps = dayPlan("u2", at("13:30"), {
-      work: work({ open: [atrasada, hoje], overdue: [atrasada], decisionsWaiting: [decisao] }),
-      events: [reuniao, jaPassou],
-      items: [captura, decisao],
-    })
+    const decisao2 = { ...decisao, decision: { options: [], door: "reversivel" as const, involves: [], status: "pendente" as const, deciderIds: ["u2"] } }
+    const now = at("13:30")
+    const steps = dayPlan(myDay("u2", now, { tasks: [atrasada, hoje], items: [captura, decisao2], events: [reuniao, jaPassou], plans: [] }), now)
     expect(steps.map((s) => s.kind)).toEqual(["atrasada", "decisao", "reuniao", "hoje", "caixa"])
     expect(steps[2].hint).toBe("Começa em 30 min · 14:00–15:00")
     expect(steps[0]).toMatchObject({ hint: "Atrasada desde 30/10", taskId: atrasada.id })

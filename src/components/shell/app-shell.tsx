@@ -50,6 +50,7 @@ import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { QuickCapture } from "@/components/hzk/quick-capture"
 import { DayGuide } from "@/components/hzk/day-guide"
+import { DoingRail } from "@/components/hzk/doing-now"
 import { PresenceDot } from "@/components/hzk/presence-badge"
 import { startPresence } from "@/lib/presence"
 import { startAutomations } from "@/lib/automations"
@@ -220,6 +221,7 @@ function Sidebar() {
           ))}
         </ScrollHint>
 
+        <DoingRail />
         <AccountMenu />
       </div>
     </aside>

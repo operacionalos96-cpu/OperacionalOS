@@ -17,10 +17,15 @@ const DOT: Record<(typeof PRESENCE)[keyof typeof PRESENCE]["tone"], string> = {
 export function PresenceBadge({ memberId, className, showDetail }: { memberId: string; className?: string; showDetail?: boolean }) {
   const p = usePresence(memberId)
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", className)} title={p.detail}>
+    <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs font-medium", className)} title={p.detail}>
       <span className={cn("size-2 shrink-0 rounded-full", DOT[PRESENCE[p.status].tone])} aria-hidden />
       <span>{presenceText(p)}</span>
-      {showDetail && p.detail && <span className="truncate font-normal text-muted-foreground">· {p.detail}</span>}
+      {showDetail && p.detail && (
+        <span className="truncate font-normal text-muted-foreground">
+          · {p.detail}
+          {p.since && ` desde ${p.since}`}
+        </span>
+      )}
     </span>
   )
 }

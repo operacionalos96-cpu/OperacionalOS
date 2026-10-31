@@ -1,5 +1,6 @@
 import {
   BotIcon,
+  CalendarDaysIcon,
   CheckSquareIcon,
   ClapperboardIcon,
   HandshakeIcon,
@@ -49,13 +50,27 @@ export const PAGES = [
     title: "Início",
     icon: HomeIcon,
     section: null,
-    purpose: "Seu resumo do dia: o que precisa de atenção, suas tarefas e como está o dinheiro.",
+    purpose: "Meu Dia: seu plano de hoje, sua agenda, o time agora e o próximo passo de cada setor.",
     howTo: [
-      "Comece por \"Precisa de atenção\" e resolva cada item ali mesmo.",
-      "Veja em \"Minhas responsabilidades\" o que é seu hoje e nesta semana.",
-      "Clique num número para abrir a área com os detalhes.",
+      "De manhã, faça o check-in pelo \"Planejar meu dia\" (ou pela bolinha do guia).",
+      "No Plano do dia, aperte ▶ na tarefa que vai fazer: o time vê o que você está fazendo.",
+      "Quando todos fizerem check-in, aperte \"Estou pronto\" na reunião diária.",
+      "No fim do expediente, use \"Fechar o dia\" para planejar amanhã.",
     ],
-    metrics: ["saldo-caixa", "meta-faturamento", "pipeline-aberto"],
+    terms: ["check-in", "fazendo-agora", "daily", "sessao"],
+  },
+  {
+    href: "/agenda",
+    title: "Agenda",
+    icon: CalendarDaysIcon,
+    section: null,
+    purpose: "O calendário do time: reuniões, sessões de trabalho, folgas e os prazos de tarefas e conteúdos.",
+    howTo: [
+      "Escolha Dia, Semana ou Mês e, se quiser, a pessoa.",
+      "Clique num horário vazio para agendar uma reunião, um compromisso ou uma sessão.",
+      "Marque uma sessão de foco com a área (ex.: comercial): no horário, essas tarefas sobem no seu plano.",
+    ],
+    terms: ["status", "sessao"],
   },
   {
     href: "/caixa-de-entrada",
@@ -79,7 +94,7 @@ export const PAGES = [
     purpose: "Quem faz parte da equipe, onde cada um está agora, do que é responsável e o que fez.",
     howTo: [
       "Em Responsabilidades, veja o status de cada um (online, em reunião…), as áreas e o que fez.",
-      "Em Agenda e reuniões, agende uma reunião: o app avisa se alguém já está ocupado.",
+      "Em Agenda, agende uma reunião: o app avisa se alguém já está ocupado.",
       "Faça o check-in no guia do dia (a bolinha no canto): o time vê que você está no expediente.",
       "Clique em \"Ver tudo\" para abrir a página da pessoa com a agenda e a lista completa.",
     ],
