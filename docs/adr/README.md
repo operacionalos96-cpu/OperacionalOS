@@ -27,3 +27,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0007](0007-frontend-modular.md) | Frontend guiado, uma fonte só para cada informação, rumo a apps independentes | Aceito |
 | [0008](0008-item-unico.md) | Item único do HZK OS guardado na tabela de tarefas | Aceito |
 | [0009](0009-presenca-do-time.md) | Presença do time: agenda, app aberto e check-in do dia | Aceito |
+| [0010](0010-meu-dia.md) | Meu Dia: uma lista do dia, "fazendo agora", daily e agenda | Aceito |

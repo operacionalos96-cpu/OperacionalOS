@@ -34,6 +34,11 @@ export function inInbox(t: Task): boolean {
   return !!t.inbox || !t.ownerId
 }
 
+/** Itens da caixa de entrada que são desta pessoa (capturados por ela ou com ela como dona). */
+export function inboxOf(memberId: string, items: Task[]): Task[] {
+  return items.filter((t) => inInbox(t) && (t.ownerId === memberId || (!t.ownerId && t.createdById === memberId)))
+}
+
 export function inboxAlert(t: Task, now: Date): boolean {
   return inInbox(t) && differenceInHours(now, parseISO(t.createdAt)) >= INBOX_ALERT_HOURS
 }

@@ -1,50 +1,15 @@
 "use client"
 
 import { useMemo } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ActivityIcon, TargetIcon } from "lucide-react"
+import { ActivityIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { teamFeed } from "@/lib/domain/insights"
 import { openEntity } from "@/lib/entities/registry"
 import { money, relative } from "@/lib/format"
-import { useGoals } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { Panel } from "@/components/shared/layout"
 import { AvatarDot } from "@/components/shared/user-avatar"
-import { GoalRow } from "@/components/goals/goal-bits"
-
-/** Metas em andamento (as 3 que vencem primeiro). */
-export function GoalsPanel({ className }: { className?: string }) {
-  const goals = useGoals((s) => s.items)
-  const today = new Date().toISOString().slice(0, 10)
-  const active = goals.filter((g) => g.end >= today).sort((a, b) => a.end.localeCompare(b.end))
-  return (
-    <Panel
-      className={className}
-      title={
-        <span className="flex items-center gap-2">
-          <TargetIcon className="size-4 text-muted-foreground" /> Metas
-        </span>
-      }
-      aside={
-        <Link href="/metas" className="text-xs text-muted-foreground hover:text-foreground">
-          {active.length > 3 ? `Ver todas (${active.length})` : "Abrir"}
-        </Link>
-      }
-    >
-      <div className="grid gap-1 p-2">
-        {active.length ? (
-          active.slice(0, 3).map((g) => <GoalRow key={g.id} goal={g} />)
-        ) : (
-          <Link href="/metas" className="t-desc rounded-lg p-2 text-sm hover:bg-accent/50">
-            Nenhuma meta em andamento. Crie uma de receita, vendas ou tarefas →
-          </Link>
-        )}
-      </div>
-    </Panel>
-  )
-}
 
 /** O que a equipe fez por último: conversas, tarefas feitas, vendas e lançamentos. */
 export function TeamFeedPanel({ className }: { className?: string }) {

@@ -140,3 +140,12 @@ describe("agenda e check-in (migration 0022)", () => {
     expect(await rows("operator", `select id from public.daily_plans`)).toHaveLength(1)
   })
 })
+
+describe("configuração do time (migration 0023)", () => {
+  const daily = `insert into public.team_settings (id, data) values ('time', '{"id":"time","daily":{"time":"09:30","link":"https://meet.google.com/x"}}')`
+  it("admin configura a daily; operator não; todos leem", async () => {
+    expect(await attempt("operator", daily)).toBe("negado")
+    expect(await attempt("admin", daily)).toBe("ok")
+    expect(await rows("viewer", `select id from public.team_settings`)).toHaveLength(1)
+  })
+})

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { FinanceSettings, Lead, Task, Transaction } from "./types"
 import {
-  attentionItems,
   balance,
   balanceSeries,
   cashflowSeries,
@@ -16,7 +15,6 @@ import {
   leadsNeedingAction,
   monthDelta,
   monthStats,
-  myAgenda,
   nextOccurrence,
   parseQuickAdd,
   assignPeople,
@@ -119,28 +117,6 @@ describe("tarefas e agenda", () => {
     expect(dueBucket("2025-10-19", NOW)).toBe("semana") // domingo
     expect(dueBucket("2025-10-20", NOW)).toBe("depois")
     expect(dueBucket(undefined, NOW)).toBe("sem_prazo")
-  })
-
-  it("agenda: só minhas tarefas até o fim da semana (próxima ação de lead não entra)", () => {
-    const tasks: Task[] = [
-      { id: "t1", title: "Minha", ownerId: "u1", dueDate: "2025-10-16", done: false, createdAt: "" },
-      { id: "t2", title: "Dele", ownerId: "u2", dueDate: "2025-10-16", done: false, createdAt: "" },
-      { id: "t3", title: "Feita", ownerId: "u1", dueDate: "2025-10-16", done: true, createdAt: "" },
-    ]
-    const leads = [lead({ nextAction: { text: "Ligar", dueDate: "2025-10-14" } }), lead({ id: "l2", ownerId: "u2" })]
-    const agenda = myAgenda("u1", leads, tasks, NOW)
-    expect(agenda.map((i) => i.id)).toEqual(["t1"])
-  })
-
-  it("itens de atenção limitados e ordenados por gravidade", () => {
-    const leads = [
-      lead({ id: "a", lastActivityAt: new Date(2025, 8, 1).toISOString() }),
-      lead({ id: "b", nextAction: { text: "x", dueDate: "2025-10-10" } }),
-    ]
-    const tasks: Task[] = [{ id: "t", title: "Atrasada", ownerId: "u1", dueDate: "2025-10-14", done: false, createdAt: "" }]
-    const { items, total } = attentionItems({ leads, tasks, txs: [], settings }, NOW, 2)
-    expect(total).toBe(3) // lead parado + tarefa + meta; ação vencida de lead não entra
-    expect(items.map((i) => i.kind)).toEqual(["tarefa_atrasada", "meta"])
   })
 })
 
@@ -252,7 +228,6 @@ describe("tarefas colaborativas", () => {
     const shared: Task = { ...base, ownerId: "u1", collaborators: ["u2"] }
     expect(taskPeople(shared)).toEqual(["u1", "u2"])
     expect(isTaskFor(shared, "u2")).toBe(true)
-    expect(myAgenda("u2", [], [shared], NOW).map((i) => i.id)).toEqual(["t"])
     expect(dayProgress([shared], "u2", NOW).total).toBe(1)
     expect(isTaskFor({ ...base, ownerId: "u1" }, "u2")).toBe(false)
   })

@@ -5,16 +5,20 @@ import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
-import { ArrowRightIcon, CalendarClockIcon, CheckIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, ScaleIcon, TriangleAlertIcon } from "lucide-react"
+import { ArrowRightIcon, CalendarClockIcon, CheckIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, MoonIcon, ScaleIcon, SunriseIcon, TriangleAlertIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { BECAME_LABEL, checkInStreak, dayPlan, dayProgress, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
 import { needsCheckIn, planId, type DailyPlan } from "@/lib/domain/presence"
-import { useCalendarEvents, useDailyPlans } from "@/lib/modules"
+import { useDailyPlans } from "@/lib/modules"
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
+import { useDoing, useMyDay } from "@/lib/use-my-day"
+import { useUI } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CloseDay } from "./close-day"
+import { DoingButton } from "./doing-now"
 import { GuideOrb } from "./guide-orb"
 import { usePersonWork } from "./team-overview"
 
@@ -56,16 +60,17 @@ export function DayGuide() {
   const tasks = useStore((s) => s.tasks)
   const items = useStore((s) => s.items)
   const toggleTask = useStore((s) => s.toggleTask)
+  const doingActions = useDoing()
   const loaded = useDailyPlans((s) => s.loaded)
   const plans = useDailyPlans((s) => s.items)
   const save = useDailyPlans((s) => s.save)
-  const events = useCalendarEvents((s) => s.items)
   const now = useMinute()
   const work = usePersonWork(meId, 1)
 
   const today = format(now, "yyyy-MM-dd")
   const mine = plans.find((p) => p.id === planId(meId, now))
-  const steps = useMemo(() => dayPlan(meId, now, { work, events, items }), [meId, now, work, events, items])
+  const day = useMyDay()
+  const steps = useMemo(() => dayPlan(day, now), [day, now])
   const progress = useMemo(() => dayProgress(meId, now, tasks), [meId, now, tasks])
   const streak = useMemo(() => checkInStreak(meId, now, plans), [meId, now, plans])
   const captures = useMemo(() => lastDayCaptures(meId, now, [...tasks, ...items]), [meId, now, tasks, items])
@@ -79,6 +84,9 @@ export function DayGuide() {
   const [flight, setFlight] = useState<{ from: DOMRect; to: DOMRect } | null>(null)
   const [hint, setHint] = useState(false)
   const [focus, setFocus] = useState("")
+  /** O que o painel mostra: o dia (padrão), o ritual Fechar o dia, ou Planejar hoje. */
+  const [mode, setMode] = useState<"dia" | "fechar" | "planejar">("dia")
+  const request = useUI((s) => s.guide)
   const panelRef = useRef<HTMLDivElement>(null)
   const orbRef = useRef<HTMLSpanElement>(null)
   const launcherRef = useRef<HTMLButtonElement>(null)
@@ -96,8 +104,21 @@ export function DayGuide() {
     else setView("min")
   }, [hydrated, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // O foco planejado ontem ("Fechar o dia") já vem preenchido no check-in.
+  useEffect(() => {
+    if (mine?.focus && !mine.checkedInAt) setFocus((f) => f || mine.focus!)
+  }, [mine?.focus, mine?.checkedInAt])
+
+  // A Início pede para abrir ("Planejar meu dia" / "Fechar o dia").
+  useEffect(() => {
+    if (!request || !started.current) return
+    open()
+    setMode(request.mode === "fechar" ? "fechar" : "dia")
+  }, [request])
+
   /** `intro`: a abertura automática do dia passa pelas etapas; reabrir pela bolinha vai direto à lista. */
   function open(intro = false) {
+    setMode("dia")
     setHint(false)
     setView("open")
     setWaving(true)
@@ -172,10 +193,16 @@ export function DayGuide() {
   }
 
   function complete(step: GuideStep) {
-    if (!step.taskId) return
-    toggleTask(step.taskId)
+    const task = taskOf(step.taskId)
+    if (!task) return
+    doingActions.complete(task)
     toast.success("Feito!", { description: step.title, action: { label: "Desfazer", onClick: () => toggleTask(step.taskId!) } })
   }
+
+  const yesterday = plans.find((p) => p.id === planId(meId, new Date(+now - 864e5)))
+  const canPlanToday = !needs && !!yesterday?.checkedInAt && !yesterday.closedAt && !day.planItems.some((x) => x.task.plannedFor === today)
+  const canClose = !needs && !!mine?.checkedInAt && !mine.closedAt && now.getHours() >= 15
+  const taskOf = (id?: string) => (id ? tasks.find((t) => t.id === id) : undefined)
 
   const capturedDay = captures && (captures.day === format(new Date(+now - 864e5), "yyyy-MM-dd") ? "ontem" : format(parseISO(captures.day), "EEEE", { locale: ptBR }))
 
@@ -212,7 +239,12 @@ export function DayGuide() {
             </button>
           </header>
 
-          {stage === "body" && (
+          {stage === "body" && mode !== "dia" && (
+            <div className="animate-enter overflow-y-auto px-4 pb-4">
+              <CloseDay day={day} target={mode === "fechar" ? "amanha" : "hoje"} onDone={() => setMode("dia")} />
+            </div>
+          )}
+          {stage === "body" && mode === "dia" && (
           <div className="grid animate-enter gap-4 overflow-y-auto px-4 pb-4">
             {work.areas.length > 0 && (
               <p className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
@@ -262,10 +294,25 @@ export function DayGuide() {
               </div>
             )}
 
+            {(canPlanToday || canClose) && (
+              <div className="flex flex-wrap gap-2">
+                {canPlanToday && (
+                  <Button size="sm" variant="outline" onClick={() => setMode("planejar")}>
+                    <SunriseIcon /> Planejar hoje
+                  </Button>
+                )}
+                {canClose && (
+                  <Button size="sm" variant="outline" onClick={() => setMode("fechar")}>
+                    <MoonIcon /> Fechar o dia
+                  </Button>
+                )}
+              </div>
+            )}
+
             <section className="grid gap-2">
               <p className="font-semibold">Por onde vamos começar?</p>
               {steps.length ? (
-                <ol className="grid gap-1.5">
+                <ol className="grid grid-cols-1 gap-1.5">
                   {steps.slice(0, 6).map((s, i) => {
                     const Icon = STEP_ICON[s.kind]
                     return (
@@ -277,6 +324,7 @@ export function DayGuide() {
                             <Icon className="size-3" /> {s.hint}
                           </span>
                         </Link>
+                        {taskOf(s.taskId) && <DoingButton task={taskOf(s.taskId)!} compact />}
                         {s.taskId ? (
                           <button type="button" onClick={() => complete(s)} aria-label={`Concluir: ${s.title}`} title="Concluir" className="flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground hover:border-success hover:bg-success/10 hover:text-success">
                             <CheckIcon className="size-4" />
@@ -306,7 +354,7 @@ export function DayGuide() {
                   <LightbulbIcon className="size-4 text-highlight" />
                   O que você anotou {capturedDay} ({captures.list.length})
                 </summary>
-                <ul className="mt-2 grid gap-1.5">
+                <ul className="mt-2 grid grid-cols-1 gap-1.5">
                   {captures.list.map(({ item, became }) => (
                     <li key={item.id} className="flex items-baseline justify-between gap-2 text-sm">
                       <span className="min-w-0 truncate">{item.title}</span>

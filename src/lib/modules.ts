@@ -10,6 +10,7 @@ import type { Agent, Hypothesis, Learning } from "@/lib/domain/ai-office"
 import type { MemberRole, OrgRole } from "@/lib/domain/org"
 import type { Area } from "@/lib/domain/areas"
 import type { CalendarEvent } from "@/lib/domain/calendar"
+import type { TeamSettings } from "@/lib/domain/daily"
 import type { DailyPlan } from "@/lib/domain/presence"
 
 /**
@@ -42,6 +43,8 @@ export const useAreas = createCollection<Area & { updatedAt?: string }>("areas")
 // HZK OS (SQL 0022): agenda do time e check-in do dia (ADR 0009).
 export const useCalendarEvents = createCollection<CalendarEvent>("calendar_events")
 export const useDailyPlans = createCollection<DailyPlan>("daily_plans")
+// Configuração do time (migration 0023): um documento "time" com a reunião diária (ADR 0010).
+export const useTeamSettings = createCollection<TeamSettings>("team_settings")
 
 // Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
 export const useOrgRoles = createCollection<OrgRole>("org_roles")

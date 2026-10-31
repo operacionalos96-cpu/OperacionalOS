@@ -14,8 +14,9 @@ import { openTaskDetail } from "@/lib/ui-store"
 import { Button } from "@/components/ui/button"
 import { Segmented } from "@/components/shared/fields"
 import { DoneLine, usePersonWork } from "@/components/hzk/team-overview"
+import { PeriodOfDay } from "@/components/hzk/doing-now"
 import { PresenceBadge } from "@/components/hzk/presence-badge"
-import { EventRow } from "@/components/hzk/team-agenda"
+import { EventRow } from "@/components/hzk/event-row"
 import { NotFound, PageHeader, Panel } from "@/components/shared/layout"
 
 /**
@@ -70,6 +71,12 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
           ) : (
             <p className="t-desc p-4 text-sm">Nada na agenda hoje.</p>
           )}
+        </Panel>
+
+        <Panel title="Período do dia" description="O que marcou como &quot;fazendo&quot; hoje, por período, e quanto tempo.">
+          <div className="p-4">
+            <PeriodOfDay memberId={id} />
+          </div>
         </Panel>
 
         <Panel title="Áreas que é dono" description="Tarefas dessas áreas vão para esta pessoa.">

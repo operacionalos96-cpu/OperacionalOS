@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { endOfMonth, format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -30,6 +30,11 @@ export default function FinancePage() {
   const settings = useStore((s) => s.financeSettings)
   const now = new Date()
   const [tab, setTab] = useState<"visao" | "movimentacoes" | "pagar" | "receber">("visao")
+  // Link direto para uma aba (ex.: a Início abre /financeiro?aba=pagar).
+  useEffect(() => {
+    const aba = new URLSearchParams(window.location.search).get("aba")
+    if (aba === "movimentacoes" || aba === "pagar" || aba === "receber") setTab(aba)
+  }, [])
   const [period, setPeriod] = useState(format(now, "yyyy-MM"))
   const periodDate = parseISO(`${period}-01`)
   const asOf = useMemo(() => periodEnd(periodDate, now), [period]) // eslint-disable-line react-hooks/exhaustive-deps

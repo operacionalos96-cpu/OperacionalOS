@@ -27,6 +27,8 @@ export interface CalendarEvent {
   participantIds: string[]
   location?: string
   notes?: string
+  /** Sessão por tipo: bloco de foco de uma área ("Sessão comercial 9–11"). */
+  areaId?: string
   createdBy: string
   createdAt: string
   updatedAt?: string

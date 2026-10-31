@@ -48,6 +48,18 @@ export const GLOSSARY = {
     term: "Check-in",
     meaning: "Um botão no guia do dia, com o foco de hoje se quiser. Assim o time sabe que você está trabalhando, mesmo com o app fechado, até você fechar o dia.",
   },
+  "fazendo-agora": {
+    term: "Fazendo agora",
+    meaning: "O ▶ numa tarefa avisa o time do que você está fazendo. Pausar ou concluir encerra. Na página de cada pessoa, o Período do dia mostra o que ela fez de manhã, à tarde e à noite.",
+  },
+  daily: {
+    term: "Reunião diária",
+    meaning: "Quando todos fizerem o check-in, o botão \"Estou pronto\" libera. Com todos prontos, aparece \"Entrar na reunião\" com o link combinado em Configurações.",
+  },
+  sessao: {
+    term: "Sessão",
+    meaning: "Um bloco de foco na agenda com uma área (ex.: sessão comercial das 9h às 11h). Durante a sessão, as tarefas dessa área sobem no seu Plano do dia.",
+  },
   "guia-do-dia": {
     term: "Guia do dia",
     meaning: "A bolinha com a marca HZK no canto da tela. Ao abrir o app no dia, ela mostra o check-in e por onde começar: atrasadas, decisões, reuniões e tarefas de hoje, e o que virou o que você anotou ontem.",
