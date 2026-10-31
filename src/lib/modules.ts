@@ -9,6 +9,8 @@ import type { Goal } from "@/lib/domain/insights"
 import type { Agent, Hypothesis, Learning } from "@/lib/domain/ai-office"
 import type { MemberRole, OrgRole } from "@/lib/domain/org"
 import type { Area } from "@/lib/domain/areas"
+import type { CalendarEvent } from "@/lib/domain/calendar"
+import type { DailyPlan } from "@/lib/domain/presence"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -36,6 +38,10 @@ export const useHypotheses = createCollection<Hypothesis>("hypotheses")
 
 // HZK OS (SQL 0021): áreas da empresa, cada uma com dono (src/lib/domain/areas.ts).
 export const useAreas = createCollection<Area & { updatedAt?: string }>("areas")
+
+// HZK OS (SQL 0022): agenda do time e check-in do dia (ADR 0009).
+export const useCalendarEvents = createCollection<CalendarEvent>("calendar_events")
+export const useDailyPlans = createCollection<DailyPlan>("daily_plans")
 
 // Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
 export const useOrgRoles = createCollection<OrgRole>("org_roles")

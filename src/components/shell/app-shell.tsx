@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import {
   CheckSquareIcon,
-  DatabaseIcon,
+  ChevronDownIcon,
   InboxIcon,
   LogOutIcon,
   MenuIcon,
@@ -35,6 +35,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -48,6 +49,9 @@ import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/le
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { QuickCapture } from "@/components/hzk/quick-capture"
+import { DayGuide } from "@/components/hzk/day-guide"
+import { PresenceDot } from "@/components/hzk/presence-badge"
+import { startPresence } from "@/lib/presence"
 import { startAutomations } from "@/lib/automations"
 import { startEventFeed } from "@/lib/event-service"
 import { NAV, NAV_SECTIONS, isActive } from "./nav"
@@ -76,6 +80,8 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
     if (!hydrated) return
     startAutomations((href) => router.push(href))
     startEventFeed()
+    // Presença do time (ADR 0009): avisa "estou com o app aberto" enquanto a aba estiver aberta.
+    startPresence(useStore.getState().meId)
   }, [hydrated, router])
 
   useGlobalShortcuts()
@@ -106,6 +112,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         <>
           <CommandPalette />
           <QuickCapture />
+          <DayGuide />
           <LeadFormDialog />
           <TaskFormDialog />
           <TransactionFormDialog />
@@ -156,7 +163,7 @@ function Sidebar() {
   return (
     // Pílula escura flutuante, só ícones; o nome aparece no balão ao passar o mouse.
     <aside className="hidden shrink-0 p-3 pr-0 md:flex">
-      <div className="flex w-16 flex-col items-center gap-3 rounded-[28px] bg-sidebar py-4 text-sidebar-foreground shadow-lift">
+      <div className="flex w-16 flex-col items-center gap-2.5 rounded-[28px] bg-sidebar py-3.5 text-sidebar-foreground shadow-lift">
         {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
         <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 rounded-full ring-2 ring-sidebar-border" />
 
@@ -167,11 +174,12 @@ function Sidebar() {
           </RailButton>
         </div>
 
-        {/* w-full: a rolagem corta o que sai da largura; o marcador laranja fica na borda da pílula. */}
-        <nav className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none]">
+        {/* w-full: a rolagem corta o que sai da largura; o marcador laranja fica na borda da pílula.
+            Em tela baixa, ScrollHint mostra que há mais itens embaixo (antes ficavam escondidos sem aviso). */}
+        <ScrollHint>
           {NAV_SECTIONS.map((section, si) => (
             <div key={si} className="flex flex-col items-center gap-1">
-              {si > 0 && <span className="my-1.5 h-px w-6 bg-sidebar-border" aria-hidden />}
+              {si > 0 && <span className="my-1 h-px w-6 bg-sidebar-border" aria-hidden />}
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href)
                 const badge = hydrated ? badges[item.href] : 0
@@ -183,7 +191,7 @@ function Sidebar() {
                         aria-label={item.label}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "group/nav relative flex size-10 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                          "group/nav relative flex size-9 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                           active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
                         )}
                       >
@@ -210,78 +218,11 @@ function Sidebar() {
               })}
             </div>
           ))}
-        </nav>
+        </ScrollHint>
 
-        <div className="flex flex-col items-center gap-1.5">
-          <DataMenu />
-          <ThemeSwitcher />
-          <AccountCard />
-        </div>
+        <AccountMenu />
       </div>
     </aside>
-  )
-}
-
-/** Discreto de propósito: usado uma vez, para levar dados antigos deste navegador para o banco. */
-function DataMenu() {
-  const [counts, setCounts] = useState<ReturnType<typeof localSnapshotCounts>>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function run() {
-    setBusy(true)
-    try {
-      const n = await importLocalData()
-      toast.success(`${n} itens importados`, { description: "Já estão no banco e aparecem para os dois." })
-      setCounts(null)
-      setTimeout(() => window.location.reload(), 800)
-    } catch {
-      toast.error("Não foi possível importar. Nada foi apagado; tente de novo.")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button aria-label="Dados" title="Dados" className={RAIL_BUTTON}>
-            <DatabaseIcon className="size-[18px]" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="right" className="w-72">
-          <DropdownMenuItem
-            onSelect={() => {
-              const c = localSnapshotCounts()
-              if (!c) toast("Não há dados antigos neste navegador.")
-              else setCounts(c)
-            }}
-          >
-            <UploadIcon /> Importar dados antigos deste navegador
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Dialog open={counts !== null} onOpenChange={(o) => !o && setCounts(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Importar para o banco?</DialogTitle>
-            <DialogDescription>
-              Encontrei neste navegador: {counts?.leads} leads, {counts?.tasks} tarefas, {counts?.transactions} lançamentos,{" "}
-              {counts?.notes} notas e {counts?.mindMaps} mapas. Se for só o exemplo que veio com o app, não importe.
-              Itens com o mesmo ID são atualizados; nada é apagado.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setCounts(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={run} disabled={busy}>
-              {busy ? "Importando…" : "Importar"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
   )
 }
 
@@ -320,38 +261,6 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** Quem está logado (vem do banco, não dá para trocar) + sair. */
-function AccountCard() {
-  const meId = useStore((s) => s.meId)
-  const meEmail = useStore((s) => s.meEmail)
-  const signOut = useStore((s) => s.signOut)
-  const hydrated = useStore((s) => s.hydrated)
-  const me = getUser(meId)
-  // Antes do login carregar, meId ainda é o valor padrão: mostrar um nome agora seria mentira.
-  if (!hydrated) return <Skeleton className="size-10 rounded-full bg-sidebar-accent" aria-label="Carregando conta" />
-  return (
-    <>
-      <RailButton label="Sair" onClick={() => signOut()}>
-        <LogOutIcon className="size-[18px]" />
-      </RailButton>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            tabIndex={0}
-            className="mt-1 flex size-9 items-center justify-center rounded-full text-xs font-semibold text-white ring-2 ring-sidebar-border"
-            style={{ backgroundColor: me.color }}
-          >
-            {me.initials}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={10}>
-          {me.name} · {meEmail}
-        </TooltipContent>
-      </Tooltip>
-    </>
-  )
-}
-
 const RAIL_BUTTON =
   "flex size-10 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground"
 
@@ -371,32 +280,137 @@ function RailButton({ label, onClick, children }: { label: string; onClick: () =
   )
 }
 
-/** Claro / escuro / automático (segue o sistema). */
-function ThemeSwitcher() {
+/**
+ * Menu da conta (avatar): quem está logado, tema, importar dados antigos e sair — num botão só,
+ * para sobrar espaço na barra e todas as áreas caberem na tela.
+ */
+function AccountMenu() {
+  const meId = useStore((s) => s.meId)
+  const meEmail = useStore((s) => s.meEmail)
+  const signOut = useStore((s) => s.signOut)
+  const hydrated = useStore((s) => s.hydrated)
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  const options = [
-    { id: "light", icon: SunIcon, label: "Claro" },
-    { id: "dark", icon: MoonIcon, label: "Escuro" },
-    { id: "system", icon: MonitorIcon, label: "Automático" },
+  const [counts, setCounts] = useState<ReturnType<typeof localSnapshotCounts>>(null)
+  const [busy, setBusy] = useState(false)
+  const me = getUser(meId)
+
+  async function runImport() {
+    setBusy(true)
+    try {
+      const n = await importLocalData()
+      toast.success(`${n} itens importados`, { description: "Já estão no banco e aparecem para todos." })
+      setCounts(null)
+      setTimeout(() => window.location.reload(), 800)
+    } catch {
+      toast.error("Não foi possível importar. Nada foi apagado; tente de novo.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Antes do login carregar, meId ainda é o valor padrão: mostrar um nome agora seria mentira.
+  if (!hydrated) return <Skeleton className="size-10 rounded-full bg-sidebar-accent" aria-label="Carregando conta" />
+  const themes = [
+    { id: "light", icon: SunIcon, label: "claro" },
+    { id: "dark", icon: MoonIcon, label: "escuro" },
+    { id: "system", icon: MonitorIcon, label: "automático" },
   ] as const
-  const current = options.find((o) => mounted && o.id === theme) ?? options[0]
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button aria-label={`Tema: ${current.label}`} title={`Tema: ${current.label}`} className={RAIL_BUTTON}>
-          <current.icon className="size-[18px]" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="right" className="w-40">
-        {options.map((o) => (
-          <DropdownMenuItem key={o.id} onSelect={() => setTheme(o.id)} className={cn(theme === o.id && "font-semibold")}>
-            <o.icon /> {o.label}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label={`Conta de ${me.name}: tema, dados e sair`}
+            className="relative flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ring-2 ring-sidebar-border transition-transform hover:scale-105"
+            style={{ backgroundColor: me.color }}
+          >
+            {me.initials}
+            <PresenceDot memberId={meId} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="right" className="w-64">
+          <div className="px-2 py-1.5">
+            <p className="text-sm font-semibold">{me.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{meEmail}</p>
+          </div>
+          <DropdownMenuSeparator />
+          {themes.map((o) => (
+            <DropdownMenuItem key={o.id} onSelect={() => setTheme(o.id)} className={cn(theme === o.id && "font-semibold")}>
+              <o.icon /> Tema {o.label}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              const c = localSnapshotCounts()
+              if (!c) toast("Não há dados antigos neste navegador.")
+              else setCounts(c)
+            }}
+          >
+            <UploadIcon /> Importar dados antigos deste navegador
           </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem onSelect={() => signOut()}>
+            <LogOutIcon /> Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={counts !== null} onOpenChange={(o) => !o && setCounts(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Importar para o banco?</DialogTitle>
+            <DialogDescription>
+              Encontrei neste navegador: {counts?.leads} leads, {counts?.tasks} tarefas, {counts?.transactions} lançamentos,{" "}
+              {counts?.notes} notas e {counts?.mindMaps} mapas. Se for só o exemplo que veio com o app, não importe.
+              Itens com o mesmo ID são atualizados; nada é apagado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCounts(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={runImport} disabled={busy}>
+              {busy ? "Importando…" : "Importar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+/** Lista que rola com um sinal visível quando há mais itens embaixo (degradê + seta). */
+function ScrollHint({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLElement>(null)
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const check = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4)
+    check()
+    el.addEventListener("scroll", check, { passive: true })
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("scroll", check)
+      ro.disconnect()
+    }
+  }, [])
+  return (
+    <div className="relative flex min-h-0 w-full flex-1 flex-col">
+      <nav ref={ref} className="flex min-h-0 w-full flex-1 flex-col items-center gap-0.5 overflow-y-auto [scrollbar-width:none]">
+        {children}
+      </nav>
+      {more && (
+        <button
+          type="button"
+          onClick={() => ref.current?.scrollBy({ top: 160, behavior: "smooth" })}
+          aria-label="Mais áreas abaixo"
+          className="absolute inset-x-0 bottom-0 flex h-10 items-end justify-center bg-gradient-to-t from-sidebar to-transparent pb-1 text-sidebar-foreground/70"
+        >
+          <ChevronDownIcon className="size-4 animate-bounce" />
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -72,6 +72,20 @@ export const PAGES = [
     terms: ["caixa-de-entrada", "area"],
   },
   {
+    href: "/equipe",
+    title: "Equipe",
+    icon: UsersIcon,
+    section: null,
+    purpose: "Quem faz parte da equipe, onde cada um está agora, do que é responsável e o que fez.",
+    howTo: [
+      "Em Responsabilidades, veja o status de cada um (online, em reunião…), as áreas e o que fez.",
+      "Em Agenda e reuniões, agende uma reunião: o app avisa se alguém já está ocupado.",
+      "Faça o check-in no guia do dia (a bolinha no canto): o time vê que você está no expediente.",
+      "Clique em \"Ver tudo\" para abrir a página da pessoa com a agenda e a lista completa.",
+    ],
+    terms: ["status", "check-in", "guia-do-dia", "nivel-acesso"],
+  },
+  {
     href: "/prospeccao",
     title: "Prospecção",
     icon: RadarIcon,
@@ -216,20 +230,6 @@ export const PAGES = [
       "Quem decide escolhe uma opção, recusa ou pede mais contexto, direto no card.",
     ],
     terms: ["decisao", "porta"],
-  },
-  {
-    href: "/equipe",
-    title: "Equipe",
-    icon: UsersIcon,
-    section: "Gestão",
-    purpose: "Quem faz parte da equipe, do que cada um é responsável e o que cada um fez.",
-    howTo: [
-      "Em Responsabilidades, veja as áreas, o que está em andamento e o que cada um fez no período.",
-      "Clique em \"Ver tudo\" para abrir a página da pessoa com a lista completa.",
-      "Convide uma pessoa pelo e-mail e escolha o nível de acesso dela.",
-      "Dê um cargo e defina a quem cada pessoa responde.",
-    ],
-    terms: ["nivel-acesso"],
   },
   {
     href: "/configuracoes",

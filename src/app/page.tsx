@@ -48,6 +48,7 @@ import { GoalBar } from "@/components/dashboard/goal-bar"
 import { GoalEditor } from "@/components/finance/goal-editor"
 import { BalanceChart, Sparkline } from "@/components/finance/charts"
 import { PriorityFlag } from "@/components/tasks/task-bits"
+import { helloFor } from "@/lib/domain/day-guide"
 import { GoalsPanel, TeamFeedPanel } from "@/components/dashboard/team-panels"
 
 export default function DashboardPage() {
@@ -69,8 +70,7 @@ export default function DashboardPage() {
     }
   }, [leads, tasks, transactions, financeSettings, meId])
 
-  const hour = now.getHours()
-  const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite"
+  const greeting = helloFor(now)
   const urgentCount = data.attention.total
 
   return (
