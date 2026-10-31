@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   BriefcaseIcon,
   CalendarDaysIcon,
+  CalendarRangeIcon,
   ClipboardListIcon,
   CrownIcon,
   GitForkIcon,
@@ -24,9 +25,10 @@ import { InviteMemberDialog } from "@/components/org/invite-member-dialog"
 import { OrgTreeView } from "@/components/org/org-tree-view"
 import { TeamOverview } from "@/components/hzk/team-overview"
 import { TeamFeedPanel } from "@/components/dashboard/team-panels"
+import { TeamWeek } from "@/components/hzk/team-week"
 import type { OrgRole } from "@/lib/domain/org"
 
-type TabType = "responsabilidades" | "membros" | "cargos" | "hierarquia"
+type TabType = "responsabilidades" | "semana" | "membros" | "cargos" | "hierarquia"
 
 export default function EquipePage() {
   const { canAdmin } = useAccess()
@@ -42,7 +44,7 @@ export default function EquipePage() {
     const aba = new URLSearchParams(window.location.search).get("aba")
     // A agenda agora é a página Agenda (calendário do time).
     if (aba === "agenda") router.replace("/agenda")
-    else if (aba === "membros" || aba === "cargos" || aba === "hierarquia") setActiveTab(aba)
+    else if (aba === "semana" || aba === "membros" || aba === "cargos" || aba === "hierarquia") setActiveTab(aba)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [creatingRole, setCreatingRole] = useState(false)
   const [roleToEdit, setRoleToEdit] = useState<OrgRole | undefined>()
@@ -127,6 +129,19 @@ export default function EquipePage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("semana")}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              activeTab === "semana"
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <CalendarRangeIcon className="h-3.5 w-3.5" />
+            Semana do time
+          </button>
+
+          <button
+            type="button"
             onClick={() => router.push("/agenda")}
             className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted"
           >
@@ -182,6 +197,9 @@ export default function EquipePage() {
             <TeamFeedPanel />
           </div>
         )}
+
+        {/* Semana do time (ADR 0011): foco de segunda, retrospectiva de sexta e o que cada um fez. */}
+        {activeTab === "semana" && <TeamWeek />}
 
         {/* Aba 1: Membros */}
         {activeTab === "membros" && (

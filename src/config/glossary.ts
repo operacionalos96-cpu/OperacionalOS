@@ -52,6 +52,10 @@ export const GLOSSARY = {
     term: "Fazendo agora",
     meaning: "O ▶ numa tarefa avisa o time do que você está fazendo. Pausar ou concluir encerra. Na página de cada pessoa, o Período do dia mostra o que ela fez de manhã, à tarde e à noite.",
   },
+  "check-in-semanal": {
+    term: "Check-in semanal",
+    meaning: "Na segunda, o foco da semana (até 3 itens). Na sexta, o que saiu, o que travou e o que precisa de alguém. As respostas de todos ficam juntas na Semana do time.",
+  },
   daily: {
     term: "Reunião diária",
     meaning: "Quando todos fizerem o check-in, o botão \"Estou pronto\" libera. Com todos prontos, aparece \"Entrar na reunião\" com o link combinado em Configurações.",
