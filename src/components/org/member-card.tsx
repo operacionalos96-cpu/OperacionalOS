@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { ShieldIcon, UserCheckIcon, ArrowUpRightIcon } from "lucide-react"
 import { getUser } from "@/config/team"
@@ -49,7 +50,10 @@ export function MemberCard({
             </div>
             <div>
               <h3 className="font-semibold text-foreground leading-tight">
-                {member.displayName || userMeta.name}
+                {/* HZK OS: a página da pessoa mostra áreas, tarefas e decisões dela. */}
+                <Link href={`/equipe/${member.teamId}`} className="hover:underline">
+                  {member.displayName || userMeta.name}
+                </Link>
               </h3>
               <p className="text-xs text-muted-foreground">{member.email}</p>
             </div>

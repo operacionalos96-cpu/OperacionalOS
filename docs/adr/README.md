@@ -25,3 +25,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0005](0005-autorizacao-no-banco.md) | Autorização por cargo aplicada no banco | Aceito |
 | [0006](0006-automacoes-no-servidor.md) | Fatos de negócio no servidor: Outbox + consumidor idempotente | Aceito |
 | [0007](0007-frontend-modular.md) | Frontend guiado, uma fonte só para cada informação, rumo a apps independentes | Aceito |
+| [0008](0008-item-unico.md) | Item único do HZK OS guardado na tabela de tarefas | Aceito |

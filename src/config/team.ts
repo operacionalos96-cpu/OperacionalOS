@@ -67,6 +67,8 @@ export function syncTeamMembers(members: MemberLike[]) {
   TEAM.splice(0, TEAM.length, ...teamFrom(members))
 }
 
-export function getUser(id: string): User {
+export function getUser(id: string | undefined | null): User {
+  // Item sem dono (caixa de entrada) chega aqui sem id: mostra "Ninguém" em vez de quebrar a tela.
+  if (!id) return { id: "", name: "Ninguém", initials: "?", color: "#94a3b8" }
   return everyone.get(id) ?? { id, name: id, initials: id.slice(0, 2).toUpperCase(), color: colorFor(id) }
 }

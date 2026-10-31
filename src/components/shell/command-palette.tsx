@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckSquareIcon, UserPlusIcon, WalletIcon } from "lucide-react"
+import { CheckSquareIcon, InboxIcon, UserPlusIcon, WalletIcon } from "lucide-react"
 import { ENTITY_ICON, openEntity, useEntitySnapshot } from "@/lib/entities/registry"
 import { ENTITY_LABEL, searchableEntities } from "@/lib/entities/summary"
 import { refKey, type EntityType } from "@/lib/entities/types"
-import { openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
+import { ITEM_KINDS } from "@/lib/domain/items"
+import { openCapture, openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
+import { KIND_ICON } from "@/components/hzk/item-bits"
 import {
   Command,
   CommandDialog,
@@ -29,6 +31,7 @@ export function CommandPalette() {
     return [...byType.entries()]
   }, [snap])
   const router = useRouter()
+  const [query, setQuery] = useState("")
 
   function run(fn: () => void) {
     setUI({ paletteOpen: false })
@@ -45,10 +48,26 @@ export function CommandPalette() {
     >
       {/* O cmdk exige o <Command> em volta: sem ele a busca quebra ao abrir. */}
       <Command className="rounded-none! bg-transparent p-0">
-      <CommandInput placeholder="Buscar lead, produto, conteúdo, nota ou ação…" />
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Buscar ou capturar: escreva e escolha o que fazer…" />
       <CommandList className="max-h-96">
-        <CommandEmpty>Nada encontrado.</CommandEmpty>
+        <CommandEmpty>Nada encontrado na busca.</CommandEmpty>
+        {/* Captura rápida (HZK OS): o que foi digitado vira item na caixa de entrada, em 2 segundos. */}
+        {query.trim().length > 1 && (
+          <CommandGroup forceMount heading="Capturar na caixa de entrada">
+            {ITEM_KINDS.map((k) => {
+              const Icon = KIND_ICON[k.id]
+              return (
+                <CommandItem key={k.id} forceMount value={`capturar ${k.label} ${query}`} onSelect={() => run(() => openCapture({ kind: k.id, title: query.trim() }))}>
+                  <Icon /> {k.label}: <span className="truncate font-medium">{query.trim()}</span>
+                </CommandItem>
+              )
+            })}
+          </CommandGroup>
+        )}
         <CommandGroup heading="Criar">
+          <CommandItem onSelect={() => run(() => openCapture())}>
+            <InboxIcon /> Captura rápida (tarefa, ideia, nota ou decisão)
+          </CommandItem>
           <CommandItem onSelect={() => run(() => openLeadForm())}>
             <UserPlusIcon /> Novo lead
           </CommandItem>

@@ -1,5 +1,4 @@
 import { addDays, setHours, startOfMonth, subMonths } from "date-fns"
-import { TEAM } from "@/config/team"
 import { toDateKey } from "@/lib/format"
 import { monthKey } from "@/lib/domain/rules"
 import { templateMap } from "@/lib/mindmap-templates"
@@ -10,7 +9,10 @@ import type { Activity, FinanceSettings, Lead, MindMap, Note, Stage, Task, Tempe
  * Todas as datas são relativas a `now`, então a demo sempre parece atual.
  */
 export function createSeed(now: Date) {
-  const [a, b] = TEAM.map((u) => u.id)
+  // Ids fixos dos fundadores: o exemplo não pode depender de quem já carregou do banco
+  // (no modo demo só existe um membro e metade das tarefas ficaria sem dono).
+  const a = "u1"
+  const b = "u2"
   const day = (offset: number) => toDateKey(addDays(now, offset))
   const at = (offset: number, hour = 10) => setHours(addDays(now, offset), hour).toISOString()
 

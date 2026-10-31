@@ -63,7 +63,7 @@ colunas reais só quando precisam de consulta no banco (ex.: notificações por 
 
 | Blueprint | Já existe | Decisão |
 |---|---|---|
-| `profiles` (nome, cargo, avatar, horas/dia) | `members` (nome, avatar, nível de acesso) + `org_roles`/`member_roles` (cargos: Founder, CEO, CFO…) | **Reaproveitar.** O cargo do blueprint (CEO/founder/time) = cargo em `member_roles`; a permissão continua em `role_level`. Só acrescentar `horas_disponiveis_dia` em `members`. Não criar `profiles`: seria uma segunda fonte de pessoas, que o ADR 0007 acabou de eliminar. |
+| `profiles` (nome, cargo, avatar, horas/dia) | `members` (nome, avatar, nível de acesso) + `org_roles`/`member_roles` (cargos: Founder, CEO, CFO…) | **Reaproveitar.** O cargo do blueprint (CEO/founder/time) = cargo em `member_roles`; a permissão continua em `role_level`. Horas por dia: **não entra** (sem aviso de sobrecarga, decisão de 31/10). Não criar `profiles`: seria uma segunda fonte de pessoas, que o ADR 0007 acabou de eliminar. |
 | `areas` | — | **Novo** (coleção `areas`: dono, apoio, aprovador). Tela em Configurações › Áreas. |
 | `items` (task/idea/decision/note) | tabela `tasks` (com recorrência, checklist, responsáveis, projeto, ligações) | **Estender `tasks` para ser o item único.** Ganha `kind` (task, idea, decision, note), `areaId`, `plannedFor`, `estimateMin`, `order`, `origin` e `status: inbox`. Tarefas antigas são `kind: task` e continuam válidas sem migrar dados. Ligações já existentes (metas, mapas, relações, automação "Virou cliente") seguem funcionando, porque o id e o tipo de entidade não mudam. |
 | `decisions` | — | **Extensão do item** (`kind: decision` + campo `decision` no jsonb: contexto, opções, recomendação, decisor, porta, resultado, motivo, data). Mesmo padrão 1-para-1 do blueprint, sem tabela paralela. |
@@ -94,8 +94,8 @@ por teste. Cada fase:
 
 | Fase | Migrations | Rotas e telas | Peças principais | Riscos |
 |---|---|---|---|---|
-| **1. Fundação** | 0021: `areas`; `horas_disponiveis_dia` em `members`; `notifications` (RLS por usuário) | `/configuracoes/areas`, `/caixa-de-entrada`, `/decisoes`, `/equipe/[id]` | `kind` e campos novos em `Task` (domínio); roteamento área → dono; regra de decisão (porta + limite R$ + cargo CEO) como função pura; captura rápida; triagem com selo de 48 h | `store.ts` e `types.ts` são compartilhados com o outro dev: combinar antes; mudanças só aditivas (campos opcionais). |
-| **2. Início Meu Dia + rituais** | 0022: `daily_plans`, `checkins` | `/` refeita nos 8 blocos; `/semana` (Semana do time); rituais em painel guiado | `myDay()` (um bloco por item, testado); soma de horas e aviso de sobrecarga; selos; Decisões pendentes para o decisor | Mudança grande de hábito: manter tudo visível e validar com vocês no modo demo antes de publicar. |
+| **1. Fundação** | 0021: `areas`; `notifications` (RLS por usuário) | `/configuracoes/areas`, `/caixa-de-entrada`, `/decisoes`, `/equipe/[id]` | `kind` e campos novos em `Task` (domínio); roteamento área → dono; regra de decisão (porta + limite R$ + cargo CEO) como função pura; captura rápida; triagem com selo de 48 h | `store.ts` e `types.ts` são compartilhados com o outro dev: combinar antes; mudanças só aditivas (campos opcionais). |
+| **2. Início Meu Dia + rituais** | 0022: `daily_plans`, `checkins` | `/` refeita nos 8 blocos; `/semana` (Semana do time); rituais em painel guiado | `myDay()` (um bloco por item, testado); selos; Decisões pendentes para o decisor | Mudança grande de hábito: manter tudo visível e validar com vocês no modo demo antes de publicar. |
 | **3. Agenda interna** (Google depois) | 0023: `calendar_events` (dono, início, fim, tipo: compromisso, foco, reunião; agenda pessoal ou "Conteúdo HZK") | Agenda na Início; tela de agenda da pessoa | Eventos salvos no Supabase; "Time agora" calculado dos eventos (em reunião / compromisso / foco = no PC) e do último acesso; `syncPostToCalendar(post)` grava o evento do post na agenda interna "Conteúdo HZK" | O status "no PC / offline" depende de cada um manter a agenda. Quando entrar o Google, ele alimenta a mesma tabela (a tela não muda). |
 | **4. Ideias & Docs** | 0024: `approvals`, `doc_versions`, `brainstorms` (+ ideias e votos); campos de doc em `notes`; âncora em comentários | `/ideias` (mural, brainstorming, pitches), `/docs/[id]` | Aprovação com vários aprovadores; versões; menções → `notifications`; "IA, sugira 10 ângulos" vira um job na fila, feito pelo Claude local (sem API paga) | Comentário ancorado no Tiptap (marca no trecho) é a parte técnica mais delicada. A sugestão da IA chega quando o computador com o Claude local estiver ligado. |
 | **5. Conteúdo** | 0025: campos novos em `content_items`/posts, métricas por marco | Conteúdos com sub-abas Radar, Pautas, Calendário, Desempenho | Kanban pelo fluxo do blueprint; calendário com arrastar; D+1/D+7; painel por pilar e formato | Mapear as etapas atuais para o fluxo novo sem perder pautas (pergunta 3). |
@@ -120,7 +120,7 @@ A Fase 4 pode andar em paralelo com a 2 e a 3.
 | Quem faz as fases | Claude faz todas, em PRs; o programador revisa. | Mudanças em `store.ts` e `types.ts` só aditivas, com aviso no PR. |
 | Etapas de conteúdo | Usar o fluxo do blueprint. | Ideia → Roteiro → Em aprovação → Produção → Agendado → Publicado → Medido; pautas atuais convertidas pelo mapeamento acima, sem perda. |
 | IA | Claude local (assinatura), sem gastar com API. | Radar e brainstorming viram **jobs na fila** que o Claude local já consome (mesmo caminho do `analyze_for_video`). Nenhuma chave de API nova. |
-| Horas por dia | Cada pessoa define a sua. | Campo na página da pessoa; começa em 6 h. |
+| Horas por dia / sobrecarga | Tirar o aviso de sobrecarga (31/10). | Sem horas por dia e sem aviso de sobrecarga no Plano do dia. A estimativa de tempo de cada item continua opcional, só como informação. |
 | Google Calendar | Por enquanto, só uma agenda salva no Supabase; integrar o Google depois. | Fase 3 vira **Agenda interna** (`calendar_events`). A integração com o Google fica para depois e só alimenta a mesma tabela. |
 
 Ainda falta, mas só para as Fases 5 e 6: **pilares e formatos** de conteúdo usados de verdade e as
@@ -139,7 +139,7 @@ Ainda falta, mas só para as Fases 5 e 6: **pilares e formatos** de conteúdo us
    - Publicado → Publicado
    - (novo) → Medido
 4. **IA:** usar a API do Claude (precisa de uma chave paga da Anthropic na Vercel) ou o Gemini, que já está configurado? O código fica pronto para os dois; a pergunta é qual ligar.
-5. **Horas disponíveis por dia** de cada pessoa (base do aviso de sobrecarga).
+5. **Horas disponíveis por dia** de cada pessoa (base do aviso de sobrecarga). *Respondido: tirar o aviso de sobrecarga.*
 6. **Conteúdo:** pilares e formatos usados de verdade, e as fontes de notícia que já acompanham (sites, newsletters, perfis).
 7. **Google Cloud:** reaproveitar o projeto e o app OAuth que já existe (usado no YouTube) ou criar um só para a agenda?
 8. **Divisão com o programador:** quem faz cada fase? A Fase 1 mexe em `store.ts` e `types.ts`, que ele também edita.

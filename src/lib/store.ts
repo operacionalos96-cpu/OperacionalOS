@@ -4,6 +4,7 @@ import { create } from "zustand"
 import { toast } from "sonner"
 import { TEAM, syncTeamMembers } from "@/config/team"
 import { isOpenStage, stageLabel } from "@/lib/domain/constants"
+import { isWorkTask } from "@/lib/domain/items"
 import { isRealizedTransaction, nextOccurrence, planSettlement } from "@/lib/domain/rules"
 import type { OrgMember, RoleLevel } from "@/lib/domain/org"
 import type {
@@ -72,6 +73,11 @@ export interface NewTaskInput {
   collaborators?: string[]
   seriesId?: string
   projectName?: string
+  /** HZK OS (src/lib/domain/items.ts): área, estimativa e quem criou. */
+  areaId?: string
+  estimateMin?: number
+  plannedFor?: string
+  createdById?: string
 }
 
 export type NewTransactionInput = Omit<Transaction, "id" | "createdById">
@@ -89,7 +95,13 @@ interface State {
   orgMembers: OrgMember[]
   leads: Lead[]
   activities: Activity[]
+  /** Tarefas de trabalho já triadas (o que as telas de tarefas, a Início e as metas usam). */
   tasks: Task[]
+  /**
+   * Demais itens da mesma tabela (HZK OS): caixa de entrada, ideias, decisões, notas rápidas e
+   * arquivados. Separados para que nenhuma tela de tarefas mude de comportamento.
+   */
+  items: Task[]
   notes: Note[]
   transactions: Transaction[]
   mindMaps: MindMap[]
@@ -114,6 +126,11 @@ interface State {
   deleteTask(id: string): void
   restoreTask(task: Task): void
 
+  /** Captura rápida e itens de qualquer tipo (ideia, decisão, nota). */
+  createItem(item: Task): Task
+  /** Atualiza qualquer item; se mudar de tipo (triagem), ele troca de lista sozinho. */
+  updateItem(id: string, patch: Partial<Omit<Task, "id">>): void
+
   createNote(): Note
   updateNote(id: string, patch: Partial<Pick<Note, "title" | "body" | "taskId" | "taskIds" | "projectName">>): void
   deleteNote(id: string): void
@@ -127,6 +144,8 @@ interface State {
   restoreTransaction(tx: Transaction): void
   setMonthlyGoal(monthKey: string, cents: number): void
   setOpeningBalance(cents: number): void
+  /** HZK OS: gasto acima deste valor vai para a CEO (null = sem limite definido). */
+  setCeoLimit(cents: number | null): void
 
   createMap(template: TemplateId | BoardTemplateId): MindMap
   /** Mapa novo a partir de elementos prontos (importar arquivo, duplicar). Ids dos elementos são mantidos. */
@@ -168,7 +187,7 @@ export const useStore = create<State>((set, get) => {
 
   const saveTask = (task: Task) => {
     task = { ...task, projectName: canon(task.projectName) }
-    set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) }))
+    set((s) => placeItem(s, task))
     persist(repos().tasks.upsert(task))
   }
 
@@ -182,6 +201,7 @@ export const useStore = create<State>((set, get) => {
     leads: [],
     activities: [],
     tasks: [],
+    items: [],
     notes: [],
     transactions: [],
     mindMaps: [],
@@ -288,7 +308,8 @@ export const useStore = create<State>((set, get) => {
           orgMembers,
           leads,
           activities,
-          tasks,
+          tasks: tasks.filter(isWorkTask),
+          items: tasks.filter((t) => !isWorkTask(t)),
           notes,
           transactions,
           mindMaps,
@@ -423,6 +444,10 @@ export const useStore = create<State>((set, get) => {
         recurrence: input.recurrence,
         seriesId: input.seriesId,
         projectName: canon(input.projectName),
+        areaId: input.areaId,
+        estimateMin: input.estimateMin,
+        plannedFor: input.plannedFor,
+        createdById: input.createdById,
         collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
       }
       set((s) => ({ tasks: [...s.tasks, task] }))
@@ -454,8 +479,19 @@ export const useStore = create<State>((set, get) => {
     },
 
     deleteTask(id) {
-      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id), items: s.items.filter((t) => t.id !== id) }))
       persist(repos().tasks.remove(id))
+    },
+
+    createItem(item) {
+      set((s) => placeItem(s, item))
+      persist(repos().tasks.upsert(item))
+      return item
+    },
+
+    updateItem(id, patch) {
+      const item = get().items.find((t) => t.id === id) ?? get().tasks.find((t) => t.id === id)
+      if (item) saveTask({ ...item, ...patch })
     },
 
     restoreTask(task) {
@@ -555,6 +591,12 @@ export const useStore = create<State>((set, get) => {
       persist(repos().financeSettings.save(financeSettings))
     },
 
+    setCeoLimit(cents) {
+      const financeSettings = { ...get().financeSettings, ceoApprovalLimitCents: cents }
+      set({ financeSettings })
+      persist(repos().financeSettings.save(financeSettings))
+    },
+
     // ---------- mapas ----------
 
     createMap(template) {
@@ -598,6 +640,18 @@ export const useStore = create<State>((set, get) => {
   }
 })
 
+// ---------- item único (HZK OS) ----------
+
+/**
+ * Coloca o item na lista certa: tarefa de trabalho em `tasks`, o resto em `items`
+ * (src/lib/domain/items.ts › isWorkTask). Se mudou de tipo na triagem, sai da outra lista.
+ */
+function placeItem(s: Pick<State, "tasks" | "items">, item: Task): Pick<State, "tasks" | "items"> {
+  const without = (list: Task[]) => list.filter((t) => t.id !== item.id)
+  const upsert = (list: Task[]) => (list.some((t) => t.id === item.id) ? list.map((t) => (t.id === item.id ? item : t)) : [...list, item])
+  return isWorkTask(item) ? { tasks: upsert(s.tasks), items: without(s.items) } : { tasks: without(s.tasks), items: upsert(s.items) }
+}
+
 // ---------- tempo real ----------
 
 type CollectionKey = "leads" | "activities" | "tasks" | "notes" | "transactions" | "mindMaps"
@@ -630,6 +684,18 @@ function startRealtime() {
     if (table === "members") {
       // Quando um membro é adicionado, editado ou removido, atualiza a lista de membros
       useStore.getState().refreshOrgMembers()
+      return
+    }
+    if (table === "tasks") {
+      // Mesma tabela, duas listas (tarefas de trabalho × demais itens).
+      useStore.setState((s) => {
+        if (eventType === "DELETE") {
+          const id = (payload.old as { id?: string }).id
+          return { tasks: s.tasks.filter((t) => t.id !== id), items: s.items.filter((t) => t.id !== id) }
+        }
+        const item = (payload.new as { data?: Task }).data
+        return item ? placeItem(s, item) : {}
+      })
       return
     }
     const key = TABLE_TO_KEY[table]
