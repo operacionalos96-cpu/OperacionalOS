@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
  * saiu, o que travou, o que precisa de alguém?" — quem for marcado recebe um aviso. As respostas
  * aparecem juntas na Semana do time.
  */
-export function WeeklyCheckinCard({ kind, onDone, className }: { kind: CheckinKind; onDone?: () => void; className?: string }) {
+export function WeeklyCheckinCard({ kind, onDone, className, hideTitle }: { kind: CheckinKind; onDone?: () => void; className?: string; hideTitle?: boolean }) {
   const meId = useStore((s) => s.meId)
   const team = useTeam()
   const save = useCheckins((s) => s.save)
@@ -42,15 +42,15 @@ export function WeeklyCheckinCard({ kind, onDone, className }: { kind: CheckinKi
       if (!shipped.trim() && !blocked.trim() && !needs.trim()) return void toast.error("Responda pelo menos uma das três")
       const from = needs.trim() ? needsFrom : []
       save({ ...base, shipped: shipped.trim() || undefined, blocked: blocked.trim() || undefined, needs: needs.trim() || undefined, needsFrom: from })
-      if (from.length) notify(from, { kind: "mencao", title: `${getUser(meId).name} precisa de você: ${needs.trim().slice(0, 80)}`, href: "/semana", fromId: meId })
+      if (from.length) notify(from, { kind: "mencao", title: `${getUser(meId).name} precisa de você: ${needs.trim().slice(0, 80)}`, href: "/equipe?aba=semana", fromId: meId })
     }
-    toast.success("Check-in da semana enviado", { description: "Aparece na Semana do time." })
+    toast.success("Check-in da semana enviado", { description: "Aparece em Equipe › Semana do time." })
     onDone?.()
   }
 
   return (
     <form onSubmit={submit} className={cn("grid gap-2 rounded-2xl border border-highlight/30 bg-highlight-soft/60 p-3", className)}>
-      <p className="flex items-center gap-2 text-sm font-semibold">
+      <p className={cn("flex items-center gap-2 text-sm font-semibold", hideTitle && "sr-only")}>
         <CalendarCheckIcon className="size-4 text-highlight" />
         {kind === "segunda" ? "Qual o seu foco da semana?" : "Como foi a semana?"}
       </p>

@@ -7,14 +7,15 @@ import { toast } from "sonner"
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { ArrowRightIcon, BellIcon, CalendarPlusIcon, CheckIcon, CircleCheckBigIcon, GripVerticalIcon, InboxIcon, VideoIcon, XIcon } from "lucide-react"
+import { ArrowRightIcon, BellIcon, CalendarCheckIcon, CalendarPlusIcon, CheckIcon, CircleCheckBigIcon, GripVerticalIcon, InboxIcon, VideoIcon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { EVENT_KINDS, timeRange, type CalendarEvent } from "@/lib/domain/calendar"
 import { TEAM_SETTINGS_ID, dailyState } from "@/lib/domain/daily"
 import { PLAN_GROUP_LABEL, reorder, type Badge, type MyDay, type PlanGroup, type PlanItem } from "@/lib/domain/my-day"
 import { sectorSteps } from "@/lib/domain/sectors"
 import { relative } from "@/lib/format"
-import { useCalendarEvents, useContentItems, useDailyPlans, useTeamSettings } from "@/lib/modules"
+import { useCalendarEvents, useCheckins, useContentItems, useDailyPlans, useTeamSettings } from "@/lib/modules"
+import { weeklyAsk } from "@/lib/domain/weekly"
 import { dismissNotification, notify, useMyNotifications } from "@/lib/notifications"
 import { useMinute } from "@/lib/presence"
 import { useFunnel } from "@/lib/funnel-store"
@@ -30,6 +31,7 @@ import { UserAvatar } from "@/components/shared/user-avatar"
 import { DecisionCard } from "./decision-card"
 import { DoingButton } from "./doing-now"
 import { PresenceBadge } from "./presence-badge"
+import { WeeklyCheckinCard } from "./weekly-checkin"
 import { usePersonWork } from "./team-overview"
 
 // ---------- Reunião diária ----------
@@ -484,5 +486,42 @@ export function InboxCounter({ count }: { count: number }) {
       </span>
       <ArrowRightIcon className="size-4 text-muted-foreground" />
     </Link>
+  )
+}
+
+// ---------- Check-in da semana ----------
+
+/**
+ * Aparece só quando falta responder (segunda: foco; sexta: retrospectiva — weeklyAsk). O botão abre
+ * o formulário ali mesmo, a partir do próprio aviso; respondeu, o aviso some.
+ */
+export function WeeklyNudge() {
+  const meId = useStore((s) => s.meId)
+  const checkins = useCheckins((s) => s.items)
+  const now = useMinute()
+  const [open, setOpen] = useState(false)
+  const kind = weeklyAsk(meId, now, checkins)
+  if (!kind) return null
+  return (
+    <section aria-label="Check-in da semana" className="overflow-hidden rounded-2xl border border-highlight/40 bg-card shadow-card">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <CalendarCheckIcon className="size-5 text-highlight" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{kind === "segunda" ? "Qual o seu foco da semana?" : "Como foi a semana?"}</p>
+          <p className="t-desc text-xs">
+            {kind === "segunda" ? "Até 3 coisas, leva 1 minuto. O time vê em Equipe › Semana do time." : "O que saiu, o que travou e o que precisa de alguém."}
+          </p>
+        </div>
+        <Button size="sm" variant={open ? "ghost" : "default"} onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? "Depois" : "Responder agora"}
+        </Button>
+        <Link href="/equipe?aba=semana" className="text-xs font-medium text-brand">
+          Ver a semana do time
+        </Link>
+      </div>
+      <div className="expand-rows" data-open={open ? "" : undefined}>
+        <div>{open && <WeeklyCheckinCard kind={kind} onDone={() => setOpen(false)} className="success-in mx-4 mb-4" hideTitle />}</div>
+      </div>
+    </section>
   )
 }

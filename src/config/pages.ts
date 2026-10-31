@@ -1,7 +1,6 @@
 import {
   BotIcon,
   CalendarDaysIcon,
-  CalendarRangeIcon,
   CheckSquareIcon,
   ClapperboardIcon,
   HandshakeIcon,
@@ -95,25 +94,11 @@ export const PAGES = [
     purpose: "Quem faz parte da equipe, onde cada um está agora, do que é responsável e o que fez.",
     howTo: [
       "Em Responsabilidades, veja o status de cada um (online, em reunião…), as áreas e o que fez.",
-      "Em Agenda, agende uma reunião: o app avisa se alguém já está ocupado.",
+      "Em Semana do time, responda o foco de segunda e a retrospectiva de sexta e veja o que cada um fez.",
       "Faça o check-in no guia do dia (a bolinha no canto): o time vê que você está no expediente.",
       "Clique em \"Ver tudo\" para abrir a página da pessoa com a agenda e a lista completa.",
     ],
-    terms: ["status", "check-in", "guia-do-dia", "nivel-acesso"],
-  },
-  {
-    href: "/semana",
-    title: "Semana do time",
-    short: "Semana",
-    icon: CalendarRangeIcon,
-    section: null,
-    purpose: "A reunião de status sem reunião: o foco de cada um, como foi a semana e o que cada um fez.",
-    howTo: [
-      "Na segunda, responda o foco da semana (até 3 coisas) no guia do dia ou aqui.",
-      "Na sexta, conte o que saiu, o que travou e o que precisa de alguém: quem você marcar recebe um aviso.",
-      "Use as setas para ver as semanas anteriores.",
-    ],
-    terms: ["check-in-semanal", "fazendo-agora"],
+    terms: ["status", "check-in", "check-in-semanal", "guia-do-dia", "nivel-acesso"],
   },
   {
     href: "/prospeccao",

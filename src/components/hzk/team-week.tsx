@@ -14,16 +14,15 @@ import { useStore } from "@/lib/store"
 import { useAreaList } from "@/lib/use-hzk"
 import { useTeam } from "@/lib/use-team"
 import { Button } from "@/components/ui/button"
-import { PageHeader } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
-import { PresenceBadge } from "@/components/hzk/presence-badge"
-import { WeeklyCheckinCard } from "@/components/hzk/weekly-checkin"
+import { PresenceBadge } from "./presence-badge"
+import { WeeklyCheckinCard } from "./weekly-checkin"
 
 /**
- * Semana do time (ADR 0011): o foco de segunda, a retrospectiva de sexta e o que cada um fez,
- * lado a lado. É a reunião de status, sem reunião.
+ * Semana do time (Equipe › Semana do time, ADR 0011): o foco de segunda, a retrospectiva de sexta e
+ * o que cada um fez, lado a lado. É a reunião de status, sem reunião.
  */
-export default function WeekPage() {
+export function TeamWeek() {
   const meId = useStore((s) => s.meId)
   const tasks = useStore((s) => s.tasks)
   const items = useStore((s) => s.items)
@@ -41,9 +40,7 @@ export default function WeekPage() {
   const names = (ids: string[]) => ids.map((id) => getUser(id).name).join(", ")
 
   return (
-    <div className="flex flex-col">
-      <PageHeader page="/semana" />
-      <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6">
+    <div className="grid gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="icon" variant="ghost" aria-label="Semana anterior" onClick={() => setWeek(format(addWeeks(parseISO(week), -1), "yyyy-MM-dd"))}>
             <ChevronLeftIcon />
@@ -78,7 +75,6 @@ export default function WeekPage() {
             <PersonColumn key={p.memberId} p={p} index={i} fridayOpen={fridayOpen} />
           ))}
         </div>
-      </div>
     </div>
   )
 }

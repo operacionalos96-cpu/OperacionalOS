@@ -16,7 +16,7 @@ import { PageHelp } from "@/components/shared/page-help"
 import { CountUp } from "@/components/shared/count-up"
 import { GuideOrb } from "@/components/hzk/guide-orb"
 import { cn } from "@/lib/utils"
-import { AgendaToday, DailyCard, DayPlanPanel, InboxCounter, SectorStepsPanel, TeamNow, WaitingForYou } from "@/components/hzk/my-day"
+import { AgendaToday, DailyCard, DayPlanPanel, InboxCounter, SectorStepsPanel, TeamNow, WaitingForYou, WeeklyNudge } from "@/components/hzk/my-day"
 
 /**
  * Início · Meu Dia (blueprint, ADR 0010): o dia de quem está usando, na ordem em que se pensa —
@@ -102,6 +102,9 @@ export default function HomePage() {
 
       <div className="guided" style={at(2)}>
         <DailyCard />
+      </div>
+      <div className="guided empty:hidden" style={at(2)}>
+        <WeeklyNudge />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5">
