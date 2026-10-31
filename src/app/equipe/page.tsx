@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
   BriefcaseIcon,
+  ClipboardListIcon,
   CrownIcon,
   GitForkIcon,
   PlusIcon,
@@ -20,9 +21,10 @@ import { RoleBadge } from "@/components/org/role-badge"
 import { RoleDialog } from "@/components/org/role-dialog"
 import { InviteMemberDialog } from "@/components/org/invite-member-dialog"
 import { OrgTreeView } from "@/components/org/org-tree-view"
+import { TeamOverview } from "@/components/hzk/team-overview"
 import type { OrgRole } from "@/lib/domain/org"
 
-type TabType = "membros" | "cargos" | "hierarquia"
+type TabType = "responsabilidades" | "membros" | "cargos" | "hierarquia"
 
 export default function EquipePage() {
   const { canAdmin } = useAccess()
@@ -30,7 +32,8 @@ export default function EquipePage() {
   const orgRoles = useOrgRoles((s) => s.items)
   const memberRoles = useMemberRoles((s) => s.items)
 
-  const [activeTab, setActiveTab] = useState<TabType>("membros")
+  // HZK OS: abre em Responsabilidades (o que cada um tem e o que fez), para a CEO acompanhar o time.
+  const [activeTab, setActiveTab] = useState<TabType>("responsabilidades")
   const [creatingRole, setCreatingRole] = useState(false)
   const [roleToEdit, setRoleToEdit] = useState<OrgRole | undefined>()
   const [invitingMember, setInvitingMember] = useState(false)
@@ -98,7 +101,20 @@ export default function EquipePage() {
         </div>
 
         {/* Seletor de Abas */}
-        <div className="flex items-center gap-1 border-b pb-2">
+        <div className="flex flex-wrap items-center gap-1 border-b pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("responsabilidades")}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              activeTab === "responsabilidades"
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <ClipboardListIcon className="h-3.5 w-3.5" />
+            Responsabilidades
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab("membros")}
@@ -138,6 +154,9 @@ export default function EquipePage() {
             Árvore Hierárquica
           </button>
         </div>
+
+        {/* Aba 0 (HZK OS): responsabilidades e feitos de cada pessoa */}
+        {activeTab === "responsabilidades" && <TeamOverview />}
 
         {/* Aba 1: Membros */}
         {activeTab === "membros" && (

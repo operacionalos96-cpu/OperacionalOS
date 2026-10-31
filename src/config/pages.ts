@@ -222,8 +222,10 @@ export const PAGES = [
     title: "Equipe",
     icon: UsersIcon,
     section: "Gestão",
-    purpose: "Quem faz parte da equipe, o cargo de cada um e quem responde a quem.",
+    purpose: "Quem faz parte da equipe, do que cada um é responsável e o que cada um fez.",
     howTo: [
+      "Em Responsabilidades, veja as áreas, o que está em andamento e o que cada um fez no período.",
+      "Clique em \"Ver tudo\" para abrir a página da pessoa com a lista completa.",
       "Convide uma pessoa pelo e-mail e escolha o nível de acesso dela.",
       "Dê um cargo e defina a quem cada pessoa responde.",
     ],
