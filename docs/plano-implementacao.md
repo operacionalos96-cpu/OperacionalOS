@@ -77,8 +77,8 @@ colunas reais só quando precisam de consulta no banco (ex.: notificações por 
 | `content_posts` | `content_items` (pauta com etapa, formato, produto) + `ContentPost` (publicação por conta, com métricas) | **Estender.** Pauta = `ContentItem` (ganha pilar, gancho, CTA, fonte, roteiro = doc); post = `ContentPost` (ganha `scheduledFor`, `igMediaId`, `googleEventId`, canal). |
 | `post_metrics` (D+1 / D+7) | `ContentPost.metrics` (uma leitura) | **Estender** para leituras por marco (D+1, D+7) com origem manual/api. O engajamento entra em `metrics.ts` (a definição muda de "÷ visualizações" para "÷ alcance", como pede o blueprint). |
 | `integrations` | `integration_accounts` + `integration_secrets` (tokens criptografados), OAuth do YouTube/TikTok | **Reaproveitar**: novos provedores `google_calendar` e `instagram`. |
-| `availability_cache` | — | **Novo.** |
-| API do Claude | `src/lib/server/ai.ts` usa Gemini (`GEMINI_API_KEY`) | **Estender `ai.ts`** com o provedor Claude (chave só no servidor e limite diário por `rate-limit.ts`). Ver pergunta 4. |
+| `availability_cache` | — | **Por enquanto, não.** O "Time agora" sai da agenda interna `calendar_events` (Fase 3). Quando o Google entrar, o FreeBusy alimenta a mesma tabela. |
+| API do Claude | Fila `ai_jobs` + workers: o Claude local (assinatura) já pega jobs pelo MCP (`analyze_for_video`) | **Reaproveitar a fila.** Resumo do Radar e sugestões do brainstorming viram jobs para o Claude local. Sem API paga (resposta 31/10). |
 | Captura rápida (⌘K / +) | Ctrl+K busca e cria; "+" cria lead, tarefa e lançamento | **Estender:** tarefa, ideia, nota ou decisão em uma linha, indo para a caixa de entrada de quem capturou. |
 | Página de cada pessoa | `/equipe` (cards, cargos, organograma) | **Estender** com `/equipe/[id]`. |
 
@@ -96,10 +96,10 @@ por teste. Cada fase:
 |---|---|---|---|---|
 | **1. Fundação** | 0021: `areas`; `horas_disponiveis_dia` em `members`; `notifications` (RLS por usuário) | `/configuracoes/areas`, `/caixa-de-entrada`, `/decisoes`, `/equipe/[id]` | `kind` e campos novos em `Task` (domínio); roteamento área → dono; regra de decisão (porta + limite R$ + cargo CEO) como função pura; captura rápida; triagem com selo de 48 h | `store.ts` e `types.ts` são compartilhados com o outro dev: combinar antes; mudanças só aditivas (campos opcionais). |
 | **2. Início Meu Dia + rituais** | 0022: `daily_plans`, `checkins` | `/` refeita nos 8 blocos; `/semana` (Semana do time); rituais em painel guiado | `myDay()` (um bloco por item, testado); soma de horas e aviso de sobrecarga; selos; Decisões pendentes para o decisor | Mudança grande de hábito: manter tudo visível e validar com vocês no modo demo antes de publicar. |
-| **3. Google Calendar** | 0023: `availability_cache`; provedor `google_calendar` | Conectar/desconectar em Configurações | OAuth por pessoa (FreeBusy + agenda "Trabalho"); job a cada 10 min no agendador; `syncPostToCalendar(post)` | App Google "Externo": publicar em Produção para o token não expirar em 7 dias; lidar com token vencido ("reconectar"). |
-| **4. Ideias & Docs** | 0024: `approvals`, `doc_versions`, `brainstorms` (+ ideias e votos); campos de doc em `notes`; âncora em comentários | `/ideias` (mural, brainstorming, pitches), `/docs/[id]` | Aprovação com vários aprovadores; versões; menções → `notifications`; "IA, sugira 10 ângulos" no servidor | Comentário ancorado no Tiptap (marca no trecho) é a parte técnica mais delicada. |
+| **3. Agenda interna** (Google depois) | 0023: `calendar_events` (dono, início, fim, tipo: compromisso, foco, reunião; agenda pessoal ou "Conteúdo HZK") | Agenda na Início; tela de agenda da pessoa | Eventos salvos no Supabase; "Time agora" calculado dos eventos (em reunião / compromisso / foco = no PC) e do último acesso; `syncPostToCalendar(post)` grava o evento do post na agenda interna "Conteúdo HZK" | O status "no PC / offline" depende de cada um manter a agenda. Quando entrar o Google, ele alimenta a mesma tabela (a tela não muda). |
+| **4. Ideias & Docs** | 0024: `approvals`, `doc_versions`, `brainstorms` (+ ideias e votos); campos de doc em `notes`; âncora em comentários | `/ideias` (mural, brainstorming, pitches), `/docs/[id]` | Aprovação com vários aprovadores; versões; menções → `notifications`; "IA, sugira 10 ângulos" vira um job na fila, feito pelo Claude local (sem API paga) | Comentário ancorado no Tiptap (marca no trecho) é a parte técnica mais delicada. A sugestão da IA chega quando o computador com o Claude local estiver ligado. |
 | **5. Conteúdo** | 0025: campos novos em `content_items`/posts, métricas por marco | Conteúdos com sub-abas Radar, Pautas, Calendário, Desempenho | Kanban pelo fluxo do blueprint; calendário com arrastar; D+1/D+7; painel por pilar e formato | Mapear as etapas atuais para o fluxo novo sem perder pautas (pergunta 3). |
-| **6. Radar** | 0026: `news_sources`, `news_items` | Conteúdos › Radar e tela de fontes | Job diário: RSS → sem duplicados → resumo e ângulo por IA; resumo semanal | Custo e limite da IA; feeds que mudam de formato. |
+| **6. Radar** | 0026: `news_sources`, `news_items` | Conteúdos › Radar e tela de fontes | O servidor busca os RSS todo dia e tira os duplicados (sem IA); cada notícia nova vira um job `summarize_news` na fila, que o Claude local resume em 2 linhas + "ângulo para a HZK"; resumo da semana também é job | Sem custo de API. As notícias ficam "aguardando resumo" até o Claude local rodar. Feeds que mudam de formato. |
 | **7. Instagram** | 0027: provedor `instagram` | Conectar Instagram | Casar post com `igMediaId`; job D+1/D+7 com `origin: api`, sem apagar o manual; stories 24 h; carrossel sem insight por mídia | Aprovação do app na Meta; conta precisa ser Profissional. |
 
 **Dependências** (iguais às do blueprint):
@@ -110,7 +110,23 @@ por teste. Cada fase:
 
 A Fase 4 pode andar em paralelo com a 2 e a 3.
 
-## 5. Perguntas antes da Fase 1
+## 5. Respostas (31/10/2026)
+
+| Pergunta | Resposta | Efeito no plano |
+|---|---|---|
+| CEO | Ainda não está no sistema; será convidada depois. | A CEO é quem tiver o cargo **CEO** em Equipe › Cargos. Enquanto ninguém tiver esse cargo, as decisões que iriam para a CEO vão para os dois founders, com aviso "sem CEO definida". |
+| Founders | **Founder A = Gabriel** (conteúdo, marca e roteiros); **Founder B = Igor** (comercial, lançamentos e tráfego). | Seed das áreas com esses donos (editável em Configurações › Áreas). |
+| Limite em R$ | Ainda não existe. | Campo em Configurações, **vazio por padrão**. Vazio = o valor não manda nada para a CEO; continuam indo as decisões de contrato, contratação e estratégia. |
+| Quem faz as fases | Claude faz todas, em PRs; o programador revisa. | Mudanças em `store.ts` e `types.ts` só aditivas, com aviso no PR. |
+| Etapas de conteúdo | Usar o fluxo do blueprint. | Ideia → Roteiro → Em aprovação → Produção → Agendado → Publicado → Medido; pautas atuais convertidas pelo mapeamento acima, sem perda. |
+| IA | Claude local (assinatura), sem gastar com API. | Radar e brainstorming viram **jobs na fila** que o Claude local já consome (mesmo caminho do `analyze_for_video`). Nenhuma chave de API nova. |
+| Horas por dia | Cada pessoa define a sua. | Campo na página da pessoa; começa em 6 h. |
+| Google Calendar | Por enquanto, só uma agenda salva no Supabase; integrar o Google depois. | Fase 3 vira **Agenda interna** (`calendar_events`). A integração com o Google fica para depois e só alimenta a mesma tabela. |
+
+Ainda falta, mas só para as Fases 5 e 6: **pilares e formatos** de conteúdo usados de verdade e as
+**fontes de notícia** que vocês acompanham.
+
+## 6. Perguntas feitas antes da Fase 1
 
 1. **Quem é quem:** qual e-mail é a CEO, qual é o Founder A (conteúdo e roteiros) e qual é o Founder B (comercial, lançamentos e tráfego)? Hoje há 3 membros: dois com nível owner e um admin.
 2. **Limite em R$** a partir do qual um gasto vai para a CEO.
