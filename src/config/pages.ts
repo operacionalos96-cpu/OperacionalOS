@@ -80,10 +80,10 @@ export const PAGES = [
     howTo: [
       "Em Responsabilidades, veja o status de cada um (online, em reunião…), as áreas e o que fez.",
       "Em Agenda e reuniões, agende uma reunião: o app avisa se alguém já está ocupado.",
-      "Faça o check-in quando abrir o app: o time vê que você está no expediente.",
+      "Faça o check-in no guia do dia (a bolinha no canto): o time vê que você está no expediente.",
       "Clique em \"Ver tudo\" para abrir a página da pessoa com a agenda e a lista completa.",
     ],
-    terms: ["status", "check-in", "nivel-acesso"],
+    terms: ["status", "check-in", "guia-do-dia", "nivel-acesso"],
   },
   {
     href: "/prospeccao",

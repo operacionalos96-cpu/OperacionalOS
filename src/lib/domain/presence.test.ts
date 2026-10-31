@@ -16,7 +16,7 @@ const ev = (over: Partial<CalendarEvent>): CalendarEvent => ({
   createdAt: "2026-11-01",
   ...over,
 })
-const plan = (over: Partial<DailyPlan> = {}): DailyPlan => ({ id: "u2:2026-11-02", memberId: "u2", date: "2026-11-02", startTime: "09:00", endTime: "18:00", checkedInAt: "2026-11-02T09:05:00", ...over })
+const plan = (over: Partial<DailyPlan> = {}): DailyPlan => ({ id: "u2:2026-11-02", memberId: "u2", date: "2026-11-02", focus: "Fechar o roteiro", checkedInAt: "2026-11-02T09:05:00", ...over })
 
 describe("presença: um status por pessoa, por prioridade", () => {
   const reuniao = ev({ title: "Call com coprodutor", participantIds: ["u2"] })
@@ -37,14 +37,14 @@ describe("presença: um status por pessoa, por prioridade", () => {
     expect(presenceOf("u2", at("16:00"), { events: [reuniao], online: true }).status).toBe("online")
   })
 
-  it("app fechado, mas fez check-in e está no horário = no expediente (até o fim do horário)", () => {
-    expect(presenceOf("u2", at("16:00"), { events: [], online: false, plan: plan() })).toMatchObject({ status: "expediente", until: "18:00" })
+  it("app fechado, mas fez check-in hoje = no expediente (mostra o foco)", () => {
+    expect(presenceOf("u2", at("19:00"), { events: [], online: false, plan: plan() })).toMatchObject({ status: "expediente", detail: "Fechar o roteiro" })
   })
 
-  it("sem check-in, ou fora do horário informado = offline", () => {
+  it("sem check-in, check-in de outro dia, ou dia já fechado = offline", () => {
     expect(presenceOf("u2", at("16:00"), { events: [], online: false }).status).toBe("offline")
-    expect(presenceOf("u2", at("19:00"), { events: [], online: false, plan: plan() }).status).toBe("offline")
     expect(presenceOf("u2", at("16:00", "2026-11-03"), { events: [], online: false, plan: plan() }).status).toBe("offline")
+    expect(presenceOf("u2", at("19:00"), { events: [], online: false, plan: plan({ closedAt: "2026-11-02T18:30:00" }) }).status).toBe("offline")
   })
 
   it("check-in só é pedido uma vez por dia (feito ou pulado)", () => {

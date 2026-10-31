@@ -22,7 +22,7 @@ Calendar ficou para depois (resposta de 31/10), então a agenda é interna, no S
    | 3 | Em compromisso | evento "compromisso" agora |
    | 4 | Em foco | bloco de foco agora |
    | 5 | Online | app aberto agora |
-   | 6 | No expediente | check-in feito e dentro do horário informado |
+   | 6 | No expediente | check-in feito hoje, até fechar o dia |
    | 7 | Offline | — |
 
    A agenda vence o "app aberto": quem está em reunião não está disponível, mesmo com o app aberto.
@@ -33,7 +33,10 @@ Calendar ficou para depois (resposta de 31/10), então a agenda é interna, no S
    - Todos veem; operator ou acima agenda.
    - O conflito de horário é avisado antes de salvar (`conflictsFor`), sem bloquear.
 4. **Check-in do dia** (`daily_plans`, mesma migration):
-   - pede o horário de hoje e o foco, num cartão discreto, uma vez por dia;
+   - um botão no **Guia do dia** (porte do guia do HZK Workspace, `src/components/hzk/day-guide.tsx`),
+     com o foco de hoje opcional e **sem horário de término** (pedido de 31/10: o horário era atrito);
+   - o guia surge na primeira abertura do dia com a saudação e "Por onde vamos começar?" (regras em
+     `src/lib/domain/day-guide.ts`); minimizado, vira uma bolinha com a marca HZK no canto;
    - feito ou pulado, só volta no dia seguinte;
    - cada um grava só o próprio, inclusive quem só visualiza; todos leem;
    - a linha do dia é a mesma que o ritual "Fechar o dia" (Fase 2) vai completar.

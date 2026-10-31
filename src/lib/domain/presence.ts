@@ -2,26 +2,25 @@
  * Presença do time (ADR 0009): on, off ou em compromisso — um status por pessoa, por prioridade.
  *   1 ausente · 2 em reunião · 3 em compromisso · 4 em foco   (automático, pela agenda)
  *   5 online                                                  (automático, app aberto agora)
- *   6 no expediente                                           (semiautomático, check-in do dia)
+ *   6 no expediente                                           (semiautomático, check-in do dia até fechar o dia)
  *   7 offline
  * Regras puras, testadas em presence.test.ts.
  */
 import { format } from "date-fns"
 import { involves, type CalendarEvent, type EventKind } from "./calendar"
 
-/** Check-in do dia (tabela daily_plans): horário de hoje e foco; o ritual de fechar o dia usa a mesma linha. */
+/** Check-in do dia (tabela daily_plans): um botão + o foco de hoje; o ritual de fechar o dia usa a mesma linha. */
 export interface DailyPlan {
   /** `${memberId}:${yyyy-MM-dd}` */
   id: string
   memberId: string
   date: string
-  /** "09:00" (horário local) */
-  startTime?: string
-  endTime?: string
   focus?: string
   checkedInAt?: string
   /** Pulou o check-in hoje (não perguntar de novo). */
   skippedAt?: string
+  /** Fase 2: fechou o dia (deixa de contar como "no expediente"). */
+  closedAt?: string
   /** Fase 2: nota escrita ao fechar o dia, lida na manhã seguinte. */
   noteForTomorrow?: string
   updatedAt?: string
@@ -71,10 +70,10 @@ export function presenceOf(memberId: string, now: Date, src: { events: CalendarE
   }
   if (src.online) return { status: "online", label: PRESENCE.online.label }
 
+  // Check-in feito hoje e o dia ainda não foi fechado = no expediente (sem horário de término).
   const p = src.plan
-  const hhmm = format(now, "HH:mm")
-  if (p?.checkedInAt && p.date === format(now, "yyyy-MM-dd") && (!p.startTime || p.startTime <= hhmm) && (!p.endTime || hhmm < p.endTime)) {
-    return { status: "expediente", label: PRESENCE.expediente.label, until: p.endTime }
+  if (p?.checkedInAt && !p.closedAt && p.date === format(now, "yyyy-MM-dd")) {
+    return { status: "expediente", label: PRESENCE.expediente.label, detail: p.focus }
   }
   return { status: "offline", label: PRESENCE.offline.label }
 }

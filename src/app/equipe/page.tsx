@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   BriefcaseIcon,
   CalendarDaysIcon,
@@ -36,6 +36,11 @@ export default function EquipePage() {
 
   // HZK OS: abre em Responsabilidades (o que cada um tem e o que fez), para a CEO acompanhar o time.
   const [activeTab, setActiveTab] = useState<TabType>("responsabilidades")
+  // Link direto para uma aba (ex.: o guia do dia abre /equipe?aba=agenda).
+  useEffect(() => {
+    const aba = new URLSearchParams(window.location.search).get("aba")
+    if (aba === "agenda" || aba === "membros" || aba === "cargos" || aba === "hierarquia") setActiveTab(aba)
+  }, [])
   const [creatingRole, setCreatingRole] = useState(false)
   const [roleToEdit, setRoleToEdit] = useState<OrgRole | undefined>()
   const [invitingMember, setInvitingMember] = useState(false)

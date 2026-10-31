@@ -8,7 +8,6 @@ import { toast } from "sonner"
 import {
   CheckSquareIcon,
   ChevronDownIcon,
-  DatabaseIcon,
   InboxIcon,
   LogOutIcon,
   MenuIcon,
@@ -50,7 +49,7 @@ import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/le
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { QuickCapture } from "@/components/hzk/quick-capture"
-import { CheckInCard } from "@/components/hzk/checkin-card"
+import { DayGuide } from "@/components/hzk/day-guide"
 import { PresenceDot } from "@/components/hzk/presence-badge"
 import { startPresence } from "@/lib/presence"
 import { startAutomations } from "@/lib/automations"
@@ -113,7 +112,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         <>
           <CommandPalette />
           <QuickCapture />
-          <CheckInCard />
+          <DayGuide />
           <LeadFormDialog />
           <TaskFormDialog />
           <TransactionFormDialog />

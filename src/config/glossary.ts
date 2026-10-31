@@ -46,7 +46,11 @@ export const GLOSSARY = {
   },
   "check-in": {
     term: "Check-in",
-    meaning: "Ao abrir o app no dia, você diz seu horário e o foco de hoje. Assim o time sabe que você está trabalhando, mesmo com o app fechado.",
+    meaning: "Um botão no guia do dia, com o foco de hoje se quiser. Assim o time sabe que você está trabalhando, mesmo com o app fechado, até você fechar o dia.",
+  },
+  "guia-do-dia": {
+    term: "Guia do dia",
+    meaning: "A bolinha com a marca HZK no canto da tela. Ao abrir o app no dia, ela mostra o check-in e por onde começar: atrasadas, decisões, reuniões e tarefas de hoje, e o que virou o que você anotou ontem.",
   },
   "caixa-de-entrada": {
     term: "Caixa de entrada",
