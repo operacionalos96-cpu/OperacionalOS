@@ -73,6 +73,9 @@ export function DayGuide() {
   const [view, setView] = useState<"closed" | "open" | "min">("closed")
   const [hello, setHello] = useState<{ firstTime: boolean; seenToday: boolean } | null>(null)
   const [waving, setWaving] = useState(false)
+  /** Abertura em etapas (como no Workspace): saudação → frase digitando → a lista do dia. */
+  const [stage, setStage] = useState<"title" | "line" | "body">("body")
+  const [typed, setTyped] = useState(0)
   const [flight, setFlight] = useState<{ from: DOMRect; to: DOMRect } | null>(null)
   const [hint, setHint] = useState(false)
   const [focus, setFocus] = useState("")
@@ -89,16 +92,34 @@ export function DayGuide() {
     setHello({ firstTime: !read(KEY_FIRST), seenToday })
     write(KEY_FIRST, "1")
     write(KEY_DAY, today)
-    if (needsCheckIn(mine) || !seenToday) open()
+    if (needsCheckIn(mine) || !seenToday) open(true)
     else setView("min")
   }, [hydrated, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function open() {
+  /** `intro`: a abertura automática do dia passa pelas etapas; reabrir pela bolinha vai direto à lista. */
+  function open(intro = false) {
     setHint(false)
     setView("open")
     setWaving(true)
     setTimeout(() => setWaving(false), 2400)
+    setTyped(0)
+    setStage(intro && !reducedMotion() ? "title" : "body")
   }
+
+  const lineText = useRef("")
+  useEffect(() => {
+    if (stage === "title") {
+      const id = setTimeout(() => setStage("line"), 900)
+      return () => clearTimeout(id)
+    }
+    if (stage !== "line") return
+    if (typed >= lineText.current.length) {
+      const id = setTimeout(() => setStage("body"), 650)
+      return () => clearTimeout(id)
+    }
+    const id = setTimeout(() => setTyped((n) => n + 1), 24)
+    return () => clearTimeout(id)
+  }, [stage, typed])
 
   /** Minimizar: o painel encolhe no orbe, que voa em arco até o canto (como no Workspace). */
   function minimize() {
@@ -132,6 +153,8 @@ export function DayGuide() {
   const g = greeting(me.name, now, { ...hello, pending: steps.length })
   const mood: GuideMood = waving ? "hello" : needs ? "calm" : guideMood(steps, progress)
   const allDone = progress.total > 0 && progress.done === progress.total
+  const line = allDone && !needs ? "Tudo entregue hoje. Mandou bem!" : g.line
+  lineText.current = line
 
   function checkIn(e: React.FormEvent) {
     e.preventDefault()
@@ -163,6 +186,7 @@ export function DayGuide() {
           ref={panelRef}
           role="dialog"
           aria-label="Guia do dia"
+          onClick={() => stage !== "body" && setStage("body")}
           className="fixed right-4 bottom-20 z-50 flex max-h-[min(40rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] origin-bottom-right animate-enter flex-col overflow-hidden rounded-3xl border bg-card shadow-lift md:right-6 md:bottom-6"
         >
           <header className="flex items-start gap-3 p-4 pb-3">
@@ -171,15 +195,25 @@ export function DayGuide() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Guia do dia</p>
-              <p className="text-lg leading-tight font-semibold">{g.title}</p>
-              <p className="t-desc mt-0.5 text-sm">{allDone && !needs ? "Tudo entregue hoje. Mandou bem!" : g.line}</p>
+              <p className="animate-enter text-lg leading-tight font-semibold">{g.title}</p>
+              {/* Leitor de tela recebe a frase inteira; a digitação é só visual. Um toque pula a abertura. */}
+              <p className="t-desc mt-0.5 min-h-10 text-sm">
+                <span className="sr-only">{line}</span>
+                {stage !== "title" && (
+                  <span aria-hidden>
+                    {stage === "line" ? line.slice(0, typed) : line}
+                    {stage === "line" && <span className="ml-px inline-block h-3.5 w-0.5 translate-y-0.5 animate-pulse bg-highlight" />}
+                  </span>
+                )}
+              </p>
             </div>
             <button type="button" onClick={minimize} aria-label="Minimizar o guia" className="-mt-1 -mr-1 rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
               <MinusIcon className="size-4" />
             </button>
           </header>
 
-          <div className="grid gap-4 overflow-y-auto px-4 pb-4">
+          {stage === "body" && (
+          <div className="grid animate-enter gap-4 overflow-y-auto px-4 pb-4">
             {work.areas.length > 0 && (
               <p className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                 Suas áreas:
@@ -288,6 +322,7 @@ export function DayGuide() {
               </details>
             )}
           </div>
+          )}
         </div>
       )}
 
@@ -295,7 +330,7 @@ export function DayGuide() {
       <button
         ref={launcherRef}
         type="button"
-        onClick={open}
+        onClick={() => open()}
         aria-label={steps.length ? `Abrir o guia do dia (${steps.length} na lista)` : "Abrir o guia do dia"}
         aria-hidden={view === "open"}
         tabIndex={view === "open" ? -1 : 0}
@@ -308,7 +343,7 @@ export function DayGuide() {
       </button>
 
       {hint && view === "min" && (
-        <button type="button" onClick={open} className="fixed right-20 bottom-44 z-40 flex animate-enter items-end gap-1 text-left md:right-24 md:bottom-16">
+        <button type="button" onClick={() => open()} className="fixed right-20 bottom-44 z-40 flex animate-enter items-end gap-1 text-left md:right-24 md:bottom-16">
           <span className="max-w-48 rounded-2xl border bg-card px-3 py-2 text-xs shadow-card">
             <span className="block font-semibold">Guia do dia</span>
             Minimizado aqui. Toque para reabrir quando quiser.
