@@ -149,3 +149,13 @@ describe("configuração do time (migration 0023)", () => {
     expect(await rows("viewer", `select id from public.team_settings`)).toHaveLength(1)
   })
 })
+
+describe("check-in semanal (migration 0024)", () => {
+  const ci = (id: string, memberId: string) => `insert into public.checkins (id, data) values ('${id}', '{"id":"${id}","memberId":"${memberId}","week":"2026-11-02","kind":"segunda","focus":["x"]}')`
+  it("cada um grava só o próprio (até quem só visualiza); todos leem", async () => {
+    expect(await attempt("viewer", ci("u5:2026-11-02:segunda", "u5"))).toBe("ok")
+    expect(await attempt("viewer", ci("u4:2026-11-02:segunda", "u4"))).toBe("negado")
+    expect(await attempt("operator", ci("u5:2026-11-02:sexta", "u4"))).toBe("negado")
+    expect(await rows("admin", `select id from public.checkins`)).toHaveLength(1)
+  })
+})

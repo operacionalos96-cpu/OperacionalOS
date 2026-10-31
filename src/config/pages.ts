@@ -1,6 +1,7 @@
 import {
   BotIcon,
   CalendarDaysIcon,
+  CalendarRangeIcon,
   CheckSquareIcon,
   ClapperboardIcon,
   HandshakeIcon,
@@ -99,6 +100,20 @@ export const PAGES = [
       "Clique em \"Ver tudo\" para abrir a página da pessoa com a agenda e a lista completa.",
     ],
     terms: ["status", "check-in", "guia-do-dia", "nivel-acesso"],
+  },
+  {
+    href: "/semana",
+    title: "Semana do time",
+    short: "Semana",
+    icon: CalendarRangeIcon,
+    section: null,
+    purpose: "A reunião de status sem reunião: o foco de cada um, como foi a semana e o que cada um fez.",
+    howTo: [
+      "Na segunda, responda o foco da semana (até 3 coisas) no guia do dia ou aqui.",
+      "Na sexta, conte o que saiu, o que travou e o que precisa de alguém: quem você marcar recebe um aviso.",
+      "Use as setas para ver as semanas anteriores.",
+    ],
+    terms: ["check-in-semanal", "fazendo-agora"],
   },
   {
     href: "/prospeccao",

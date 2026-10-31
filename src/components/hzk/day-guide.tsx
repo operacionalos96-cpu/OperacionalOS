@@ -9,7 +9,8 @@ import { ArrowRightIcon, CalendarClockIcon, CheckIcon, FlameIcon, InboxIcon, Lig
 import { getUser } from "@/config/team"
 import { BECAME_LABEL, checkInStreak, dayPlan, dayProgress, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
 import { needsCheckIn, planId, type DailyPlan } from "@/lib/domain/presence"
-import { useDailyPlans } from "@/lib/modules"
+import { useCheckins, useDailyPlans } from "@/lib/modules"
+import { weeklyAsk } from "@/lib/domain/weekly"
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
 import { useDoing, useMyDay } from "@/lib/use-my-day"
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { CloseDay } from "./close-day"
 import { DoingButton } from "./doing-now"
 import { GuideOrb } from "./guide-orb"
+import { WeeklyCheckinCard } from "./weekly-checkin"
 import { usePersonWork } from "./team-overview"
 
 /** Preferências só deste navegador (como no Workspace): já viu o guia alguma vez / em que dia abriu. */
@@ -62,6 +64,7 @@ export function DayGuide() {
   const toggleTask = useStore((s) => s.toggleTask)
   const doingActions = useDoing()
   const loaded = useDailyPlans((s) => s.loaded)
+  const checkins = useCheckins((s) => s.items)
   const plans = useDailyPlans((s) => s.items)
   const save = useDailyPlans((s) => s.save)
   const now = useMinute()
@@ -202,6 +205,7 @@ export function DayGuide() {
   const yesterday = plans.find((p) => p.id === planId(meId, new Date(+now - 864e5)))
   const canPlanToday = !needs && !!yesterday?.checkedInAt && !yesterday.closedAt && !day.planItems.some((x) => x.task.plannedFor === today)
   const canClose = !needs && !!mine?.checkedInAt && !mine.closedAt && now.getHours() >= 15
+  const weekly = needs ? null : weeklyAsk(meId, now, checkins)
   const taskOf = (id?: string) => (id ? tasks.find((t) => t.id === id) : undefined)
 
   const capturedDay = captures && (captures.day === format(new Date(+now - 864e5), "yyyy-MM-dd") ? "ontem" : format(parseISO(captures.day), "EEEE", { locale: ptBR }))
@@ -293,6 +297,8 @@ export function DayGuide() {
                 )}
               </div>
             )}
+
+            {weekly && <WeeklyCheckinCard kind={weekly} />}
 
             {(canPlanToday || canClose) && (
               <div className="flex flex-wrap gap-2">

@@ -55,7 +55,7 @@ Depois, no GitHub, abra um **Pull Request** para a `main`:
 - O banco é compartilhado com outros apps (ver `docs/adr/0004-banco-compartilhado.md`): não use o
   histórico de migrações do Supabase CLI.
 
-**Última migration aplicada em produção:** `0022_agenda_presenca.sql` (31/10/2026, depois do deploy da agenda, presença e Guia do dia).
+**Última migration aplicada em produção:** `0023_team_settings.sql` (31/10/2026, depois do deploy da Fase 2: Meu Dia, Agenda e daily).
 
 ## Se der conflito
 

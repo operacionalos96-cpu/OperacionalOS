@@ -12,6 +12,7 @@ import type { Area } from "@/lib/domain/areas"
 import type { CalendarEvent } from "@/lib/domain/calendar"
 import type { TeamSettings } from "@/lib/domain/daily"
 import type { DailyPlan } from "@/lib/domain/presence"
+import type { WeeklyCheckin } from "@/lib/domain/weekly"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -45,6 +46,8 @@ export const useCalendarEvents = createCollection<CalendarEvent>("calendar_event
 export const useDailyPlans = createCollection<DailyPlan>("daily_plans")
 // Configuração do time (migration 0023): um documento "time" com a reunião diária (ADR 0010).
 export const useTeamSettings = createCollection<TeamSettings>("team_settings")
+// Check-in semanal (migration 0024): segunda = foco; sexta = saiu, travou, precisa (ADR 0011).
+export const useCheckins = createCollection<WeeklyCheckin>("checkins")
 
 // Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
 export const useOrgRoles = createCollection<OrgRole>("org_roles")
