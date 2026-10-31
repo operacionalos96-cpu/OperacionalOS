@@ -82,7 +82,7 @@ function DecisionCard({ item, canDecide, overdue }: { item: Task; canDecide?: bo
       return
     }
     const before = d!
-    updateItem(item.id, { decision: { ...d!, status, outcome, reason: reason.trim() || undefined, decidedAt: status === "mais_contexto" ? undefined : new Date().toISOString().slice(0, 10), decidedBy: meId } })
+    updateItem(item.id, { decision: { ...d!, status, outcome, reason: reason.trim() || undefined, decidedAt: status === "mais_contexto" ? undefined : new Date().toISOString(), decidedBy: meId } })
     notify([item.createdById ?? item.ownerId], {
       kind: "decisao",
       title: status === "mais_contexto" ? `Pediram mais contexto: ${item.title}` : `Decidido: ${item.title}`,

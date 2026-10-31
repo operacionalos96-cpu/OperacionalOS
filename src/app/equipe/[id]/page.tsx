@@ -1,38 +1,33 @@
 "use client"
 
-import { use, useMemo } from "react"
+import { use, useState } from "react"
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 import { getUser } from "@/config/team"
-import { ownerOfArea } from "@/lib/domain/areas"
-import { decisionsWaitingFor } from "@/lib/domain/items"
-import { isTaskFor } from "@/lib/domain/rules"
 import { dueLabel } from "@/lib/format"
 import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { openTaskDetail } from "@/lib/ui-store"
-import { useAreaList, usePeople } from "@/lib/use-hzk"
 import { Button } from "@/components/ui/button"
+import { Segmented } from "@/components/shared/fields"
+import { DoneLine, usePersonWork } from "@/components/hzk/team-overview"
 import { NotFound, PageHeader, Panel } from "@/components/shared/layout"
 
 /**
- * Página da pessoa (HZK OS): áreas dela, tarefas em andamento e decisões esperando por ela. É o que tira a necessidade de ligar para saber o andamento.
+ * Página da pessoa (HZK OS): áreas dela, decisões esperando, tarefas em andamento e tudo o que ela
+ * fez no período. Mesma regra da tela Equipe (usePersonWork): os números nunca divergem.
  */
 export default function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const members = useStore((s) => s.orgMembers)
-  const tasks = useStore((s) => s.tasks)
-  const items = useStore((s) => s.items)
-  const areas = useAreaList()
-  const people = usePeople()
+  const [days, setDays] = useState<"7" | "30">("7")
+  const w = usePersonWork(id, Number(days))
   const roles = useMemberRoles((s) => s.items)
   const orgRoles = useOrgRoles((s) => s.items)
 
   const member = members.find((m) => m.teamId === id)
   const user = getUser(id)
-  const myAreas = useMemo(() => areas.filter((a) => ownerOfArea(a, people) === id), [areas, people, id])
-  const doing = useMemo(() => tasks.filter((t) => !t.done && isTaskFor(t, id)).sort((a, b) => (a.dueDate ?? "9").localeCompare(b.dueDate ?? "9")), [tasks, id])
-  const waiting = useMemo(() => decisionsWaitingFor(id, items), [items, id])
+  const { areas: myAreas, open: doing, decisionsWaiting: waiting, done } = w
   const titles = roles.filter((r) => r.memberId === id).map((r) => orgRoles.find((o) => o.id === r.roleId)?.title).filter(Boolean)
 
   if (members.length > 0 && !member) return <NotFound title="Pessoa não encontrada" backHref="/equipe" backLabel="Voltar à equipe" />
@@ -99,6 +94,31 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
           )}
         </Panel>
 
+        <Panel
+          title={`Feito (${done.length})`}
+          description="Tarefas concluídas, decisões tomadas e contatos com leads."
+          aside={
+            <Segmented
+              size="sm"
+              value={days}
+              onChange={setDays}
+              options={[
+                { value: "7", label: "7 dias" },
+                { value: "30", label: "30 dias" },
+              ]}
+            />
+          }
+        >
+          {done.length ? (
+            <ul className="grid gap-2 p-4">
+              {done.map((d) => (
+                <DoneLine key={`${d.kind}:${d.id}`} entry={d} />
+              ))}
+            </ul>
+          ) : (
+            <p className="t-desc p-4 text-sm">Nada concluído no período.</p>
+          )}
+        </Panel>
       </div>
     </div>
   )
