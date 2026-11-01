@@ -17,7 +17,6 @@ import { PageHelp } from "@/components/shared/page-help"
 import { CountUp } from "@/components/shared/count-up"
 import { GuideOrb } from "@/components/hzk/guide-orb"
 import { cn } from "@/lib/utils"
-import { KpiStrip } from "@/components/hzk/kpi-strip"
 import { AgendaToday, DailyCard, DayPlanPanel, InboxCounter, SectorStepsPanel, TeamNow, WaitingForYou, WeeklyNudge } from "@/components/hzk/my-day"
 
 /**
@@ -101,10 +100,6 @@ export default function HomePage() {
           </div>
         </aside>
       )}
-
-      <div className="guided" style={at(2)}>
-        <KpiStrip day={day} />
-      </div>
 
       <div className="guided" style={at(2)}>
         <DailyCard />

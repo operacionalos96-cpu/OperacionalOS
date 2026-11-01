@@ -58,7 +58,7 @@ A regra do briefing: nenhuma cor, fonte ou card novo, e nenhuma regra de negóci
 ## Consequências
 
 - **Página nova** usa `PageHeader` + `.page-body`, e o teste garante isso.
-- **Faixa de KPIs na Início:** respeita as abas da pessoa. Quem não vê o Financeiro não vê saldo
-  nem meta.
+- **Início sem KPIs:** a faixa proposta pelo briefing foi retirada a pedido (31/10). Os números ficam
+  nas próprias telas.
 - **Selects nativos:** ainda restam em filtros secundários. A troca pelo select customizado segue
   tela a tela.
