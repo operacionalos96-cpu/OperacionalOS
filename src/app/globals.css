@@ -136,10 +136,11 @@
   --info-soft: oklch(0.5 0 0 / 8%);
 
   /* Estágios = rampa SEQUENCIAL neutra (ordem do funil); só "ganho" é verde. */
-  --stage-novo: oklch(0.82 0 0);
-  --stage-contato: oklch(0.68 0 0);
-  --stage-proposta: oklch(0.52 0 0);
-  --stage-negociacao: oklch(0.34 0 0);
+  /* Etapas do funil com cor própria (mock do Pipeline): novo laranja, contato azul, proposta cinza, negociação coral. */
+  --stage-novo: var(--hzk-orange);
+  --stage-contato: oklch(0.62 0.15 245);
+  --stage-proposta: oklch(0.6 0.01 255);
+  --stage-negociacao: oklch(0.62 0.19 25);
 
   --shadow-card: 0 1px 2px oklch(0.3 0.04 255 / 4%), 0 10px 30px -14px oklch(0.3 0.06 255 / 14%);
   --sheen-color: color-mix(in oklch, var(--hzk-orange) 9%, transparent);
@@ -200,10 +201,10 @@
   --info: #9aa4b5;
   --info-soft: rgb(255 255 255 / 6%);
 
-  --stage-novo: #4a5568;
-  --stage-contato: #6b778a;
-  --stage-proposta: #9aa4b5;
-  --stage-negociacao: #d3d9e3;
+  --stage-novo: #f06a36;
+  --stage-contato: #3ba4f0;
+  --stage-proposta: #8c96a8;
+  --stage-negociacao: #ef4f4f;
 
   /* Aresta de vidro: 1px de luz no topo do card dá a sensação de camada sobre o fundo. */
   --shadow-card: inset 0 1px 0 rgb(255 255 255 / 5%), 0 12px 32px -18px rgb(0 0 0 / 70%);
@@ -249,7 +250,9 @@
     /* Luz ambiente: dois brilhos muito suaves da marca no fundo. Estático (não anima, não pesa). */
     background-image:
       radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%),
-      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--hzk-navy) 5%, transparent), transparent 70%);
+      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--hzk-navy) 5%, transparent), transparent 70%),
+      /* Brasa no canto inferior direito (mock): a mesma luz laranja dos traços LED dos cards. */
+      radial-gradient(32rem 20rem at 105% 110%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%);
     background-attachment: fixed;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
@@ -492,9 +495,11 @@
  * t-label   → rótulo: nome de um dado ou grupo. Pequeno, caixa-alta, cinza.
  * t-value   → informação: o dado em si. Grande, tabular, escuro.
  * t-desc    → descrição: contexto/explicação. Normal, cinza, nunca em negrito.
+ * Leitura para qualquer idade: nada de corpo abaixo de 14 px nem rótulo abaixo de 11 px
+ * (WCAG 1.4.4/1.4.12; NN/g, "Legibility, Readability, and Comprehension").
  */
 @utility t-title {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--foreground);
@@ -515,8 +520,8 @@
   color: var(--foreground);
 }
 @utility t-desc {
-  font-size: 0.8125rem;
-  line-height: 1.45;
+  font-size: 0.875rem;
+  line-height: 1.5;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -720,7 +725,7 @@
     width: 100%;
     max-width: var(--page-max);
     margin-inline: auto;
-    padding: 8px var(--gutter) 32px;
+    padding: 12px var(--gutter) 48px;
   }
   .page-body.is-narrow { padding-right: max(var(--gutter), calc(100% - 720px - var(--gutter))); }
   .page-body.is-medium { padding-right: max(var(--gutter), calc(100% - 1100px - var(--gutter))); }

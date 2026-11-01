@@ -2,12 +2,12 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
-import { HandshakeIcon } from "lucide-react"
+import { BarChart3Icon, Building2Icon, CalendarIcon, CoinsIcon, HandshakeIcon, UserIcon, UsersIcon, WalletIcon } from "lucide-react"
 import { clients } from "@/lib/domain/insights"
 import { money, relative } from "@/lib/format"
 import { useProducts } from "@/lib/modules"
 import { useStore } from "@/lib/store"
-import { EmptyState, PageHeader } from "@/components/shared/layout"
+import { EmptyState, PageHeader, StatCard } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
 
 /** Cliente = lead ganho. Mesma entidade do Pipeline, outra visão: quanto cada um já pagou. */
@@ -27,23 +27,43 @@ export default function ClientsPage() {
           <EmptyState icon={HandshakeIcon} title="Nenhum cliente ainda" description="Quando um lead for marcado como ganho no Pipeline, ele aparece aqui." className="py-20" />
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3">
-              <Stat label="Clientes" value={String(rows.length)} />
-              <Stat label="Recebido" value={money(total)} />
-              <Stat label="Ticket médio" value={money(Math.round(total / rows.length))} />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatCard label="Clientes" icon={UsersIcon} style={{ "--i": 0 } as React.CSSProperties}>
+                <p className="t-value mt-1">{rows.length}</p>
+              </StatCard>
+              <StatCard label="Recebido" icon={CoinsIcon} style={{ "--i": 1 } as React.CSSProperties}>
+                <p className="t-value mt-1">{money(total)}</p>
+              </StatCard>
+              <StatCard label="Ticket médio" icon={BarChart3Icon} led style={{ "--i": 2 } as React.CSSProperties}>
+                <p className="t-value mt-1">{money(Math.round(total / rows.length))}</p>
+              </StatCard>
             </div>
-            <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
+              {/* Cabeçalho da tabela com ícone em cada coluna (mock). */}
+              <div className="hidden items-center gap-4 border-b px-5 py-3 text-sm font-medium text-muted-foreground sm:flex">
+                <span className="flex flex-1 items-center gap-2"><Building2Icon className="size-4" /> Cliente</span>
+                <span className="flex w-36 items-center gap-2"><UserIcon className="size-4" /> Responsável</span>
+                <span className="flex w-40 items-center gap-2"><CalendarIcon className="size-4" /> Última compra</span>
+                <span className="flex w-36 items-center gap-2"><WalletIcon className="size-4" /> Recebido</span>
+              </div>
               <ul className="divide-y">
                 {rows.map((r) => (
                   <li key={r.lead.id}>
-                    <Link href={`/pipeline/${r.lead.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50">
+                    <Link href={`/pipeline/${r.lead.id}`} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent/50">
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-highlight/20 bg-highlight-soft text-highlight">
+                        <HandshakeIcon className="size-5" />
+                      </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{r.lead.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{[r.lead.company, productName(r.lead.productId)].filter(Boolean).join(" · ") || "—"}</p>
+                        <p className="truncate text-base font-semibold">{r.lead.name}</p>
+                        <p className="truncate text-sm text-muted-foreground">{[r.lead.company, productName(r.lead.productId)].filter(Boolean).join(" · ") || "—"}</p>
                       </div>
-                      <UserAvatar userId={r.lead.ownerId} size="xs" />
-                      <span className="hidden w-28 text-right text-xs text-muted-foreground sm:block">{r.lastAt ? relative(r.lastAt) : ""}</span>
-                      <span className="tabular w-28 text-right text-sm font-semibold">
+                      <span className="hidden w-36 sm:block">
+                        <UserAvatar userId={r.lead.ownerId} />
+                      </span>
+                      <span className="hidden w-40 items-center gap-2 text-sm text-muted-foreground sm:flex">
+                        {r.lastAt && <><CalendarIcon className="size-4" /> {relative(r.lastAt)}</>}
+                      </span>
+                      <span className="tabular w-36 text-base font-semibold">
                         {money(r.totalCents)}
                         <span className="block text-xs font-normal text-muted-foreground">
                           {r.purchases} {r.purchases === 1 ? "entrada" : "entradas"}
@@ -57,15 +77,6 @@ export default function ClientsPage() {
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <p className="t-label">{label}</p>
-      <p className="tabular mt-1 text-lg font-semibold">{value}</p>
     </div>
   )
 }

@@ -13,7 +13,7 @@ import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { useAccess } from "@/lib/use-access"
 import { Button } from "@/components/ui/button"
-import { EmptyState, PageHeader, Panel } from "@/components/shared/layout"
+import { EmptyState, PageHeader, Panel, StatCard } from "@/components/shared/layout"
 import { MemberCard } from "@/components/org/member-card"
 import { RoleBadge } from "@/components/org/role-badge"
 import { RoleDialog } from "@/components/org/role-dialog"
@@ -56,13 +56,11 @@ export default function EquipePage() {
     <div className="flex items-center gap-2">
       {canAdmin && (
         <>
-          <Button variant="outline" size="sm" onClick={() => setCreatingRole(true)}>
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Novo Cargo
+          <Button variant="outline" onClick={() => setCreatingRole(true)}>
+            <PlusIcon /> Novo cargo
           </Button>
-          <Button size="sm" onClick={() => setInvitingMember(true)}>
-            <UserPlusIcon className="h-4 w-4 mr-1" />
-            Adicionar Membro
+          <Button variant="brand" onClick={() => setInvitingMember(true)}>
+            <UserPlusIcon /> Adicionar membro
           </Button>
         </>
       )}
@@ -78,38 +76,18 @@ export default function EquipePage() {
       <div className="page-body grid gap-6">
         {/* Métricas da Organização */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-2xs">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <UsersIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{totalMembers}</div>
-              <div className="text-xs text-muted-foreground">Membros Ativos</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-2xs">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <BriefcaseIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{totalRoles}</div>
-              <div className="text-xs text-muted-foreground">Cargos Cadastrados</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-2xs">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-              <CrownIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{leadershipCount}</div>
-              <div className="text-xs text-muted-foreground">Liderança / Founders</div>
-            </div>
-          </div>
+          <StatCard label="Membros ativos" icon={UsersIcon} style={{ "--i": 0 } as React.CSSProperties}>
+            <p className="t-value mt-1">{totalMembers}</p>
+          </StatCard>
+          <StatCard label="Cargos cadastrados" icon={BriefcaseIcon} style={{ "--i": 1 } as React.CSSProperties}>
+            <p className="t-value mt-1">{totalRoles}</p>
+          </StatCard>
+          <StatCard label="Liderança / founders" icon={CrownIcon} style={{ "--i": 2 } as React.CSSProperties}>
+            <p className="t-value mt-1">{leadershipCount}</p>
+          </StatCard>
         </div>
 
-        {/* Seções da página (abas com sublinhado); Agenda leva para a página Agenda. */}
+        {/* Seções da página (abas em cápsula); Agenda leva para a página Agenda. */}
         <SectionTabs
           value={activeTab}
           onChange={(v) => (v === "agenda" ? router.push("/agenda") : setActiveTab(v))}

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { PageHeader, Panel } from "@/components/shared/layout"
+import { Led, PageHeader, Panel } from "@/components/shared/layout"
 
 const MODELS = ["Claude", "GPT", "Gemini", "Outro"]
 
@@ -51,6 +51,8 @@ export default function AiOfficePage() {
     const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length)
     return [...agents].sort((a, b) => rank(a.id) - rank(b.id))
   }, [agents])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = ordered.find((a) => a.id === selectedId) ?? ordered[0]
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name
   const data = useMemo(() => conversionData(leads), [leads])
   const visibleEvents = useMemo(() => events.filter((e) => {
@@ -86,10 +88,44 @@ export default function AiOfficePage() {
         {!agentsLoaded ? null : agents.length === 0 ? (
           <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0010 no Supabase para criar os agentes.</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {ordered.map((a) => (
-              <AgentCard key={a.id} agent={a} jobs={jobs.filter((j) => j.agent_id === a.id)} workers={workers.filter((w) => w.agent_id === a.id)} />
-            ))}
+          <div className="grid gap-4 lg:grid-cols-[minmax(280px,1fr)_2fr]">
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-card">
+              <header className="flex items-center gap-2 px-4 pt-4 pb-2">
+                <h2 className="text-base font-semibold">Agentes de IA</h2>
+                <span className="tabular rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{ordered.length}</span>
+              </header>
+              <ul className="grid gap-1.5 p-2">
+                {ordered.map((a) => {
+                  const st = agentStatus(a, jobs.filter((j) => j.agent_id === a.id))
+                  const active = a.id === selected?.id
+                  return (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(a.id)}
+                        aria-pressed={active}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition-colors hover:bg-accent/50",
+                          active && "border-highlight/60 bg-highlight-soft/30",
+                        )}
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-highlight/20 bg-highlight-soft text-highlight">
+                          <BotIcon className="size-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">{a.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{a.role}</span>
+                        </span>
+                        <StatusPill st={st} />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+            {selected && (
+              <AgentCard key={selected.id} agent={selected} jobs={jobs.filter((j) => j.agent_id === selected.id)} workers={workers.filter((w) => w.agent_id === selected.id)} />
+            )}
           </div>
         )}
 
@@ -206,34 +242,48 @@ function feedText(e: BusinessEvent, name?: string) {
   return e.event_type.startsWith("job.") ? describeJobEvent(e.event_type, e.metadata) : describeEvent(e, name)
 }
 
+/** Status real vem da fila: há job em execução → trabalhando; senão o cadastro. */
+function agentStatus(agent: Agent, jobs: JobRow[]) {
+  const current = jobs.find((j) => j.status === "running" || j.status === "claimed")
+  const queued = jobs.filter((j) => j.status === "queued" || j.status === "retry_scheduled").length
+  const dead = jobs.filter((j) => j.status === "dead_letter").length
+  return AGENT_STATUS[agent.status === "disabled" ? "disabled" : current ? "working" : dead ? "error" : queued ? "waiting" : agent.status]
+}
+
+function StatusPill({ st }: { st: ReturnType<typeof agentStatus> }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        st.tone === "brand" && "bg-brand/15 text-brand",
+        st.tone === "warning" && "bg-warning/15 text-warning",
+        st.tone === "danger" && "bg-danger-soft text-danger",
+        st.tone === "muted" && "bg-muted text-muted-foreground",
+      )}
+    >
+      {st.label}
+    </span>
+  )
+}
+
 function AgentCard({ agent, jobs, workers }: { agent: Agent; jobs: JobRow[]; workers: WorkerRow[] }) {
-  // Status real vem da fila: há job em execução → trabalhando; senão o cadastro.
   const current = jobs.find((j) => j.status === "running" || j.status === "claimed")
   const queued = jobs.filter((j) => j.status === "queued" || j.status === "retry_scheduled").length
   const dead = jobs.filter((j) => j.status === "dead_letter").length
   const lastDone = jobs.filter((j) => j.completed_at).sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? ""))[0]
-  const st = AGENT_STATUS[agent.status === "disabled" ? "disabled" : current ? "working" : dead ? "error" : queued ? "waiting" : agent.status]
+  const st = agentStatus(agent, jobs)
   return (
-    <article className="grid gap-3 rounded-xl border bg-card p-4">
-      <header className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-          <BotIcon className="size-5 text-muted-foreground" />
+    <article className="relative grid content-start gap-4 overflow-hidden rounded-2xl border bg-card p-5 shadow-card">
+      <Led />
+      <header className="relative flex items-start gap-3">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-highlight/20 bg-highlight-soft text-highlight">
+          <BotIcon className="size-6" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{agent.name}</p>
-          <p className="text-xs text-muted-foreground">{agent.role}</p>
+          <p className="text-lg font-semibold">{agent.name}</p>
+          <p className="text-sm text-muted-foreground">{agent.role}</p>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
-            st.tone === "brand" && "bg-brand/15 text-brand",
-            st.tone === "warning" && "bg-warning/15 text-warning",
-            st.tone === "danger" && "bg-danger-soft text-danger",
-            st.tone === "muted" && "bg-muted text-muted-foreground",
-          )}
-        >
-          {st.label}
-        </span>
+        <StatusPill st={st} />
       </header>
       <dl className="grid gap-1 text-xs">
         <div className="flex justify-between gap-2">

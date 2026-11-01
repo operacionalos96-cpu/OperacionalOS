@@ -249,7 +249,7 @@ function Sidebar() {
   const group = (s: (typeof sections)[number], i: number) => (
     <div key={s.title ?? i} className={cn("flex w-full flex-col gap-1", open ? "items-stretch" : "items-center")}>
       {open ? (
-        <p className="nav-label px-2.5 pt-2 pb-0.5 text-[10px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">{s.title}</p>
+        <p className="nav-label px-2.5 pt-2 pb-0.5 text-[11px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">{s.title}</p>
       ) : (
         i > 0 && <span className="my-1.5 h-px w-6 bg-sidebar-foreground/10" aria-hidden />
       )}

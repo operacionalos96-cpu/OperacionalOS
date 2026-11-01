@@ -10,13 +10,15 @@ import type { DailyPlan } from "./presence"
 /** Configuração do time (team_settings, documento "time"). */
 export interface TeamSettings {
   id: string
-  /** Reunião diária: horário ("09:30") e link (Meet, Zoom…). */
+  /** Reunião diária: horário ("07:30") e link (Meet, Zoom…). */
   daily?: { time?: string; link?: string }
   /** Abas de cada pessoa ajustadas pelo owner (ADR 0012). Sem entrada = padrão pelas áreas. */
   pagesByMember?: Record<string, string[]>
   updatedAt?: string
 }
 export const TEAM_SETTINGS_ID = "time"
+/** Horário da reunião diária enquanto o time não salvar outro em Configurações. */
+export const DAILY_DEFAULT_TIME = "07:30"
 
 export interface DailyState {
   /** Quem conta hoje (time menos quem está ausente). */

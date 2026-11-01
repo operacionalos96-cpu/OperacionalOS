@@ -153,7 +153,7 @@ function TimeGrid({ days, entries, onOpen, onSlot }: { days: Date[]; entries: Ag
           </div>
         ))}
         {/* Dia todo: ausências e prazos */}
-        <div className="border-b px-1 py-1 text-right text-[10px] text-muted-foreground">dia todo</div>
+        <div className="border-b px-1 py-1 text-right text-[11px] text-muted-foreground">dia todo</div>
         {days.map((d) => (
           <div key={+d} className="grid content-start gap-1 border-b border-l p-1">
             {entries
@@ -165,7 +165,7 @@ function TimeGrid({ days, entries, onOpen, onSlot }: { days: Date[]; entries: Ag
         ))}
         <div className="relative">
           {hours.map((h) => (
-            <div key={h} className="pr-1 text-right text-[10px] text-muted-foreground" style={{ height: HOUR_PX }}>
+            <div key={h} className="pr-1 text-right text-[11px] text-muted-foreground" style={{ height: HOUR_PX }}>
               {String(h).padStart(2, "0")}:00
             </div>
           ))}

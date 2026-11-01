@@ -24,7 +24,7 @@ export default function DecisionsPage() {
     .sort((a, b) => (b.decision?.decidedAt ?? "").localeCompare(a.decision?.decidedAt ?? ""))
 
   const newButton = (
-    <Button onClick={() => setCreating(true)}>
+    <Button variant="brand" onClick={() => setCreating(true)}>
       <PlusIcon /> Nova decisão
     </Button>
   )

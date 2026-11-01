@@ -155,7 +155,7 @@ export default function VaultPage() {
               <Button variant="outline" onClick={lock}>
                 <LockIcon /> Trancar
               </Button>
-              <Button onClick={() => setEditing({})}>
+              <Button variant="brand" onClick={() => setEditing({})}>
                 <PlusIcon /> Novo
               </Button>
             </div>

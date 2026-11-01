@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { toast } from "sonner"
-import { RotateCcwIcon, SearchIcon, XIcon } from "lucide-react"
+import { CircleCheckIcon, LayersIcon, RotateCcwIcon, SearchIcon, XIcon } from "lucide-react"
 import { JOB_TYPES, describeJobEvent } from "@/lib/domain/jobs"
 import { duration } from "@/lib/domain/prospecting"
 import { relative } from "@/lib/format"
@@ -244,27 +244,43 @@ function StatusSummary({ jobs, agentName }: { jobs: JobRow[]; agentName: (id: st
     const end = j.completed_at
     if (start && end) byAgent.set(j.agent_id, [...(byAgent.get(j.agent_id) ?? []), new Date(end).getTime() - new Date(start).getTime()])
   }
-  if (!jobs.length) return null
+  const icons = { fila: LayersIcon, ok: CircleCheckIcon, erro: XIcon } as const
+  // Mock: barra no topo; embaixo, três indicadores com ícone e as médias por agente à direita.
   return (
-    <div className="grid gap-2 rounded-xl border bg-card p-4">
+    <div className="grid gap-4 rounded-2xl border bg-card p-5 shadow-card">
       <div className="flex h-3 overflow-hidden rounded-full bg-muted" aria-hidden>
         {groups.map((g) => (
           <span key={g.id} className="grow-x h-full" style={{ width: `${(g.count / total) * 100}%`, background: g.color }} />
         ))}
       </div>
-      <p className="tabular flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {groups.map((g) => (
-          <span key={g.id} className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full" style={{ background: g.color }} />
-            {g.label} <span className="font-semibold text-foreground">{g.count}</span>
-          </span>
-        ))}
-        {[...byAgent.entries()].map(([id, ms]) => (
-          <span key={id}>
-            {agentName(id)}: média {duration(ms.reduce((a, b) => a + b, 0) / ms.length)}
-          </span>
-        ))}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {groups.map((g, i) => {
+          const Icon = icons[g.id as keyof typeof icons]
+          return (
+            <div key={g.id} className={cn("flex items-center gap-3", i > 0 && "sm:border-l sm:pl-6")}>
+              <span
+                className="flex size-11 items-center justify-center rounded-xl"
+                style={{ color: g.id === "fila" ? "var(--highlight)" : g.color, backgroundColor: `color-mix(in oklch, ${g.id === "fila" ? "var(--highlight)" : g.color} 14%, transparent)` }}
+              >
+                <Icon className="size-5" />
+              </span>
+              <span>
+                <span className="block text-xs text-muted-foreground">{g.label}</span>
+                <span className="tabular block text-2xl font-bold tracking-tight">{g.count}</span>
+              </span>
+            </div>
+          )
+        })}
+        {byAgent.size > 0 && (
+          <p className="tabular grid gap-1 text-xs text-muted-foreground sm:ml-auto sm:border-l sm:pl-6">
+            {[...byAgent.entries()].map(([id, ms]) => (
+              <span key={id}>
+                {agentName(id)}: média {duration(ms.reduce((a, b) => a + b, 0) / ms.length)}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

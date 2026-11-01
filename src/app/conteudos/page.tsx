@@ -15,6 +15,16 @@ import {
   FilmIcon,
   PencilIcon,
   PlugIcon,
+  Building2Icon,
+  CalendarDaysIcon,
+  CircleCheckIcon,
+  ColumnsIcon,
+  LayersIcon,
+  LightbulbIcon,
+  RadioIcon,
+  ScissorsIcon,
+  UserIcon,
+  VideoIcon,
   PlusIcon,
   SendIcon,
   UsersIcon,
@@ -73,11 +83,11 @@ function Content() {
           tab === "metricas" ? (
             <SyncMetricsButton onDone={reload} />
           ) : tab === "contas" ? (
-            <Button onClick={() => setAccountForm({ open: true, account: null })}>
+            <Button variant="brand" onClick={() => setAccountForm({ open: true, account: null })}>
               <PlusIcon /> Nova conta
             </Button>
           ) : (
-            <Button onClick={() => setNewOpen(true)}>
+            <Button variant="brand" onClick={() => setNewOpen(true)}>
               <PlusIcon /> Novo conteúdo
             </Button>
           )
@@ -126,6 +136,10 @@ function Production({ onNew }: { onNew: () => void }) {
   const [viewMode, setViewMode] = useState<"etapas" | "calendario">("etapas")
   const [calendarMonth, setCalendarMonth] = useState(formatDate(new Date(), "yyyy-MM"))
   const brands = uniqueProjects(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)])
+  const brandOptions = [
+    { value: "todos", label: <><LayersIcon className="size-3.5" /> Visão geral</> },
+    ...brands.map((b) => ({ value: b, label: <>{b === "HZK" ? <Building2Icon className="size-3.5" /> : <UserIcon className="size-3.5" />} {b}</> })),
+  ]
   const visible = items.filter((i) => {
     const account = accounts.find((a) => a.id === (i.accountId ?? i.posts[0]?.accountId))
     const itemBrand = i.brand ?? account?.brand
@@ -138,79 +152,75 @@ function Production({ onNew }: { onNew: () => void }) {
   const calendarEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 1 })
   const calendarDays = Array.from({ length: differenceInCalendarDays(calendarEnd, calendarStart) + 1 }, (_, i) => addDays(calendarStart, i))
 
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col">
-        <div className="page-container flex flex-wrap items-center gap-2 pt-3">
-          <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
-        </div>
-      <EmptyState
-        className="py-20"
-        icon={ClapperboardIcon}
-        title="Nenhum conteúdo ainda"
-        description="Crie o primeiro como ideia. Ele passa por roteiro, gravação (bruto), edição, revisão e fica pronto para postar."
-        action={
-          <Button variant="outline" onClick={onNew}>
-            <PlusIcon /> Novo conteúdo
-          </Button>
-        }
-      />
-      </div>
-    )
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Trilha de etapas com contagem: onde a produção está travando? */}
-      <ol className="page-container flex flex-wrap items-center gap-1 pt-3 text-xs" aria-label="Etapas">
-        {CONTENT_STAGES.filter((st) => st.id !== "publicado").map((st, i) => {
-          const n = visible.filter((v) => v.stage === st.id).length
-          return (
-            <li key={st.id} className="flex items-center gap-1">
-              {i > 0 && <span className="text-muted-foreground/50" aria-hidden>→</span>}
-              <span className={cn("rounded-full px-2 py-0.5", n ? "bg-foreground/10 font-medium text-foreground" : "text-muted-foreground")}>
-                {st.label} <span className="tabular">{n}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
-      {/* 2º nível = filtro (pílulas menores), não aba: Visão geral, Gabriel, HZK… */}
+      {/* Filtros (2º nível, não aba): marca, conta e produto à esquerda; modo de ver à direita. */}
       <div className="page-container flex flex-wrap items-center gap-2 pt-3">
-        <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">Conta
-          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground" aria-label="Filtrar produção por conta">
+        <Segmented value={brand} onChange={setBrand} options={brandOptions} />
+        <span className="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden />
+        <label className="flex h-9 items-center gap-2 rounded-xl border bg-card px-3 text-xs text-muted-foreground shadow-card">Conta
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="bg-transparent text-sm font-medium text-foreground outline-none" aria-label="Filtrar produção por conta">
             <option value="todos">Todas</option>
             {accounts.filter((a) => a.active && (brand === "todos" || !a.brand || a.brand === brand)).map((a) => <option key={a.id} value={a.id}>{a.name} · {a.platform}</option>)}
           </select>
         </label>
-        {products.length > 0 && <label className="flex items-center gap-2 text-xs text-muted-foreground">Produto
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground" aria-label="Filtrar por produto">
+        {products.length > 0 && <label className="flex h-9 items-center gap-2 rounded-xl border bg-card px-3 text-xs text-muted-foreground shadow-card">Produto
+          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="bg-transparent text-sm font-medium text-foreground outline-none" aria-label="Filtrar por produto">
             <option value="todos">Todos</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>}
-        <Segmented size="sm" value={viewMode} onChange={setViewMode} options={[{ value: "etapas", label: "Etapas" }, { value: "calendario", label: "Calendário" }]} />
         {viewMode === "calendario" && <div className="flex items-center gap-1">
           <button type="button" aria-label="Mês anterior" onClick={() => setCalendarMonth(formatDate(addDays(monthStart, -1), "yyyy-MM"))} className="rounded-md border px-2 py-1 text-xs hover:bg-accent">‹</button>
           <span className="min-w-28 text-center text-xs font-medium capitalize">{formatDate(monthStart, "MMMM yyyy", { locale: ptBR })}</span>
           <button type="button" aria-label="Próximo mês" onClick={() => setCalendarMonth(formatDate(addDays(endOfMonth(monthStart), 1), "yyyy-MM"))} className="rounded-md border px-2 py-1 text-xs hover:bg-accent">›</button>
         </div>}
-        <span className="ml-auto text-xs text-muted-foreground">{visible.length} conteúdos</span>
+        <Segmented
+          className="ml-auto"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: "etapas", label: <><ColumnsIcon className="size-3.5" /> Etapas</> },
+            { value: "calendario", label: <><CalendarDaysIcon className="size-3.5" /> Calendário</> },
+          ]}
+        />
       </div>
-      {viewMode === "etapas" ? <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 sm:px-6">
+      {viewMode === "etapas" ? <div className="page-container flex min-h-0 flex-1 gap-3 overflow-x-auto pt-4 pb-4">
         {CONTENT_STAGES.map((stage) => {
           const list = visible.filter((i) => i.stage === stage.id)
+          const Icon = STAGE_ICON[stage.id]
           return (
-            <section key={stage.id} className="flex w-64 shrink-0 flex-col rounded-xl border bg-muted/40">
-              <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-                <span className="text-sm font-semibold">{stage.label}</span>
-                <span className="tabular text-xs text-muted-foreground">{list.length}</span>
+            <section key={stage.id} className="flex min-w-[176px] flex-1 flex-col overflow-hidden rounded-2xl border bg-card/70 shadow-card">
+              <div className="px-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <Icon className={cn("size-[18px] shrink-0", list.length ? "text-highlight" : "text-muted-foreground")} />
+                  <span className="truncate text-base font-semibold tracking-tight">{stage.label}</span>
+                  <span className="tabular text-xs text-muted-foreground">{list.length}</span>
+                </div>
+                <p className="t-desc mt-1 truncate text-xs">{stage.hint}</p>
+                <span className="mt-3 block h-0.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <span className="block h-full rounded-full bg-highlight transition-[width] duration-(--dur-4)" style={{ width: `${visible.length ? (list.length / visible.length) * 100 : 0}%` }} />
+                </span>
               </div>
-              <p className="t-desc -mt-1 px-3 pb-2 text-xs">{stage.hint}</p>
-              <div className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
+              <div className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-3 pb-2">
                 {list.map((item, i) => (
                   <ContentCard key={item.id} item={item} index={i} />
                 ))}
+                {list.length === 0 && (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-2 py-8 text-center">
+                    <Icon className="mb-1 size-8 stroke-[1.4] text-muted-foreground" />
+                    <p className="text-sm font-semibold">Nenhum conteúdo</p>
+                    <p className="text-xs text-muted-foreground">Adicione um conteúdo nesta etapa.</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-3 pt-1">
+                <button
+                  type="button"
+                  onClick={onNew}
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border bg-background/50 text-sm font-medium transition-colors hover:bg-accent"
+                >
+                  <PlusIcon className="size-4" /> Adicionar conteúdo
+                </button>
               </div>
             </section>
           )
@@ -237,6 +247,16 @@ function Production({ onNew }: { onNew: () => void }) {
   )
 }
 
+const STAGE_ICON: Record<ContentStage, React.ComponentType<{ className?: string }>> = {
+  ideia: LightbulbIcon,
+  roteiro: FileTextIcon,
+  gravacao: VideoIcon,
+  edicao: ScissorsIcon,
+  revisao: CircleCheckIcon,
+  pronto: SendIcon,
+  publicado: RadioIcon,
+}
+
 function ContentCard({ item, index }: { item: ContentItem; index: number }) {
   const product = useProducts((s) => s.items.find((p) => p.id === item.productId))
   const stageIdx = CONTENT_STAGES.findIndex((s) => s.id === item.stage)
@@ -245,14 +265,21 @@ function ContentCard({ item, index }: { item: ContentItem; index: number }) {
   const published = item.posts.filter((p) => p.status === "publicado").length
 
   return (
-    <div className="group stagger rounded-lg border bg-card p-3 transition-colors hover:border-foreground/20" style={{ "--i": Math.min(index, 10) } as React.CSSProperties}>
+    <div className="group stagger rounded-xl border bg-card p-3 shadow-card transition-[border-color,translate] hover:-translate-y-px hover:border-foreground/20" style={{ "--i": Math.min(index, 10) } as React.CSSProperties}>
       <Link href={`/conteudos/${item.id}`} className="block">
-        <p className="line-clamp-2 text-sm leading-snug font-medium">{item.title}</p>
-        <p className="t-desc mt-1 truncate text-xs">
-          {formatLabel(item.format)}
-          {product ? ` · ${product.name}` : ""}{item.brand ? ` · ${item.brand}` : ""}
-        </p>
-        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-start gap-2.5">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-highlight-soft text-highlight">
+            <ClapperboardIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="line-clamp-2 text-sm leading-snug font-semibold">{item.title}</p>
+            <p className="t-desc mt-0.5 truncate text-xs">
+              {formatLabel(item.format)}
+              {product ? ` · ${product.name}` : ""}{item.brand ? ` · ${item.brand}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
           {item.script?.trim() && (
             <span className="inline-flex items-center gap-1" title="Tem roteiro">
               <FileTextIcon className="size-3" /> roteiro
