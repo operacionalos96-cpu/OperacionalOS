@@ -495,9 +495,11 @@
  * t-label   → rótulo: nome de um dado ou grupo. Pequeno, caixa-alta, cinza.
  * t-value   → informação: o dado em si. Grande, tabular, escuro.
  * t-desc    → descrição: contexto/explicação. Normal, cinza, nunca em negrito.
+ * Leitura para qualquer idade: nada de corpo abaixo de 14 px nem rótulo abaixo de 11 px
+ * (WCAG 1.4.4/1.4.12; NN/g, "Legibility, Readability, and Comprehension").
  */
 @utility t-title {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--foreground);
@@ -518,8 +520,8 @@
   color: var(--foreground);
 }
 @utility t-desc {
-  font-size: 0.8125rem;
-  line-height: 1.45;
+  font-size: 0.875rem;
+  line-height: 1.5;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -723,7 +725,7 @@
     width: 100%;
     max-width: var(--page-max);
     margin-inline: auto;
-    padding: 8px var(--gutter) 32px;
+    padding: 12px var(--gutter) 48px;
   }
   .page-body.is-narrow { padding-right: max(var(--gutter), calc(100% - 720px - var(--gutter))); }
   .page-body.is-medium { padding-right: max(var(--gutter), calc(100% - 1100px - var(--gutter))); }

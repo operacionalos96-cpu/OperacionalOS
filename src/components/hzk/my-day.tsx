@@ -320,7 +320,7 @@ function PlanRow({ item, first, index }: { item: PlanItem; first?: boolean; inde
       )}
     >
       {first && !done && (
-        <span className="absolute top-0 right-3 rounded-b-md bg-highlight px-2 py-px text-[10px] font-bold tracking-wide text-white uppercase">Comece por aqui</span>
+        <span className="absolute top-0 right-3 rounded-b-md bg-highlight px-2 py-px text-[11px] font-bold tracking-wide text-white uppercase">Comece por aqui</span>
       )}
       {done ? (
         <div className="flex items-center gap-3 p-3" role="status">

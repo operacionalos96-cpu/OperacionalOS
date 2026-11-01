@@ -83,7 +83,7 @@ function Content() {
           tab === "metricas" ? (
             <SyncMetricsButton onDone={reload} />
           ) : tab === "contas" ? (
-            <Button onClick={() => setAccountForm({ open: true, account: null })}>
+            <Button variant="brand" onClick={() => setAccountForm({ open: true, account: null })}>
               <PlusIcon /> Nova conta
             </Button>
           ) : (

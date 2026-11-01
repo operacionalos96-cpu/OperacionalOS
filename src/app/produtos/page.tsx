@@ -33,7 +33,7 @@ export default function ProductsPage() {
     <div className="flex flex-col">
       <PageHeader page="/produtos"
         actions={
-          <Button onClick={() => setFormOpen(true)}>
+          <Button variant="brand" onClick={() => setFormOpen(true)}>
             <PlusIcon /> Novo produto
           </Button>
         }

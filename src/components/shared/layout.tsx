@@ -172,11 +172,11 @@ export function Panel({
   return (
     <section className={cn("flex flex-col rounded-xl border bg-card shadow-card", className)} style={style}>
       {(title || aside) && (
-        <div className="flex items-start gap-3 border-b px-4 py-3">
+        <div className="flex items-start gap-3 border-b px-5 py-4">
           {Icon && <Icon className="mt-0.5 size-5 shrink-0 text-highlight" />}
           <div className="min-w-0">
             {title && <h2 className="t-title">{title}</h2>}
-            {description && <p className="t-desc mt-0.5 text-xs">{description}</p>}
+            {description && <p className="t-desc mt-1 max-w-prose">{description}</p>}
           </div>
           {aside && <div className="ml-auto flex items-center gap-2 self-center">{aside}</div>}
         </div>

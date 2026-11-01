@@ -327,7 +327,7 @@ function DayProgress({ done, total, team, week }: { done: number; total: number;
               className={cn("size-6 rounded-full", d.today && "ring-2 ring-highlight/50 ring-offset-2 ring-offset-card")}
               style={{ background: d.total ? `conic-gradient(var(--success) ${d.pct * 360}deg, var(--muted) 0)` : "var(--muted)" }}
             />
-            <span className={cn("text-[10px] uppercase", d.today ? "font-semibold text-foreground" : "text-muted-foreground")}>{format(parseISO(d.date), "EEEEE", { locale: ptBR })}</span>
+            <span className={cn("text-[11px] uppercase", d.today ? "font-semibold text-foreground" : "text-muted-foreground")}>{format(parseISO(d.date), "EEEEE", { locale: ptBR })}</span>
           </li>
         ))}
       </ol>
