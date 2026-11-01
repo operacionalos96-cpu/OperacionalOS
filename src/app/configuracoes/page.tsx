@@ -7,7 +7,7 @@ import { getUser } from "@/config/team"
 import type { Area, PersonRef } from "@/lib/domain/areas"
 import { moneyInputValue } from "@/lib/format"
 import { useAreas, useTeamSettings } from "@/lib/modules"
-import { TEAM_SETTINGS_ID } from "@/lib/domain/daily"
+import { DAILY_DEFAULT_TIME, TEAM_SETTINGS_ID } from "@/lib/domain/daily"
 import { ROLE_PAGES, canSee, visiblePages } from "@/lib/domain/access-pages"
 import { isAtLeast } from "@/lib/domain/org"
 import { PAGES } from "@/config/pages"
@@ -177,7 +177,7 @@ function CeoLimitPanel({ editable }: { editable: boolean }) {
 function DailyMeetingPanel({ editable }: { editable: boolean }) {
   const current = useTeamSettings((s) => s.items.find((x) => x.id === TEAM_SETTINGS_ID))
   const save = useTeamSettings((s) => s.save)
-  const [time, setTime] = useState(current?.daily?.time ?? "09:30")
+  const [time, setTime] = useState(current?.daily?.time ?? DAILY_DEFAULT_TIME)
   const [link, setLink] = useState(current?.daily?.link ?? "")
   function submit(e: React.FormEvent) {
     e.preventDefault()
