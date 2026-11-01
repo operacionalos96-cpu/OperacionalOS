@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { LockIcon } from "lucide-react"
+import { CalendarIcon, CoinsIcon, LayersIcon, LockIcon, UsersIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import type { Area, PersonRef } from "@/lib/domain/areas"
 import { moneyInputValue } from "@/lib/format"
@@ -32,17 +32,19 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/configuracoes" />
-      <div className="page-body is-medium grid gap-4">
+      <div className="page-body grid gap-4">
         {!canAdmin && (
           <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm text-muted-foreground">
             <LockIcon className="size-4" /> Só a gestão muda estas configurações. Você pode consultar.
           </p>
         )}
-        <Panel title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela. Compare de relance quem é dono de quê.">
+        <Panel icon={LayersIcon} title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela. Compare de relance quem é dono de quê.">
           <AreasMatrix areas={areas} editable={canAdmin} ownerName={(a) => ownerLabel(a, people)} />
         </Panel>
-        <CeoLimitPanel editable={canAdmin} />
-        <DailyMeetingPanel editable={canAdmin} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CeoLimitPanel editable={canAdmin} />
+          <DailyMeetingPanel editable={canAdmin} />
+        </div>
         <PagesByMemberPanel editable={isOwner} />
       </div>
     </div>
@@ -140,7 +142,7 @@ function CeoLimitPanel({ editable }: { editable: boolean }) {
   const [text, setText] = useState(moneyInputValue(limit ?? undefined))
   const [cents, setCents] = useState<number | null>(limit)
   return (
-    <Panel title="Limite de gasto para a CEO" description="Decisões com dinheiro acima deste valor vão para a CEO. Vazio = o valor não decide sozinho (contrato, contratação e estratégia continuam indo).">
+    <Panel icon={CoinsIcon} title="Limite de gasto para a CEO" description="Decisões com dinheiro acima deste valor vão para a CEO. Vazio = o valor não decide sozinho (contrato, contratação e estratégia continuam indo).">
       <div className="flex flex-wrap items-end gap-3 p-4">
         <div className="min-w-48 flex-1">
           {editable ? (
@@ -188,7 +190,7 @@ function DailyMeetingPanel({ editable }: { editable: boolean }) {
     toast.success("Reunião diária salva")
   }
   return (
-    <Panel title="Reunião diária" description="Quando todos fizerem o check-in, o Pronto libera na Início; com todos prontos, o botão abre este link.">
+    <Panel icon={CalendarIcon} title="Reunião diária" description="Quando todos fizerem o check-in, o Pronto libera na Início; com todos prontos, o botão abre este link.">
       <form id="daily" onSubmit={submit} className="grid gap-3 p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
         <Field label="Horário" htmlFor="daily-time">
           <Input id="daily-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!editable} />
@@ -226,7 +228,7 @@ function PagesByMemberPanel({ editable }: { editable: boolean }) {
   }
 
   return (
-    <Panel title="O que cada um vê" description="As abas do menu de cada pessoa. Começa pelas áreas dela; quem é owner vê tudo.">
+    <Panel icon={UsersIcon} title="O que cada um vê" description="As abas do menu de cada pessoa. Começa pelas áreas dela; quem é owner vê tudo.">
       {others.length === 0 ? (
         <p className="t-desc p-4 text-sm">Ninguém além de você por enquanto.</p>
       ) : (

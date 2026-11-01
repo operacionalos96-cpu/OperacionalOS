@@ -59,13 +59,13 @@ export default function MapsPage() {
           if (f) void importFile(f)
         }}
       />
-      <Button variant="ghost" onClick={() => fileRef.current?.click()}>
+      <Button variant="outline" onClick={() => fileRef.current?.click()}>
         <UploadIcon /> Importar
       </Button>
       <Button variant="outline" onClick={() => setPicking("estruturado")}>
         <NetworkIcon /> Novo mapa estruturado
       </Button>
-      <Button onClick={() => setPicking("lousa")}>
+      <Button variant="brand" onClick={() => setPicking("lousa")}>
         <PenLineIcon /> Nova lousa
       </Button>
     </>
@@ -75,16 +75,16 @@ export default function MapsPage() {
     <div className="flex flex-col">
       <PageHeader page="/mapas" actions={actions}>
         {maps.length > 0 && (
-          <div className="flex gap-1.5" role="tablist" aria-label="Filtrar por tipo">
+          <div className="flex gap-2" role="tablist" aria-label="Filtrar por tipo">
             {(["todos", "lousa", "estruturado"] as const).map((f) => (
               <button
                 key={f}
                 role="tab"
                 aria-selected={filter === f}
                 onClick={() => setFilter(f)}
-                className={cn("rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors", filter === f ? "border-foreground/30 bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+                className={cn("rounded-full border px-4 py-1.5 text-sm font-medium transition-colors", filter === f ? "border-highlight bg-highlight-soft/40 text-foreground" : "bg-card text-muted-foreground hover:text-foreground")}
               >
-                {f === "todos" ? "Todos" : f === "lousa" ? "Lousas" : "Mapas estruturados"} <span className="tabular ml-1 text-muted-foreground">{count(f)}</span>
+                {f === "todos" ? "Todos" : f === "lousa" ? "Lousas" : "Mapas estruturados"} <span className="tabular ml-1.5 rounded-full bg-muted px-1.5 text-xs text-muted-foreground">{count(f)}</span>
               </button>
             ))}
           </div>
@@ -105,13 +105,17 @@ export default function MapsPage() {
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((m) => (
               <li key={m.id}>
-                <Link href={`/mapas/${m.id}`} className="block rounded-xl border-2 bg-card p-4 transition-colors hover:border-foreground/30">
-                  <Preview map={m} />
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-semibold", boardMode(m) === "lousa" ? "border-info/50 text-info" : "border-brand/50 text-brand")}>{BOARD_MODES.find((x) => x.id === boardMode(m))!.short}</span>
-                    <p className="truncate text-[15px] font-semibold">{m.title}</p>
+                <Link href={`/mapas/${m.id}`} className="block overflow-hidden rounded-2xl border bg-card shadow-card transition-[border-color,translate] hover:-translate-y-px hover:border-foreground/25">
+                  {/* Prévia ocupa o topo do card; nome e situação embaixo (mock). */}
+                  <div className="bg-muted/25 p-4">
+                    <Preview map={m} />
                   </div>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
+                  <div className="border-t px-5 py-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className={cn("shrink-0 rounded-lg border px-2 py-0.5 text-xs font-semibold", boardMode(m) === "lousa" ? "text-foreground" : "border-brand/60 bg-brand-soft text-brand")}>{BOARD_MODES.find((x) => x.id === boardMode(m))!.short}</span>
+                    <p className="truncate text-lg font-semibold">{m.title}</p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {boardMode(m) === "lousa"
                       ? statsText(m) || "vazia"
                       : (() => {
@@ -120,6 +124,7 @@ export default function MapsPage() {
                         })()}{" "}
                     · editado {relative(m.updatedAt)}
                   </p>
+                  </div>
                 </Link>
               </li>
             ))}

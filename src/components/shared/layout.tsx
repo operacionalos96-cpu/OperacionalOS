@@ -151,6 +151,7 @@ export function BigEmpty({ icon: Icon, title, text, action }: { icon: React.Comp
 }
 
 export function Panel({
+  icon: Icon,
   title,
   description,
   aside,
@@ -158,6 +159,8 @@ export function Panel({
   className,
   style,
 }: {
+  /** Ícone laranja à esquerda do título (mock): identifica o bloco de relance. */
+  icon?: React.ComponentType<{ className?: string }>
   title?: React.ReactNode
   /** Uma linha explicando o que o bloco mostra. */
   description?: React.ReactNode
@@ -169,7 +172,8 @@ export function Panel({
   return (
     <section className={cn("flex flex-col rounded-xl border bg-card shadow-card", className)} style={style}>
       {(title || aside) && (
-        <div className="flex items-start gap-2 border-b px-4 py-3">
+        <div className="flex items-start gap-3 border-b px-4 py-3">
+          {Icon && <Icon className="mt-0.5 size-5 shrink-0 text-highlight" />}
           <div className="min-w-0">
             {title && <h2 className="t-title">{title}</h2>}
             {description && <p className="t-desc mt-0.5 text-xs">{description}</p>}
