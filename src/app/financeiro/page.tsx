@@ -95,7 +95,6 @@ export default function FinancePage() {
           <StatCard
             label={`Resultado de ${format(periodDate, "MMMM yyyy", { locale: ptBR })}`}
             icon={ScaleIcon}
-            accent="var(--chart-in)"
             metric="resultado-mes"
             style={{ "--i": 1 } as React.CSSProperties}
           >
@@ -112,6 +111,7 @@ export default function FinancePage() {
           <StatCard
             metric="meta-faturamento"
             icon={TargetIcon}
+            led
             accent={stats.goal.pct >= 1 ? "var(--success)" : stats.goal.atRisk ? "var(--warning)" : "var(--brand)"}
             aside={
               <GoalEditor
@@ -139,12 +139,15 @@ export default function FinancePage() {
           </StatCard>
         </div>
 
-        <PlannedVsRealized stats={stats} />
+        {/* Disposição do mock: previsto × destino do dinheiro; depois evolução × entradas/saídas. */}
         <div className="grid gap-4 lg:grid-cols-5">
-          <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" asOf={asOf} />
+          <PlannedVsRealized stats={stats} className="lg:col-span-3" />
           <ExpensesByCategory transactions={transactions} className="lg:col-span-2" period={periodDate} />
         </div>
-        <CashflowChart transactions={transactions.filter(isRealizedTransaction)} asOf={asOf} />
+        <div className="grid gap-4 lg:grid-cols-5">
+          <BalanceChart settings={settings} transactions={transactions} className="lg:col-span-3" asOf={asOf} />
+          <CashflowChart transactions={transactions.filter(isRealizedTransaction)} asOf={asOf} className="lg:col-span-2" />
+        </div>
         </>}
         {tab === "movimentacoes" && <TransactionList transactions={transactions.filter((t) => isRealizedTransaction(t) && inPeriod(t, periodDate))} periodLabel={format(periodDate, "MMMM yyyy", { locale: ptBR })} />}
         {tab === "pagar" && <PlannedAccounts transactions={transactions} type="saida" periodDate={periodDate} />}
@@ -154,7 +157,7 @@ export default function FinancePage() {
   )
 }
 
-function PlannedVsRealized({ stats }: { stats: { planned: ReturnType<typeof plannedStats>; month: { income: number; expense: number; net: number }; balance: number } }) {
+function PlannedVsRealized({ stats, className }: { className?: string; stats: { planned: ReturnType<typeof plannedStats>; month: { income: number; expense: number; net: number }; balance: number } }) {
   const { planned, month } = stats
   const projected = stats.balance + planned.netOpen
   const max = Math.max(1, month.income + planned.incomeOpen, month.expense + planned.expenseOpen)
@@ -175,7 +178,7 @@ function PlannedVsRealized({ stats }: { stats: { planned: ReturnType<typeof plan
     </div>
   )
   return (
-    <Panel title="Previsto vs realizado" description="Sólido = já passou pelo caixa. Contorno = contas do período ainda não baixadas.">
+    <Panel className={className} title="Previsto vs realizado" description="Sólido = já passou pelo caixa. Contorno = contas do período ainda não baixadas.">
       <div className="grid gap-4 p-4">
         {row("Entradas", month.income, planned.incomeOpen, planned.incomeOverdue, "var(--chart-in)")}
         {row("Saídas", month.expense, planned.expenseOpen, planned.expenseOverdue, "var(--chart-out)")}

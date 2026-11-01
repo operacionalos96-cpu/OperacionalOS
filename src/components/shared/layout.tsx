@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import Link from "next/link"
 import { InfoIcon } from "lucide-react"
 import { PAGES } from "@/config/pages"
@@ -164,6 +164,46 @@ export function Panel({
   )
 }
 
+/**
+ * Traço de luz laranja (efeito "LED"/neon da identidade): uma curva que acende no canto do card.
+ * Só decoração — o card precisa de `relative overflow-hidden`. Use em 1 card por grupo, no máximo,
+ * para a luz apontar para o que importa (meta, ticket, fila do dia).
+ */
+export function Led({ corner = "bottom", className }: { corner?: "bottom" | "top"; className?: string }) {
+  const id = useId()
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 320 120"
+      preserveAspectRatio="none"
+      className={cn(
+        "led pointer-events-none absolute right-0 h-[70%] w-[62%] max-w-80",
+        corner === "bottom" ? "bottom-0" : "top-0 -scale-y-100",
+        className,
+      )}
+    >
+      <defs>
+        <linearGradient id={`${id}-s`} x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="var(--highlight)" stopOpacity="0" />
+          <stop offset="0.55" stopColor="var(--highlight)" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#ffb48a" />
+        </linearGradient>
+        <linearGradient id={`${id}-f`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="var(--highlight)" stopOpacity="0.22" />
+          <stop offset="1" stopColor="var(--highlight)" stopOpacity="0" />
+        </linearGradient>
+        <filter id={`${id}-g`} x="-20%" y="-50%" width="140%" height="200%">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
+      </defs>
+      {/* Brilho sob a curva, halo borrado e o fio de luz. */}
+      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4 L 320 120 L 0 120 Z" fill={`url(#${id}-f)`} />
+      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="6" filter={`url(#${id}-g)`} />
+      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 /** "?" discreto que explica o que um número significa e como é calculado. */
 export function InfoTip({ children }: { children: React.ReactNode }) {
   return (
@@ -199,6 +239,7 @@ export function StatCard({
   accent,
   href,
   aside,
+  led,
   children,
   className,
   style,
@@ -211,33 +252,44 @@ export function StatCard({
   accent?: string
   href?: string
   aside?: React.ReactNode
+  /** Traço de luz no canto (efeito LED): no máximo um card por faixa. */
+  led?: boolean
   children: React.ReactNode
   className?: string
   style?: React.CSSProperties
 }) {
   const label = labelOverride ?? (metric ? METRICS[metric].label : "")
   const info = metric ? METRICS[metric].help : infoOverride
+  // Mock da identidade: ícone num quadrado laranja à esquerda; rótulo, valor e contexto à direita.
   const body = (
     <>
-      <div className="flex items-center gap-2">
+      {led && <Led />}
+      <div className="relative flex gap-4">
         {Icon && (
-          <span className="flex size-6 items-center justify-center text-muted-foreground" style={accent ? { color: accent } : undefined}>
-            <Icon className="size-4" />
+          <span
+            className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-highlight/20 bg-highlight-soft text-highlight shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]"
+            style={accent ? { color: accent, backgroundColor: `color-mix(in oklch, ${accent} 14%, transparent)`, borderColor: `color-mix(in oklch, ${accent} 24%, transparent)` } : undefined}
+          >
+            <Icon className="size-6" />
           </span>
         )}
-        {/* Label de KPI em 1 linha (reticências + dica): os valores ficam na mesma linha de base. */}
-        <p className="t-label truncate" title={label}>
-          {label}
-        </p>
-        {info && <InfoTip>{info}</InfoTip>}
-        {aside && <div className="ml-auto">{aside}</div>}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {/* Label de KPI em 1 linha (reticências + dica): os valores ficam na mesma linha de base. */}
+            <p className="truncate text-sm font-medium text-muted-foreground" title={label}>
+              {label}
+            </p>
+            {info && <InfoTip>{info}</InfoTip>}
+            {aside && <div className="ml-auto">{aside}</div>}
+          </div>
+          {children}
+        </div>
       </div>
-      {children}
     </>
   )
   // Profundidade: inclina levemente na direção do mouse (desligado no toque e com "reduzir movimento").
   const tiltRef = useTilt<HTMLDivElement>()
-  const cls = cn("tilt relative flex flex-col rounded-xl border bg-card p-5 shadow-card stagger", className)
+  const cls = cn("tilt relative flex flex-col overflow-hidden rounded-2xl border bg-card p-5 shadow-card stagger", className)
   return href ? (
     <Link href={href} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2" style={style}>
       <div ref={tiltRef} className={cn(cls, "h-full")}>

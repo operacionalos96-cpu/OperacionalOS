@@ -20,7 +20,7 @@ const config = {
   acumulado: { label: "Resultado acumulado", color: "var(--highlight)" },
 } satisfies ChartConfig
 
-export function CashflowChart({ transactions, asOf }: { transactions: Transaction[]; asOf?: Date }) {
+export function CashflowChart({ transactions, asOf, className }: { transactions: Transaction[]; asOf?: Date; className?: string }) {
   const [range, setRange] = useState<"30" | "90">("30")
   // Linha do resultado acumulado no período: "estou no positivo?" (só soma o que a série já tem).
   const data = useMemo(() => {
@@ -33,6 +33,7 @@ export function CashflowChart({ transactions, asOf }: { transactions: Transactio
 
   return (
     <Panel
+      className={className}
       title="Entradas vs saídas"
       description={range === "30" ? "Por dia, últimos 30 dias" : "Por semana, últimos 90 dias"}
       aside={
