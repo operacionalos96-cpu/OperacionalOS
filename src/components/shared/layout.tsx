@@ -132,6 +132,24 @@ export function EmptyState({
   )
 }
 
+/**
+ * Vazio de destaque (mock do AI Office): card grande com o ícone laranja e o traço de luz. Para
+ * a tela inteira de uma seção sem itens; dentro de listas e colunas, use EmptyState.
+ */
+export function BigEmpty({ icon: Icon, title, text, action }: { icon: React.ComponentType<{ className?: string }>; title: string; text?: string; action?: React.ReactNode }) {
+  return (
+    <div className="relative flex animate-enter flex-col items-center gap-3 overflow-hidden rounded-2xl border bg-card px-6 py-16 text-center shadow-card">
+      <Led />
+      <span className="relative mb-2 flex size-20 items-center justify-center rounded-2xl border border-highlight/40 bg-highlight-soft text-highlight shadow-[0_0_20px_-12px_var(--highlight)]">
+        <Icon className="size-9" />
+      </span>
+      <p className="relative text-xl font-semibold">{title}</p>
+      {text && <p className="relative text-sm text-muted-foreground">{text}</p>}
+      {action && <div className="relative mt-3">{action}</div>}
+    </div>
+  )
+}
+
 export function Panel({
   title,
   description,
@@ -166,7 +184,7 @@ export function Panel({
 
 /**
  * Traço de luz laranja (efeito "LED"/neon da identidade): uma curva que acende no canto do card.
- * Só decoração — o card precisa de `relative overflow-hidden`. Use em 1 card por grupo, no máximo,
+ * Só decoração, pequena e fraca: nunca chama mais atenção que o número. O card precisa de `relative overflow-hidden`. Use em 1 card por grupo, no máximo,
  * para a luz apontar para o que importa (meta, ticket, fila do dia).
  */
 export function Led({ corner = "bottom", className }: { corner?: "bottom" | "top"; className?: string }) {
@@ -177,7 +195,7 @@ export function Led({ corner = "bottom", className }: { corner?: "bottom" | "top
       viewBox="0 0 320 120"
       preserveAspectRatio="none"
       className={cn(
-        "led pointer-events-none absolute right-0 h-[70%] w-[62%] max-w-80",
+        "led pointer-events-none absolute right-0 h-[min(50%,4.5rem)] w-[42%] max-w-56 opacity-70",
         corner === "bottom" ? "bottom-0" : "top-0 -scale-y-100",
         className,
       )}
@@ -185,11 +203,11 @@ export function Led({ corner = "bottom", className }: { corner?: "bottom" | "top
       <defs>
         <linearGradient id={`${id}-s`} x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="var(--highlight)" stopOpacity="0" />
-          <stop offset="0.55" stopColor="var(--highlight)" stopOpacity="0.9" />
-          <stop offset="1" stopColor="#ffb48a" />
+          <stop offset="0.6" stopColor="var(--highlight)" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#ffb48a" stopOpacity="0.85" />
         </linearGradient>
         <linearGradient id={`${id}-f`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="var(--highlight)" stopOpacity="0.22" />
+          <stop offset="0" stopColor="var(--highlight)" stopOpacity="0.1" />
           <stop offset="1" stopColor="var(--highlight)" stopOpacity="0" />
         </linearGradient>
         <filter id={`${id}-g`} x="-20%" y="-50%" width="140%" height="200%">
@@ -198,8 +216,8 @@ export function Led({ corner = "bottom", className }: { corner?: "bottom" | "top
       </defs>
       {/* Brilho sob a curva, halo borrado e o fio de luz. */}
       <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4 L 320 120 L 0 120 Z" fill={`url(#${id}-f)`} />
-      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="6" filter={`url(#${id}-g)`} />
-      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="4" opacity="0.6" filter={`url(#${id}-g)`} />
+      <path d="M0 112 C 90 112, 150 70, 205 64 S 285 20, 320 4" fill="none" stroke={`url(#${id}-s)`} strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   )
 }

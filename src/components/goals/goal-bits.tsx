@@ -47,7 +47,7 @@ export function GoalRow({ goal, className, size = "compact" }: { goal: Goal; cla
         </div>
         <div className="h-2.5 overflow-hidden rounded-full bg-muted">
           <div
-            className={cn("h-full rounded-full transition-[width] duration-500", pct >= 100 ? "bg-success" : "bg-gradient-to-r from-brand to-[#ff8a57] shadow-[0_0_12px_var(--brand)]")}
+            className={cn("h-full rounded-full transition-[width] duration-500", pct >= 100 ? "bg-success" : "bg-gradient-to-r from-brand to-[#ff8a57] shadow-[0_0_6px_-1px_var(--brand)]")}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>

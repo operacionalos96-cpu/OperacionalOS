@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { KeyRoundIcon, PlusIcon } from "lucide-react"
+import { CodeIcon, CpuIcon, KeyRoundIcon, PlusIcon } from "lucide-react"
+import { BigEmpty } from "@/components/shared/layout"
 import { workerHealth, type WorkerHealth } from "@/lib/domain/jobs"
 import { relative } from "@/lib/format"
 import { useAgents } from "@/lib/modules"
@@ -65,12 +66,12 @@ export function WorkersPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-2">
         <p className="t-desc text-sm">Cada app/IA que trabalha na fila é um worker, com token próprio, capabilities e permissões mínimas.</p>
-        <Button size="sm" onClick={() => setCreating(true)}>
+        <Button variant="brand" onClick={() => setCreating(true)}>
           <PlusIcon /> Novo worker
         </Button>
       </div>
       {workers.length === 0 ? (
-        <p className="t-desc rounded-xl border bg-card p-6 text-center text-sm">Nenhum worker ainda.</p>
+        <BigEmpty icon={CpuIcon} title="Nenhum worker ainda" text="Cadastre o app ou a IA que vai pegar trabalho da fila." action={<Button variant="outline" className="border-brand" onClick={() => setCreating(true)}><PlusIcon /> Novo worker</Button>} />
       ) : (
         <ul className="grid gap-2 md:grid-cols-2">
           {workers.map((w) => (
@@ -103,14 +104,21 @@ export function WorkersPanel() {
           ))}
         </ul>
       )}
-      <div className="rounded-xl border bg-card p-4 text-xs text-muted-foreground">
-        <p className="t-label mb-1">Como conectar</p>
+      <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 text-xs text-muted-foreground shadow-card md:flex-row md:items-center">
+        <span className="flex items-center gap-3 md:w-52 md:shrink-0">
+          <span className="flex size-11 items-center justify-center rounded-xl border border-highlight/20 bg-highlight-soft text-highlight">
+            <CodeIcon className="size-5" />
+          </span>
+          <span className="text-base font-semibold text-foreground">Como conectar</span>
+        </span>
+        <div className="grid flex-1 gap-1">
         <p>
           <strong>MCP</strong> (Claude Code/Desktop, ChatGPT dev mode): servidor HTTP <code>{origin}/api/mcp</code> com cabeçalho <code>Authorization: Bearer &lt;token&gt;</code>.
         </p>
         <p className="mt-1">
           <strong>REST</strong> (automações): <code>POST {origin}/api/workers/claim_next_job</code> com o mesmo cabeçalho. Sem job, a resposta traz <code>poll.retry_after_seconds</code>.
         </p>
+        </div>
       </div>
       {creating && <CreateWorker onClose={() => setCreating(false)} onCreated={setToken} />}
       {token && <RevealOnce title="Token do worker" value={token} hint="Configure no app/automação como Authorization: Bearer <token>. Se vazar, gere um novo aqui." onClose={() => setToken(null)} />}

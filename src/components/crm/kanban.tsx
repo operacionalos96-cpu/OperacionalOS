@@ -141,10 +141,10 @@ function Column({
       )}
     >
       {/* Brilho da etapa no topo da coluna (profundidade, como nos cards). */}
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-[0.07]" style={{ background: `linear-gradient(to bottom, ${color}, transparent)` }} />
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-16 opacity-[0.04]" style={{ background: `linear-gradient(to bottom, ${color}, transparent)` }} />
       <div className="relative grid gap-2 px-4 pt-4 pb-3">
         <div className="flex items-center gap-2.5">
-          <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
+          <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
           <span className="text-base font-semibold tracking-tight">{label}</span>
           <span className="tabular rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{leads.length + hidden}</span>
         </div>

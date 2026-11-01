@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { toast } from "sonner"
-import { CopyIcon, KeyRoundIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
+import { CopyIcon, KeyRoundIcon, PlusIcon, RotateCcwIcon, Trash2Icon, WebhookIcon } from "lucide-react"
+import { BigEmpty } from "@/components/shared/layout"
 import { EVENT_TYPES } from "@/lib/domain/ai-office"
 import { relative } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -61,12 +62,12 @@ export function WebhooksPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-2">
         <p className="t-desc text-sm">Avisam sistemas externos (n8n, Make, servidor de um worker) quando algo acontece. Assinados com HMAC-SHA256; entregues em segundo plano, com novas tentativas.</p>
-        <Button size="sm" onClick={() => setCreating(true)}>
+        <Button variant="brand" onClick={() => setCreating(true)}>
           <PlusIcon /> Novo webhook
         </Button>
       </div>
       {webhooks.length === 0 ? (
-        <p className="t-desc rounded-xl border bg-card p-6 text-center text-sm">Nenhum webhook. Sem push, os workers usam polling inteligente.</p>
+        <BigEmpty icon={WebhookIcon} title="Nenhum webhook configurado" text="Sem push, os workers usam polling inteligente." action={<Button variant="outline" className="border-brand" onClick={() => setCreating(true)}><PlusIcon /> Novo webhook</Button>} />
       ) : (
         <ul className="grid gap-2">
           {webhooks.map((w) => {

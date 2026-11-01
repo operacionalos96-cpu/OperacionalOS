@@ -252,7 +252,7 @@
       radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%),
       radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--hzk-navy) 5%, transparent), transparent 70%),
       /* Brasa no canto inferior direito (mock): a mesma luz laranja dos traços LED dos cards. */
-      radial-gradient(42rem 26rem at 105% 108%, color-mix(in oklch, var(--brand) 13%, transparent), transparent 70%);
+      radial-gradient(32rem 20rem at 105% 110%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%);
     background-attachment: fixed;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
