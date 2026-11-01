@@ -2,7 +2,7 @@
 
 import { Suspense } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Segmented } from "@/components/shared/fields"
+import { SectionTabs } from "@/components/shared/fields"
 import { PageHeader } from "@/components/shared/layout"
 import { Notes } from "@/components/tasks/notes"
 import { TaskList } from "@/components/tasks/task-list"
@@ -33,8 +33,7 @@ function TasksAndNotes() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader page="/tarefas">
-        <Segmented
-          className="w-fit"
+        <SectionTabs
           value={tab}
           onChange={(v) => go({ aba: v })}
           options={[

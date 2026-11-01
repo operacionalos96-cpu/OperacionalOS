@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeftIcon, MaximizeIcon, MinimizeIcon } from "lucide-react"
+import { ArrowLeftIcon, MaximizeIcon, MinimizeIcon, CloudCheckIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store"
 import { deleteMapWithRows, migrateMap, restoreMapWithRows, useMindMap, useRowStorageReady } from "@/lib/maps"
@@ -96,7 +96,10 @@ export default function MapPage() {
         ) : (
           <p className="ml-auto hidden min-w-0 truncate text-sm text-muted-foreground lg:block">{statsText(map) || "Lousa vazia"}</p>
         )}
-        <span className="hidden text-xs whitespace-nowrap text-muted-foreground xl:block">Salvo automaticamente</span>
+        {/* Salvamento num ícone com dica, para a barra não acumular texto. */}
+        <span className="flex size-8 items-center justify-center text-success" title="Salvo automaticamente" aria-label="Salvo automaticamente">
+          <CloudCheckIcon className="size-4" />
+        </span>
         <Button variant="ghost" size="icon-sm" onClick={toggleFocus} aria-pressed={focusMode} aria-label={focusMode ? "Sair do modo foco" : "Modo foco: esconde o menu lateral"} title={focusMode ? "Sair do modo foco" : "Modo foco: tela toda para o quadro"}>
           {focusMode ? <MinimizeIcon /> : <MaximizeIcon />}
         </Button>

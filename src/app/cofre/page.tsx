@@ -162,7 +162,7 @@ export default function VaultPage() {
           )
         }
       />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
+      <div className="page-body is-narrow grid gap-4">
         {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
         {!items && !error && <Unlock onUnlocked={load} />}
         {items && items.length === 0 && (

@@ -4,9 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import {
-  ArrowLeftIcon,
-  CheckIcon,
+import { CheckIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FileVideoIcon,
@@ -42,7 +40,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Chip, DueDateField, Field, OwnerToggle, ProductSelect } from "@/components/shared/fields"
-import { Panel, NotFound } from "@/components/shared/layout"
+import { Panel, NotFound, Breadcrumb } from "@/components/shared/layout"
 import { PlatformIcon, accountLabel } from "@/components/content/content-bits"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
@@ -74,10 +72,8 @@ export default function ContentItemPage() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex flex-col gap-3 border-b px-4 py-4 sm:px-6">
-        <Link href="/conteudos" className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeftIcon className="size-3.5" /> Conteúdos
-        </Link>
+      <header className="page-container flex flex-col gap-3 pt-6 pb-3">
+        <Breadcrumb href="/conteudos" label="Conteúdos" current={item.title} />
         <div className="flex items-start gap-3">
           <TitleEditor value={item.title} onSave={(title) => set({ title })} />
           <Button variant="ghost" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={destroy} aria-label="Excluir conteúdo">
@@ -97,7 +93,7 @@ export default function ContentItemPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6 lg:grid-cols-3">
+      <div className="page-body grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <ScriptPanel item={item} />
           <AssetsPanel item={item} />

@@ -181,6 +181,12 @@ export function monthDelta(settings: FinanceSettings, txs: Transaction[], now: D
   return { net, pct }
 }
 
+/**
+ * Variação percentual que vale mostrar (briefing UI/UX): com a base anterior muito pequena, o % vira
+ * ruído ("+R$ 110 (11000%)"). Acima de 300% em módulo, mostre só o valor absoluto.
+ */
+export const meaningfulPct = (pct: number | null): number | null => (pct === null || !Number.isFinite(pct) || Math.abs(pct) > 3 ? null : pct)
+
 export function goalProgress(settings: FinanceSettings, txs: Transaction[], now: Date) {
   const target = settings.monthlyGoals[monthKey(now)] ?? 0
   const achieved = monthStats(txs, now).income
@@ -367,6 +373,54 @@ export function dayProgress(tasks: Task[], userId: string | null, now: Date) {
   const pending = mine.filter((t) => !t.done).length
   const total = doneToday + pending
   return { done: doneToday, total, pct: total ? doneToday / total : 0 }
+}
+
+// ---------- atraso do lead (Pipeline: chips e faixas) ----------
+
+/** Dias de atraso de um lead: ação vencida = desde a data; parado = desde a última atividade. */
+export function leadDelayDays(lead: Lead, now: Date): number {
+  const u = leadUrgency(lead, now)
+  if (u === "vencida") return daysSince(lead.nextAction.dueDate, now)
+  if (u === "parado") return daysSince(lead.lastActivityAt, now)
+  return 0
+}
+
+/** Tom do chip de atraso (briefing): até 6 dias neutro, 7–29 âmbar, 30+ vermelho. Sem borda colorida. */
+export const delayTone = (days: number): "neutral" | "warning" | "danger" => (days >= 30 ? "danger" : days >= 7 ? "warning" : "neutral")
+
+export type DelayBand = "30+" | "15-29" | "ate14"
+export const DELAY_BANDS: { id: DelayBand; label: string }[] = [
+  { id: "30+", label: "30 dias ou mais" },
+  { id: "15-29", label: "15 a 29 dias" },
+  { id: "ate14", label: "Até 14 dias" },
+]
+export const delayBand = (days: number): DelayBand => (days >= 30 ? "30+" : days >= 15 ? "15-29" : "ate14")
+
+/** Histograma de dias sem ação (0–7, 8–14, 15–29, 30+), clicável como filtro. */
+export function delayHistogram(days: number[]): { id: string; label: string; count: number; min: number; max: number }[] {
+  const bins = [
+    { id: "0-7", label: "0–7", min: 0, max: 7 },
+    { id: "8-14", label: "8–14", min: 8, max: 14 },
+    { id: "15-29", label: "15–29", min: 15, max: 29 },
+    { id: "30+", label: "30+", min: 30, max: Infinity },
+  ]
+  return bins.map((b) => ({ ...b, count: days.filter((d) => d >= b.min && d <= b.max).length }))
+}
+
+/**
+ * Faixa da semana (Tarefas, briefing): para cada dia de segunda a domingo, quanto do que vencia
+ * naquele dia foi concluído. Mesma base do "Seu dia" (prazo), só que por dia.
+ */
+export function weekProgress(tasks: Task[], userId: string | null, now: Date): { date: string; done: number; total: number; pct: number; today: boolean }[] {
+  const monday = startOfWeek(now, { weekStartsOn: 1 })
+  const todayKey = format(now, "yyyy-MM-dd")
+  const mine = tasks.filter((t) => (userId === null || isTaskFor(t, userId)) && t.dueDate)
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = format(addDays(monday, i), "yyyy-MM-dd")
+    const ofDay = mine.filter((t) => t.dueDate!.slice(0, 10) === date)
+    const done = ofDay.filter((t) => t.done).length
+    return { date, done, total: ofDay.length, pct: ofDay.length ? done / ofDay.length : 0, today: date === todayKey }
+  })
 }
 
 // ---------- utils ----------

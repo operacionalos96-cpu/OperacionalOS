@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -21,6 +21,8 @@ import {
   UserPlusIcon,
   WalletIcon,
   WifiOffIcon,
+  PinIcon,
+  PinOffIcon,
 } from "lucide-react"
 import { getUser } from "@/config/team"
 import { isOverdue, isTaskFor, leadsNeedingAction } from "@/lib/domain/rules"
@@ -55,7 +57,7 @@ import { PresenceDot } from "@/components/hzk/presence-badge"
 import { startPresence } from "@/lib/presence"
 import { startAutomations } from "@/lib/automations"
 import { startEventFeed } from "@/lib/event-service"
-import { NAV, NAV_SECTIONS, isActive } from "./nav"
+import { NAV, NAV_SECTIONS, isActive, type NavItem } from "./nav"
 import { pageOf } from "@/lib/domain/access-pages"
 import { useVisiblePages } from "@/lib/use-access-pages"
 
@@ -103,7 +105,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
       <main className={cn("flex min-w-0 flex-1 flex-col overflow-y-auto", !focusMode && "pb-16 md:pb-0")}>
         {/* key por rota: cada página entra com um fade curto. */}
         {hydrated ? (
-          <div key={pathname} className="flex min-h-0 flex-1 animate-enter flex-col">
+          <div key={pathname} className="page-enter flex min-h-0 flex-1 flex-col">
             <PageGate pathname={pathname}>{children}</PageGate>
           </div>
         ) : (
@@ -152,7 +154,7 @@ function useBadges() {
     const now = new Date()
     return {
       "/caixa-de-entrada": [...items, ...tasks].filter((t) => inInbox(t) && (t.ownerId === meId || t.createdById === meId || !t.ownerId)).length,
-      "/pipeline": leadsNeedingAction(leads, now).length,
+      "/pipeline": leadsNeedingAction(leads.filter((l) => l.ownerId === meId), now).length,
       "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length,
     } as Record<string, number>
   }, [leads, tasks, items, meId])
@@ -182,72 +184,129 @@ function PageGate({ pathname, children }: { pathname: string; children: React.Re
   )
 }
 
+const PIN_KEY = "hzk-os-sidebar-fixa"
+
+/**
+ * Barra lateral (Briefing UI/UX, ADR 0013): a pílula escura de sempre, agora em grupos
+ * (Dia a dia · Vendas · Criação · Gestão; Sistema no rodapé fixo). Ao passar o mouse (ou focar
+ * pelo teclado) ela se expande sobre o conteúdo, sem empurrá-lo, mostrando rótulos e nomes dos
+ * grupos; "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
+ */
 function Sidebar() {
   const pathname = usePathname()
   const sections = useNavSections()
   const badges = useBadges()
   const hydrated = useStore((s) => s.hydrated)
+  const [hover, setHover] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  useEffect(() => {
+    try {
+      setPinned(localStorage.getItem(PIN_KEY) === "1")
+    } catch {}
+  }, [])
+  const togglePin = () => {
+    const next = !pinned
+    setPinned(next)
+    try {
+      localStorage.setItem(PIN_KEY, next ? "1" : "0")
+    } catch {}
+  }
+  const open = pinned || hover
+  const main = sections.filter((s) => s.title !== "Sistema")
+  const system = sections.find((s) => s.title === "Sistema")
+
+  const item = (it: NavItem) => {
+    const active = isActive(pathname, it.href)
+    const badge = hydrated ? (badges[it.href] ?? 0) : 0
+    return (
+      <Link
+        key={it.href}
+        href={it.href}
+        aria-label={it.label}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "group/nav relative flex h-9 shrink-0 items-center rounded-full text-sidebar-foreground/60 transition-[background-color,color] duration-(--dur-1) hover:bg-sidebar-accent hover:text-sidebar-foreground",
+          open ? "w-full gap-3 px-2.5" : "w-9 justify-center",
+          active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+        )}
+      >
+        <it.icon className="size-[18px] shrink-0 transition-transform duration-(--dur-1) group-hover/nav:scale-110" />
+        {open && <span className="nav-label truncate text-sm font-medium">{it.label}</span>}
+        {badge > 0 && (
+          <span
+            className={cn(
+              "tabular flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar",
+              open ? "ml-auto" : "absolute -top-0.5 -right-0.5",
+            )}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
+  const group = (s: (typeof sections)[number], i: number) => (
+    <div key={s.title ?? i} className={cn("flex w-full flex-col gap-1", open ? "items-stretch" : "items-center")}>
+      {open ? (
+        <p className="nav-label px-2.5 pt-2 pb-0.5 text-[10px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">{s.title}</p>
+      ) : (
+        i > 0 && <span className="my-1.5 h-px w-6 bg-sidebar-foreground/10" aria-hidden />
+      )}
+      {s.items.map(item)}
+    </div>
+  )
 
   return (
-    // Pílula escura flutuante, só ícones; o nome aparece no balão ao passar o mouse.
-    <aside className="hidden shrink-0 p-3 pr-0 md:flex">
-      <div className="flex w-16 flex-col items-center gap-2.5 rounded-[28px] bg-sidebar py-3.5 text-sidebar-foreground shadow-lift">
-        {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
-        <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 rounded-full ring-2 ring-sidebar-border" />
+    <aside className={cn("relative hidden shrink-0 transition-[width] duration-(--dur-4) ease-(--ease-std) md:block", pinned ? "w-[244px]" : "w-[76px]")}>
+      <div
+        onPointerEnter={() => setHover(true)}
+        onPointerLeave={() => setHover(false)}
+        onFocus={() => setHover(true)}
+        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
+        className={cn(
+          "absolute inset-y-3 left-3 z-40 flex flex-col gap-2.5 overflow-hidden rounded-[28px] bg-sidebar py-3.5 text-sidebar-foreground shadow-lift transition-[width] duration-(--dur-4) ease-(--ease-std)",
+          open ? "w-[220px] px-2.5" : "w-16 items-center",
+        )}
+      >
+        <div className={cn("flex items-center gap-2", open && "px-1")}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
+          <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 shrink-0 rounded-full ring-2 ring-sidebar-border" />
+          {open && (
+            <>
+              <span className="nav-label flex-1 truncate text-sm font-semibold">Operacional OS</span>
+              <button
+                type="button"
+                onClick={togglePin}
+                aria-pressed={pinned}
+                aria-label={pinned ? "Soltar a barra lateral" : "Fixar a barra lateral aberta"}
+                title={pinned ? "Soltar" : "Fixar aberta"}
+                className="nav-label rounded-full p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                {pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}
+              </button>
+            </>
+          )}
+        </div>
 
-        <div className="flex flex-col items-center gap-1.5">
+        <div className={cn("flex gap-1.5", open ? "flex-row items-center px-1" : "flex-col items-center")}>
           <NewMenu compact />
           <RailButton label="Buscar (Ctrl K)" onClick={() => useUI.getState().set({ paletteOpen: true })}>
             <SearchIcon className="size-[18px]" />
           </RailButton>
+          {open && (
+            <kbd className="nav-label ml-auto rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] text-sidebar-foreground/60" aria-hidden>
+              Ctrl K
+            </kbd>
+          )}
         </div>
 
-        {/* w-full: a rolagem corta o que sai da largura; o marcador laranja fica na borda da pílula.
-            Em tela baixa, ScrollHint mostra que há mais itens embaixo (antes ficavam escondidos sem aviso). */}
-        <ScrollHint>
-          {sections.map((section, si) => (
-            <div key={si} className="flex flex-col items-center gap-1">
-              {si > 0 && <span className="my-1 h-px w-6 bg-sidebar-border" aria-hidden />}
-              {section.items.map((item) => {
-                const active = isActive(pathname, item.href)
-                const badge = hydrated ? badges[item.href] : 0
-                return (
-                  <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={item.href}
-                        aria-label={item.label}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "group/nav relative flex size-9 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                          active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
-                        )}
-                      >
-                        {/* Ativo = círculo claro + marcador laranja na borda da pílula. */}
-                        <span
-                          className={cn(
-                            "absolute top-1/2 -left-3 h-4 w-1 -translate-y-1/2 rounded-r-full bg-highlight transition-transform duration-300",
-                            active ? "scale-y-100" : "scale-y-0",
-                          )}
-                        />
-                        <item.icon className="size-[18px] transition-transform duration-200 group-hover/nav:scale-110" />
-                        {badge > 0 && (
-                          <span className="tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-xs font-semibold text-white ring-2 ring-sidebar">
-                            {badge}
-                          </span>
-                        )}
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={10}>
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                )
-              })}
-            </div>
-          ))}
+        <ScrollHint open={open} pathname={pathname}>
+          {main.map(group)}
         </ScrollHint>
 
+        {/* Sistema: rodapé fixo, fora da rolagem. */}
+        {system && <div className="w-full border-t border-sidebar-foreground/10 pt-2">{group({ ...system, title: open ? system.title : null }, 0)}</div>}
         <DoingRail />
         <AccountMenu />
       </div>
@@ -408,9 +467,15 @@ function AccountMenu() {
 }
 
 /** Lista que rola com um sinal visível quando há mais itens embaixo (degradê + seta). */
-function ScrollHint({ children }: { children: React.ReactNode }) {
+function ScrollHint({ children, open, pathname }: { children: React.ReactNode; open: boolean; pathname: string }) {
   const ref = useRef<HTMLElement>(null)
   const [more, setMore] = useState(false)
+  // Indicador laranja único que desliza até o item ativo (em vez de piscar em cada item).
+  const [mark, setMark] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current?.querySelector<HTMLElement>("[aria-current=page]")
+    setMark(el ? el.offsetTop + el.offsetHeight / 2 - 8 : null)
+  }, [pathname, open, children])
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -426,7 +491,14 @@ function ScrollHint({ children }: { children: React.ReactNode }) {
   }, [])
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
-      <nav ref={ref} className="flex min-h-0 w-full flex-1 flex-col items-center gap-0.5 overflow-y-auto [scrollbar-width:none]">
+      <nav ref={ref} className={cn("relative flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-y-auto [scrollbar-width:none]", open ? "items-stretch" : "items-center")}>
+        {mark !== null && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-0 h-4 w-1 rounded-r-full bg-highlight transition-[top] duration-(--dur-3) ease-(--ease-std)"
+            style={{ top: mark }}
+          />
+        )}
         {children}
       </nav>
       {more && (

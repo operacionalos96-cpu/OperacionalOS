@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { InfoIcon } from "lucide-react"
 import { PAGES } from "@/config/pages"
@@ -8,6 +9,23 @@ import { PageHelp } from "./page-help"
 import { useTilt } from "@/lib/use-tilt"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+
+/** Caminho acima do título ("Produtos / Curso X"): o jeito único de voltar de uma tela de detalhe. */
+export function Breadcrumb({ href, label, current }: { href: string; label: string; current?: string }) {
+  return (
+    <nav aria-label="Caminho" className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <Link href={href} className="action-link">
+        {label}
+      </Link>
+      {current && (
+        <>
+          <span aria-hidden>/</span>
+          <span className="truncate text-foreground">{current}</span>
+        </>
+      )}
+    </nav>
+  )
+}
 
 /**
  * Cabeçalho padrão de página. Use `page="/rota"`: título, descrição e o botão "Como usar" vêm de
@@ -21,31 +39,53 @@ export function PageHeader({
   title,
   description,
   actions,
+  back,
   children,
 }: {
   page?: (typeof PAGES)[number]["href"]
   title?: string
   description?: string
   actions?: React.ReactNode
+  /** Caminho de volta (breadcrumb acima do título), ex.: { href: "/equipe", label: "Equipe" }. */
+  back?: { href: string; label: string }
   children?: React.ReactNode
 }) {
   const info = page ? PAGES.find((p) => p.href === page) : undefined
+  // Cabeçalho fixo que encolhe ao rolar (72 → 52 px; o subtítulo some): as ações ficam sempre à mão.
+  const sentinel = useRef<HTMLDivElement>(null)
+  const [compact, setCompact] = useState(false)
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
   return (
-    <header className="flex flex-col gap-3 bg-background/80 px-4 pt-6 pb-3 backdrop-blur sm:px-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title ?? info?.title}</h1>
-          {(description ?? info?.purpose) && <p className="t-desc mt-0.5 text-sm">{description ?? info?.purpose}</p>}
-        </div>
-        {(info || actions) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {info && <PageHelp page={info} />}
-            {actions}
+    <>
+      <div ref={sentinel} aria-hidden className="h-px" />
+      <header
+        data-compact={compact ? "" : undefined}
+        className="sticky top-0 z-20 border-b border-transparent bg-background/80 backdrop-blur transition-[border-color,box-shadow] duration-(--dur-3) data-compact:border-border data-compact:shadow-[0_8px_24px_-20px_rgb(0_0_0/0.25)]"
+      >
+        <div className={cn("page-container flex flex-col gap-3 transition-[padding] duration-(--dur-3) ease-(--ease-std)", compact ? "py-2" : "pt-6 pb-3")}>
+          {back && !compact && <Breadcrumb href={back.href} label={back.label} current={title ?? info?.title} />}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className={cn("truncate font-semibold tracking-tight transition-[font-size] duration-(--dur-3)", compact ? "text-lg" : "text-2xl")}>{title ?? info?.title}</h1>
+              {(description ?? info?.purpose) && !compact && <p className="t-desc mt-0.5 text-sm">{description ?? info?.purpose}</p>}
+            </div>
+            {(info || actions) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {info && <PageHelp page={info} />}
+                {actions}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      {children}
-    </header>
+          {children}
+        </div>
+      </header>
+    </>
   )
 }
 
@@ -185,7 +225,10 @@ export function StatCard({
             <Icon className="size-4" />
           </span>
         )}
-        <p className="t-label">{label}</p>
+        {/* Label de KPI em 1 linha (reticências + dica): os valores ficam na mesma linha de base. */}
+        <p className="t-label truncate" title={label}>
+          {label}
+        </p>
         {info && <InfoTip>{info}</InfoTip>}
         {aside && <div className="ml-auto">{aside}</div>}
       </div>

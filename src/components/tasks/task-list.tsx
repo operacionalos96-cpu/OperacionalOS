@@ -3,6 +3,8 @@
 import { projectKey, uniqueProjects } from "@/lib/domain/project-names"
 import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import {
   AlignLeftIcon,
   ArrowDownUpIcon,
@@ -15,9 +17,9 @@ import {
   MoreHorizontalIcon,
   RepeatIcon,
   SearchIcon,
-  SparklesIcon,
   Trash2Icon,
   XIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react"
 import { getUser } from "@/config/team"
 import { useTeam } from "@/lib/use-team"
@@ -36,6 +38,7 @@ import {
   daysSince,
   parseQuickAdd,
   taskBucket,
+  weekProgress,
 } from "@/lib/domain/rules"
 import { dueLabel, dueShortcuts } from "@/lib/format"
 import { cycleTaskStatus, deleteTaskWithUndo } from "@/lib/actions"
@@ -107,6 +110,14 @@ export function TaskList() {
   const allLabels = useMemo(() => [...new Set(tasks.flatMap((t) => t.labels ?? []))].sort(), [tasks])
   const allProjects = useMemo(() => uniqueProjects(tasks.map((t) => t.projectName)), [tasks])
   const filtering = !!query || !!priority || !!label || project !== "todos" || responsible !== "todos" || dueFilter !== "todos"
+  const DUE_LABEL = { atrasadas: "Atrasadas", hoje: "Vencem hoje", com_prazo: "Com prazo", sem_prazo: "Sem prazo" } as const
+  const activeFilters = [
+    project !== "todos" && { id: "projeto", label: project, clear: () => setProject("todos") },
+    responsible !== "todos" && { id: "resp", label: getUser(responsible).name, clear: () => setResponsible("todos") },
+    dueFilter !== "todos" && { id: "prazo", label: DUE_LABEL[dueFilter], clear: () => setDueFilter("todos") },
+    priority && { id: "prio", label: PRIORITIES.find((p) => p.id === priority)!.label, clear: () => setPriority(null) },
+    label && { id: "etq", label: `#${label}`, clear: () => setLabel(null) },
+  ].filter(Boolean) as { id: string; label: string; clear: () => void }[]
 
   const grouped = useMemo(() => {
     const n = new Date()
@@ -137,60 +148,91 @@ export function TaskList() {
   let rowIndex = 0
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
-      <DayProgress done={progress.done} total={progress.total} team={scope === "todas"} />
+    <div className="page-body flex flex-col gap-5">
+      <DayProgress done={progress.done} total={progress.total} team={scope === "todas"} week={weekProgress(tasks, scope === "minhas" ? meId : null, now)} />
 
       <QuickAdd />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Segmented
-          size="sm"
-          value={scope}
-          onChange={setScope}
-          options={[
-            { value: "todas", label: <>Equipe <span className="tabular text-muted-foreground">{openOf(false)}</span></> },
-            { value: "minhas", label: <>Minhas <span className="tabular text-muted-foreground">{openOf(true)}</span></> },
-          ]}
-        />
-        <div className="relative min-w-40 flex-1 sm:max-w-56">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar tarefa" className="h-7 pl-8 text-xs" />
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Segmented
+            size="sm"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: "todas", label: <>Equipe <span className="tabular text-muted-foreground">{openOf(false)}</span></> },
+              { value: "minhas", label: <>Minhas <span className="tabular text-muted-foreground">{openOf(true)}</span></> },
+            ]}
+          />
+          <div className="relative min-w-40 flex-1 sm:max-w-64">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar tarefa" className="h-7 pl-8 text-xs" />
+          </div>
+          {/* Filtros recolhidos (briefing): um botão "Filtros (n)" no lugar de duas fileiras de controles. */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Chip active={activeFilters.length > 0}>
+                <SlidersHorizontalIcon className="size-3.5" /> Filtros{activeFilters.length ? ` (${activeFilters.length})` : ""}
+              </Chip>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="grid w-72 gap-3 p-3">
+              <label className="grid gap-1 text-xs font-medium">
+                Projeto
+                <select aria-label="Filtrar por projeto" value={project} onChange={(e) => setProject(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground">
+                  <option value="todos">Todos os projetos</option>
+                  {allProjects.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Responsável
+                <select aria-label="Filtrar por responsável" value={responsible} onChange={(e) => setResponsible(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground">
+                  <option value="todos">Todos responsáveis</option>
+                  {TEAM.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Prazo
+                <select aria-label="Filtrar por prazo" value={dueFilter} onChange={(e) => setDueFilter(e.target.value as typeof dueFilter)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground">
+                  <option value="todos">Todos os prazos</option><option value="atrasadas">Atrasadas</option><option value="hoje">Vencem hoje</option><option value="com_prazo">Com prazo</option><option value="sem_prazo">Sem prazo</option>
+                </select>
+              </label>
+              <div className="grid gap-1 text-xs font-medium">
+                Prioridade
+                <div className="flex flex-wrap gap-1.5">
+                  {PRIORITIES.map((p) => (
+                    <Chip key={p.id} active={priority === p.id} onClick={() => setPriority(priority === p.id ? null : p.id)}>
+                      <FlagIcon className="size-3.5" style={{ color: p.color }} /> {p.label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              {allLabels.length > 0 && (
+                <div className="grid gap-1 text-xs font-medium">
+                  Etiqueta
+                  <div className="flex flex-wrap gap-1.5">
+                    {allLabels.map((l) => (
+                      <button key={l} type="button" onClick={() => setLabel(label === l ? null : l)} className={cn("rounded-full transition-transform hover:scale-105", label === l && "ring-2 ring-brand/50")}>
+                        <LabelChip label={l} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+          <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setSort(sort === "prazo" ? "prioridade" : "prazo")}>
+            <ArrowDownUpIcon /> {sort === "prazo" ? "Por prazo" : "Por prioridade"}
+          </Button>
         </div>
-        <select aria-label="Filtrar por projeto" value={project} onChange={(e) => setProject(e.target.value)} className="h-7 max-w-40 rounded-md border bg-card px-2 text-xs text-foreground">
-          <option value="todos">Todos os projetos</option>
-          {allProjects.map((name) => <option key={name} value={name}>{name}</option>)}
-        </select>
-        <select aria-label="Filtrar por responsável" value={responsible} onChange={(e) => setResponsible(e.target.value)} className="h-7 max-w-40 rounded-md border bg-card px-2 text-xs text-foreground">
-          <option value="todos">Todos responsáveis</option>
-          {TEAM.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-        </select>
-        <select aria-label="Filtrar por prazo" value={dueFilter} onChange={(e) => setDueFilter(e.target.value as typeof dueFilter)} className="h-7 max-w-36 rounded-md border bg-card px-2 text-xs text-foreground">
-          <option value="todos">Todos os prazos</option><option value="atrasadas">Atrasadas</option><option value="hoje">Vencem hoje</option><option value="com_prazo">Com prazo</option><option value="sem_prazo">Sem prazo</option>
-        </select>
-        <FilterMenu
-          icon={FlagIcon}
-          label={priority ? PRIORITIES.find((p) => p.id === priority)!.label : "Prioridade"}
-          active={!!priority}
-          onClear={() => setPriority(null)}
-        >
-          {PRIORITIES.map((p) => (
-            <Chip key={p.id} active={priority === p.id} onClick={() => setPriority(priority === p.id ? null : p.id)}>
-              <FlagIcon className="size-3.5" style={{ color: priority === p.id ? undefined : p.color }} /> {p.label}
-            </Chip>
-          ))}
-        </FilterMenu>
-        {allLabels.length > 0 && (
-          <FilterMenu icon={SparklesIcon} label={label ? `#${label}` : "Etiqueta"} active={!!label} onClear={() => setLabel(null)}>
-            {allLabels.map((l) => (
-              <button key={l} type="button" onClick={() => setLabel(label === l ? null : l)} className={cn("rounded-full transition-transform hover:scale-105", label === l && "ring-2 ring-brand/50")}>
-                <LabelChip label={l} />
-              </button>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {activeFilters.map((f) => (
+              <Chip key={f.id} active onClick={f.clear} aria-label={`Remover filtro ${f.label}`}>
+                {f.label} <XIcon className="size-3" />
+              </Chip>
             ))}
-          </FilterMenu>
+          </div>
         )}
-        <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setSort(sort === "prazo" ? "prioridade" : "prazo")}>
-          <ArrowDownUpIcon /> {sort === "prazo" ? "Por prazo" : "Por prioridade"}
-        </Button>
       </div>
 
       {openCount === 0 && !grouped.get("feitas")?.length ? (
@@ -239,7 +281,7 @@ export function TaskList() {
 }
 
 /** Anel de progresso do dia: "o que era para hoje, quanto já foi". */
-function DayProgress({ done, total, team }: { done: number; total: number; team: boolean }) {
+function DayProgress({ done, total, team, week }: { done: number; total: number; team: boolean; week: ReturnType<typeof weekProgress> }) {
   const pct = total ? done / total : 0
   const r = 22
   const c = 2 * Math.PI * r
@@ -277,43 +319,22 @@ function DayProgress({ done, total, team }: { done: number; total: number; team:
         </p>
         <p className="text-xs text-muted-foreground">Conta as tarefas de hoje e as atrasadas.</p>
       </div>
+      {/* Como foi a semana: 7 círculos, cada um preenchido pelo % concluído do que vencia no dia. */}
+      <ol className="ml-auto hidden items-end gap-1.5 sm:flex" aria-label="Sua semana">
+        {week.map((d) => (
+          <li key={d.date} className="flex flex-col items-center gap-1" title={`${format(parseISO(d.date), "EEEE dd/MM", { locale: ptBR })}: ${d.done} de ${d.total}`}>
+            <span
+              className={cn("size-6 rounded-full", d.today && "ring-2 ring-highlight/50 ring-offset-2 ring-offset-card")}
+              style={{ background: d.total ? `conic-gradient(var(--success) ${d.pct * 360}deg, var(--muted) 0)` : "var(--muted)" }}
+            />
+            <span className={cn("text-[10px] uppercase", d.today ? "font-semibold text-foreground" : "text-muted-foreground")}>{format(parseISO(d.date), "EEEEE", { locale: ptBR })}</span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }
 
-function FilterMenu({
-  icon: Icon,
-  label,
-  active,
-  onClear,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  active: boolean
-  onClear: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <Popover>
-      <div className="inline-flex items-center">
-        <PopoverTrigger asChild>
-          <Chip active={active} className={cn(active && "rounded-r-none")}>
-            <Icon className="size-3.5" /> {label}
-          </Chip>
-        </PopoverTrigger>
-        {active && (
-          <Chip active onClick={onClear} className="rounded-l-none border-l-brand-foreground/20 px-1.5" aria-label="Limpar filtro">
-            <XIcon className="size-3" />
-          </Chip>
-        )}
-      </div>
-      <PopoverContent align="start" className="flex w-auto max-w-72 flex-wrap gap-1.5 p-2">
-        {children}
-      </PopoverContent>
-    </Popover>
-  )
-}
 
 function TaskGroup({ tasks, now, startIndex, blocked }: { tasks: Task[]; now: Date; startIndex: number; blocked: Map<string, number> }) {
   return (
@@ -448,6 +469,8 @@ function QuickAdd() {
   const [priority, setPriority] = useState<Priority | undefined>()
   const [projectName, setProjectName] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  // Campo limpo (briefing): prazo, pessoas, projeto e prioridade aparecem quando o campo recebe foco.
+  const [focused, setFocused] = useState(false)
   const assignees = people ?? [meId]
   const shortcuts = dueShortcuts().slice(0, 2)
   const parsed = parseQuickAdd(title)
@@ -464,12 +487,17 @@ function QuickAdd() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border bg-card p-2 shadow-card transition-shadow focus-within:shadow-lift focus-within:ring-2 focus-within:ring-brand/25">
+    <form
+      onSubmit={submit}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && !title && setFocused(false)}
+      className="rounded-xl border bg-card p-2 shadow-card transition-shadow focus-within:shadow-lift focus-within:ring-2 focus-within:ring-brand/25"
+    >
       <Input
         ref={inputRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Adicionar tarefa…  (ex.: Ligar pro cliente !alta #vendas)"
+        placeholder="Adicionar tarefa…  (@pessoa, #etiqueta, !alta)"
         className="border-0 bg-transparent text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
       {(parsed.labels.length > 0 || parsed.priority) && (
@@ -481,6 +509,8 @@ function QuickAdd() {
           ))}
         </div>
       )}
+      <div className="expand-rows" data-open={focused || title ? "" : undefined}>
+      <div>
       <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1">
         <Chip active={!dueDate} onClick={() => setDueDate(undefined)}>
           Sem prazo
@@ -519,6 +549,8 @@ function QuickAdd() {
         >
           <MoreHorizontalIcon />
         </Button>
+      </div>
+      </div>
       </div>
     </form>
   )

@@ -72,3 +72,18 @@ describe("uma fonte para cada informação", () => {
     expect(offenders).toEqual([])
   })
 })
+
+describe("grade e navegação únicas (ADR 0013)", () => {
+  it("todo item do menu tem um grupo da barra lateral", () => {
+    const groups = new Set(["Dia a dia", "Vendas", "Criação", "Gestão", "Sistema"])
+    expect(PAGES.filter((p) => !groups.has(String(p.section))).map((p) => p.href)).toEqual([])
+  })
+
+  it("nenhuma tela volta ao container antigo (mx-auto max-w-*): use page-body / page-container", () => {
+    const old = /mx-auto[^"]*max-w-(3xl|4xl|5xl|6xl)|max-w-(3xl|4xl|5xl|6xl)[^"]*mx-auto/
+    const offenders = [...sourceFiles(APP), ...sourceFiles(join(process.cwd(), "src", "components"))]
+      .filter((f) => old.test(readFileSync(f, "utf8")))
+      .map((f) => relative(process.cwd(), f))
+    expect(offenders).toEqual([])
+  })
+})

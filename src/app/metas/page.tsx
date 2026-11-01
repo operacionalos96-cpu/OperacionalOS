@@ -22,13 +22,13 @@ export default function GoalsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/metas" actions={newButton} />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
+      <div className="page-body is-narrow grid gap-4">
         {goals.length === 0 ? (
           <EmptyState icon={TargetIcon} title="Nenhuma meta ainda" description="Crie uma meta de receita, de vendas ou ligada a tarefas." action={newButton} className="py-20" />
         ) : (
           <>
             <Panel title="Em andamento">
-              <div className="grid gap-1 p-2">{active.length ? active.map((g) => <GoalRow key={g.id} goal={g} />) : <p className="t-desc p-2 text-sm">Nenhuma meta em andamento.</p>}</div>
+              <div className="grid gap-1 p-2">{active.length ? active.map((g) => <GoalRow key={g.id} goal={g} />) : <EmptyState icon={TargetIcon} title="Nenhuma meta em andamento" description="As metas encerradas ficam abaixo. Crie uma nova para acompanhar o ritmo." action={newButton} className="py-8" />}</div>
             </Panel>
             {past.length > 0 && (
               <Panel title="Encerradas">

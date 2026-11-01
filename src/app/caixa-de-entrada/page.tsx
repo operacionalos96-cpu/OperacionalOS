@@ -55,7 +55,7 @@ export default function InboxPage() {
           ]}
         />
       </PageHeader>
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
+      <div className="page-body is-narrow grid gap-4">
         {inbox.length === 0 ? (
           <EmptyState
             icon={InboxIcon}

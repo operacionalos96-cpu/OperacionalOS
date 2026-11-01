@@ -1,5 +1,6 @@
 "use client"
 
+import { Segmented, SectionTabs } from "@/components/shared/fields"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -48,6 +49,8 @@ export default function ProspectingPage() {
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [pending, setPending] = useState<FunnelPending | null>(null)
   const [rejecting, setRejecting] = useState(false)
+  /** O card que acabou de sair (aprovado → direita, descartado → esquerda), animando por 220 ms. */
+  const [leaving, setLeaving] = useState<{ lead: Lead; dir: "left" | "right" } | null>(null)
   const [whatsTarget, setWhatsTarget] = useWhatsappTarget()
   // Sessão: começa na primeira decisão.
   const session = useRef<{ start: number | null; done: number }>({ start: null, done: 0 })
@@ -84,6 +87,7 @@ export default function ProspectingPage() {
     countDecision()
     const message = firstMessage(current)
     approveLead(current.id)
+    setLeaving({ lead: current, dir: "right" })
     const following = queue[index + 1]?.id ?? null
     if (!openWhatsapp(current.contact, message, whatsTarget)) {
       toast.warning(`${current.name} aprovado, mas sem WhatsApp válido`, { description: `${whatsappProblem(current.contact)}. Contate por outro meio ou cadastre o número no lead.` })
@@ -141,41 +145,66 @@ export default function ProspectingPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SiteInfoButton leads={leads} />
-            <WhatsTargetSwitch value={whatsTarget} onChange={setWhatsTarget} />
-            <div className="flex rounded-lg border p-0.5 text-xs">
-              {(["meus", "todos"] as const).map((s) => (
-                <button key={s} onClick={() => setScope(s)} className={cn("rounded-md px-2.5 py-1 font-medium", scope === s ? "bg-accent" : "text-muted-foreground hover:text-foreground")}>
-                  {s === "meus" ? "Meus leads" : "Todos"}
-                </button>
-              ))}
-            </div>
           </div>
         }
       />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
-        {/* Progresso do dia e da sessão */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Stat label="Na sessão" value={`${done} / ${done + queue.length}`} />
-          <Stat label="Contatados hoje" value={String(stats.contacted)} tone="success" />
-          <Stat label="Descartados hoje" value={String(stats.rejected)} />
-          <Stat label="Restantes" value={String(queue.length)} />
-          <Stat label="Tempo · média" value={done ? `${duration(elapsed)} · ${duration(elapsed / done)}` : "—"} icon={TimerIcon} />
+      <div className="page-body is-narrow grid gap-4">
+        {/* Faixa única de progresso da sessão: quanto falta na fila de hoje? */}
+        <div className="grid gap-2 rounded-2xl border bg-card px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="tabular text-sm font-semibold">
+              {done} / {done + queue.length}
+            </span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Progresso da sessão" aria-valuemin={0} aria-valuemax={done + queue.length} aria-valuenow={done}>
+              <div className="h-full rounded-full bg-highlight transition-[width] duration-(--dur-4) ease-(--ease-std)" style={{ width: `${done + queue.length ? (done / (done + queue.length)) * 100 : 0}%` }} />
+            </div>
+          </div>
+          <p className="tabular flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              <span className="font-semibold text-success">{stats.contacted}</span> contatados hoje
+            </span>
+            <span>
+              <span className="font-semibold text-foreground">{stats.rejected}</span> descartados hoje
+            </span>
+            <span>
+              <span className="font-semibold text-foreground">{queue.length}</span> restantes
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <TimerIcon className="size-3" /> {done ? `${duration(elapsed)} · média ${duration(elapsed / done)}` : "—"}
+            </span>
+          </p>
         </div>
 
-        <div className="flex gap-1 border-b text-sm">
-          {(
-            [
-              ["fila", `Fila (${queue.length})`],
-              ["aguardando", `Aguardando contato (${waiting.length})`],
-              ["funil", "Funil"],
-              ["descartados", `Descartados (${discarded.length})`],
-            ] as const
-          ).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={cn("-mb-px border-b-2 px-3 py-2", tab === id ? "border-brand font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>
-              {label}
-            </button>
-          ))}
+        {/* Filtros com rótulo, logo acima das abas (antes soltos no cabeçalho). */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <span className="flex items-center gap-2">
+            <span className="t-label">Canal</span>
+            <Segmented size="sm" value={whatsTarget} onChange={setWhatsTarget} options={TARGETS.map((t) => ({ value: t.id, label: t.label }))} />
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="t-label">Dono</span>
+            <Segmented
+              size="sm"
+              value={scope}
+              onChange={setScope}
+              options={[
+                { value: "meus", label: "Meus leads" },
+                { value: "todos", label: "Todos" },
+              ]}
+            />
+          </span>
         </div>
+
+        <SectionTabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "fila", label: `Fila (${queue.length})` },
+            { value: "aguardando", label: `Aguardando contato (${waiting.length})` },
+            { value: "funil", label: "Funil" },
+            { value: "descartados", label: `Descartados (${discarded.length})` },
+          ]}
+        />
 
         <SiteInfoProgress />
 
@@ -196,7 +225,19 @@ export default function ProspectingPage() {
 
         {tab === "fila" &&
           (current ? (
-            <LeadCard firstMessage={firstMessage} whatsTarget={whatsTarget} lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
+            <div className="relative">
+              {/* Pilha atrás do card: comunica "fila". */}
+              {queue.length > 1 && <span aria-hidden className="absolute inset-x-3 -bottom-2 h-full rounded-2xl border bg-card/70" />}
+              {queue.length > 2 && <span aria-hidden className="absolute inset-x-6 -bottom-4 h-full rounded-2xl border bg-card/40" />}
+              <div key={current.id} className="relative card-rise">
+                <LeadCard firstMessage={firstMessage} whatsTarget={whatsTarget} lead={current} position={index + 1} total={queue.length} onPrev={() => go(-1)} onNext={() => go(1)} onApprove={approveAndContact} onReject={() => setRejecting(true)} blocked={!!pending} />
+              </div>
+              {leaving && (
+                <div key={`saindo-${leaving.lead.id}`} aria-hidden className={cn("pointer-events-none absolute inset-x-0 top-0 z-10", leaving.dir === "right" ? "card-out-right" : "card-out-left")} onAnimationEnd={() => setLeaving(null)}>
+                  <LeadCard firstMessage={firstMessage} whatsTarget={whatsTarget} lead={leaving.lead} position={index} total={queue.length} onPrev={() => {}} onNext={() => {}} onApprove={() => {}} onReject={() => {}} blocked />
+                </div>
+              )}
+            </div>
           ) : (
             <EmptyState icon={PartyPopperIcon} title="Fila zerada" description={scope === "meus" ? "Nenhum lead seu esperando revisão. Veja “Todos” ou importe mais." : "Nenhum lead esperando revisão."} className="py-16" />
           ))}
@@ -264,6 +305,7 @@ export default function ProspectingPage() {
           onOpenChange={setRejecting}
           onDone={() => {
             countDecision()
+            setLeaving({ lead: current, dir: "left" })
             setCurrentId(queue[index + 1]?.id ?? null)
           }}
         />
@@ -367,16 +409,6 @@ function List({ items, empty }: { items: { lead: Lead; detail: string; action: R
   )
 }
 
-function Stat({ label, value, tone, icon: Icon }: { label: string; value: string; tone?: "success"; icon?: React.ComponentType<{ className?: string }> }) {
-  return (
-    <div className="rounded-xl border bg-card px-3 py-2">
-      <p className="t-label flex items-center gap-1">
-        {Icon && <Icon className="size-3" />} {label}
-      </p>
-      <p className={cn("tabular mt-0.5 text-base font-semibold", tone === "success" && "text-success")}>{value}</p>
-    </div>
-  )
-}
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="ml-1 rounded border bg-muted px-1 font-sans text-xs text-muted-foreground">{children}</kbd>
@@ -389,18 +421,6 @@ const TARGETS: { id: WhatsappTarget; label: string; hint: string }[] = [
 ]
 
 /** Onde o WhatsApp abre (lembrado neste navegador). */
-function WhatsTargetSwitch({ value, onChange }: { value: WhatsappTarget; onChange: (t: WhatsappTarget) => void }) {
-  return (
-    <div className="flex items-center rounded-lg border p-0.5 text-xs" title="Onde abrir o WhatsApp">
-      <MessageCircleIcon className="mx-1.5 size-3.5 text-success" />
-      {TARGETS.map((t) => (
-        <button key={t.id} onClick={() => onChange(t.id)} title={t.hint} className={cn("rounded-md px-2 py-1 font-medium", value === t.id ? "bg-accent" : "text-muted-foreground hover:text-foreground")}>
-          {t.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 /** Telefone da empresa: clicar abre a conversa (sem aprovar); copiar; aviso se parecer fixo. */
 function WhatsChip({ lead, target, message }: { lead: Lead; target: WhatsappTarget; message: string }) {

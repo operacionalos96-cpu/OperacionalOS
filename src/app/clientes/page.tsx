@@ -22,7 +22,7 @@ export default function ClientsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/clientes" />
-      <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6">
+      <div className="page-body grid gap-4">
         {rows.length === 0 ? (
           <EmptyState icon={HandshakeIcon} title="Nenhum cliente ainda" description="Quando um lead for marcado como ganho no Pipeline, ele aparece aqui." className="py-20" />
         ) : (

@@ -68,10 +68,18 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  --animate-enter: enter 420ms var(--ease-out) both;
+  --animate-enter: enter var(--dur-3) var(--ease-out) both;
   --animate-pop: pop 360ms var(--ease-spring) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Movimento (Briefing UI/UX, ADR 0013): curto, de distância pequena e com função.
+   * Nada passa de 320 ms, exceto o desenho inicial de gráficos. A saída é ~30% mais rápida. */
+  --dur-1: 120ms; /* hover, press, troca de cor */
+  --dur-2: 180ms; /* dropdowns, tooltips, popovers, saída de modais */
+  --dur-3: 240ms; /* entrada de modais, troca de página, indicador de aba */
+  --dur-4: 320ms; /* painéis laterais, expansão da barra lateral */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* tudo que entra */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* tudo que sai */
+  --ease-std: cubic-bezier(0.2, 0, 0, 1); /* mudança de posição/tamanho */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* Material 3 "emphasized decelerate": entra rápido e assenta devagar (sensação de peso real). */
   --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
@@ -107,7 +115,7 @@
   --secondary: oklch(0.955 0.006 255);
   --secondary-foreground: oklch(0.21 0 0);
   --muted: oklch(0.955 0.006 255);
-  --muted-foreground: oklch(0.52 0.012 255);
+  --muted-foreground: oklch(0.47 0.014 255); /* 4,5:1 sobre o fundo (briefing: texto secundário) */
   --accent: oklch(0.95 0.012 255);
   --accent-foreground: oklch(0.21 0 0);
   --destructive: oklch(0.58 0.19 25);
@@ -137,10 +145,10 @@
   --sheen-color: color-mix(in oklch, var(--hzk-orange) 9%, transparent);
   --shadow-lift: 0 2px 4px oklch(0.3 0.04 255 / 4%), 0 22px 44px -18px oklch(0.3 0.08 255 / 26%);
 
-  /* Entradas = verde (positivo), saídas = neutro. Validado com dataviz. */
-  /* Par validado (scripts/validate_palette.js do dataviz): CVD ΔE 23, contraste ≥ 3:1. */
-  --chart-in: #1f78c8;
-  --chart-out: #ea5b25;
+  /* Semântica fixa dos gráficos (briefing): entradas/positivo = verde; saídas/atraso = coral suave;
+   * laranja fica só para ação e para a linha do saldo. */
+  --chart-in: oklch(0.58 0.13 152);
+  --chart-out: oklch(0.66 0.13 28);
   --chart-1: oklch(0.55 0.14 152);
   --chart-2: oklch(0.72 0 0);
   --chart-3: oklch(0.45 0 0);
@@ -165,14 +173,14 @@
   --foreground: #e8ecf2;
   --card: #151c27;
   --card-foreground: #e8ecf2;
-  --popover: #19212e;
+  --popover: #1c2533; /* nível 3: modal/popover */
   --popover-foreground: #e8ecf2;
   --primary: #e8ecf2;
   --primary-foreground: #1b2432;
   --secondary: #1c2431;
   --secondary-foreground: #e8ecf2;
   --muted: #1c2431;
-  --muted-foreground: #8b95a7;
+  --muted-foreground: #9ca6b7; /* 4,5:1 sobre o card escuro */
   --accent: #222b3a;
   --accent-foreground: #e8ecf2;
   --destructive: oklch(0.66 0.17 24);
@@ -202,14 +210,14 @@
   --sheen-color: rgb(255 255 255 / 7%);
   --shadow-lift: 0 8px 24px -12px rgb(0 0 0 / 70%);
 
-  --chart-in: #3d8fd6;
-  --chart-out: #e85a24;
+  --chart-in: oklch(0.72 0.14 152);
+  --chart-out: oklch(0.72 0.12 28);
   --chart-1: oklch(0.7 0.15 152);
   --chart-2: #6b778a;
   --chart-3: #9aa4b5;
   --chart-4: #7d889b;
   --chart-5: #d3d9e3;
-  --sidebar: #1b2432;
+  --sidebar: #1f2937; /* um nível acima do card: a pílula volta a flutuar */
   --sidebar-foreground: #e8ecf2;
   --sidebar-primary: oklch(0.95 0.008 255);
   --sidebar-primary-foreground: #1b2432;
@@ -226,6 +234,10 @@
     border-color: color-mix(in oklch, var(--border) 55%, transparent);
     box-shadow: var(--shadow-card);
   }
+  /* Modo escuro: borda de 1 px a 6% de branco separa o card do fundo (briefing). */
+  :where(.dark) :where(.bg-card.border, [data-slot="card"]) {
+    border-color: rgb(255 255 255 / 6%);
+  }
 }
 
 @layer base {
@@ -237,7 +249,7 @@
     /* Luz ambiente: dois brilhos muito suaves da marca no fundo. Estático (não anima, não pesa). */
     background-image:
       radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%),
-      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--chart-in) 6%, transparent), transparent 70%);
+      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--hzk-navy) 5%, transparent), transparent 70%);
     background-attachment: fixed;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
@@ -278,20 +290,23 @@
   from { transform: scaleX(0); }
 }
 
+/* Cascata de 30 ms, no máximo 6 elementos (o resto entra junto) — briefing. */
 @utility stagger {
   animation: var(--animate-enter);
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation-delay: calc(min(var(--i, 0), 6) * 30ms);
 }
 @utility grow-x {
   transform-origin: left;
   animation: grow-x 700ms var(--ease-out) both;
 }
+/* Card clicável: sobe 1 px e a sombra aumenta um pouco (120 ms); press reduz para 0,99. */
 @utility lift {
-  transition: box-shadow 260ms var(--ease-out), transform 260ms var(--ease-out), border-color 200ms;
+  transition: box-shadow var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out), border-color var(--dur-1);
   &:hover {
     box-shadow: var(--shadow-lift);
-    transform: translateY(-4px);
+    transform: translateY(-1px);
   }
+  &:active { transform: scale(0.99); }
 }
 @utility check-burst {
   position: relative;
@@ -685,3 +700,81 @@
 @media (prefers-reduced-motion: reduce) {
   .guide-timer { animation: none; width: 0; }
 }
+
+/* ---------- Grade de página (Briefing UI/UX, ADR 0013) ----------
+ * Cabeçalho, filtros e conteúdo na MESMA borda esquerda. Fluido ao lado da barra lateral, margem
+ * de 32 px (24 abaixo de 1280), teto de 1600 px centralizado: o vazio que sobra fica nas duas
+ * bordas, nunca dentro do conteúdo. "is-narrow" (720 px) só onde a leitura pede, alinhado à esquerda.
+ */
+:root { --gutter: 24px; --page-max: 1600px; }
+@media (min-width: 1280px) { :root { --gutter: 32px; } }
+/* Em @layer components: utilitários (pt-6, gap-*) continuam podendo ajustar cada página. */
+@layer components {
+  .page-container {
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+  .page-body {
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: 8px var(--gutter) 32px;
+  }
+  .page-body.is-narrow { padding-right: max(var(--gutter), calc(100% - 720px - var(--gutter))); }
+  .page-body.is-medium { padding-right: max(var(--gutter), calc(100% - 1100px - var(--gutter))); }
+}
+/* Cards que se adaptam ao espaço: mais colunas conforme a tela cresce. */
+@utility grid-auto-cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+/* Link de ação único: cinza que fica laranja no hover. */
+@utility action-link {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  transition: color var(--dur-1) var(--ease-out);
+  &:hover { color: var(--highlight); }
+}
+
+/* Barra lateral expandindo: os rótulos entram 40 ms depois da largura (briefing). */
+@keyframes nav-label-in { from { opacity: 0; translate: -4px 0; } }
+.nav-label { animation: nav-label-in var(--dur-3) var(--ease-out) 40ms backwards; }
+
+/* Modais (briefing): o fundo escurece e desfoca de 0 a 6 px em 180 ms; a janela entra em escala
+ * 0,96→1 + opacidade (240 ms) e sai 1→0,98 (180 ms). */
+@keyframes scrim-blur-in { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(6px); } }
+@keyframes scrim-blur-out { from { opacity: 1; backdrop-filter: blur(6px); } to { opacity: 0; backdrop-filter: blur(0); } }
+.modal-scrim { backdrop-filter: blur(6px); }
+.modal-scrim[data-open] { animation: scrim-blur-in var(--dur-2) var(--ease-out); }
+.modal-scrim[data-closed] { animation: scrim-blur-out var(--dur-2) var(--ease-in) forwards; }
+@keyframes window-in { from { opacity: 0; scale: 0.96; } }
+@keyframes window-out { to { opacity: 0; scale: 0.98; } }
+.modal-window[data-open] { animation: window-in var(--dur-3) var(--ease-out); }
+.modal-window[data-closed] { animation: window-out var(--dur-2) var(--ease-in) forwards; }
+/* Dropdowns, popovers e calendário já crescem a partir do gatilho (origin do Radix); duração = --dur-2. */
+/* Toasts sobem 12 px do canto; com "Desfazer", uma barra de 5 s mostra quanto tempo falta. */
+[data-sonner-toast] { --y: 12px; }
+[data-sonner-toast]:has([data-button])::after {
+  content: "";
+  position: absolute;
+  left: 12px; right: 12px; bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--highlight);
+  transform-origin: left;
+  animation: toast-timer 5s linear forwards;
+}
+@keyframes toast-timer { to { transform: scaleX(0); } }
+/* Troca de página: só o conteúdo (sidebar e cabeçalho ficam); entra 240 ms + 8 px. */
+@keyframes page-in { from { opacity: 0; translate: 0 8px; } }
+@utility page-enter { animation: page-in var(--dur-3) var(--ease-out) both; }
+/* Barras crescem da base (gráficos): 500 ms na primeira vez. */
+@keyframes grow-y { from { transform: scaleY(0); } }
+@utility grow-y { transform-origin: bottom; animation: grow-y 500ms var(--ease-out) both; }
+/* Prospecção: aprovar desliza o card à direita com tom verde; descartar, à esquerda esmaecendo;
+ * o próximo sobe da pilha. 220 ms, para manter o ritmo do teclado. */
+@keyframes card-out-right { to { opacity: 0; translate: 48px 0; filter: drop-shadow(0 0 0 var(--success)); box-shadow: inset 0 0 0 2px var(--success); } }
+@keyframes card-out-left { to { opacity: 0; translate: -48px 0; } }
+@keyframes card-rise { from { opacity: 0; translate: 0 10px; scale: 0.98; } }
+.card-out-right { animation: card-out-right 220ms var(--ease-in) forwards; }
+.card-out-left { animation: card-out-left 220ms var(--ease-in) forwards; }
+.card-rise { animation: card-rise 220ms var(--ease-out); }

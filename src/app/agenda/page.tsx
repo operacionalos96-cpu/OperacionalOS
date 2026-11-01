@@ -8,7 +8,7 @@ export default function AgendaPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/agenda" />
-      <div className="p-4 sm:p-6">
+      <div className="page-body">
         <CalendarView />
       </div>
     </div>

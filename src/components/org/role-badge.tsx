@@ -13,7 +13,7 @@ export function RoleBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+      className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-colors ${
         isPrimary ? "ring-1 ring-inset ring-foreground/20" : "opacity-90"
       } ${className}`}
       style={{

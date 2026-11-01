@@ -12,6 +12,7 @@ import { useRelations } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
 import { Panel } from "@/components/shared/layout"
+import { Input } from "@/components/ui/input"
 import { EntityChip, EntityPicker } from "./entity-bits"
 
 /**
@@ -19,14 +20,27 @@ import { EntityChip, EntityPicker } from "./entity-bits"
  * criadas à mão (removíveis) e ligações que já existem (lead do produto, balão do
  * mapa, lançamento do lead…). É o mesmo painel em todas as telas.
  */
+const PAGE = 8
+
 export function ConnectionsPanel({ entity, className, bare = false }: { entity: EntityRef; className?: string; bare?: boolean }) {
   const snap = useEntitySnapshot()
   const meId = useStore((s) => s.meId)
   const save = useRelations((s) => s.save)
   const remove = useRelations((s) => s.remove)
   const [kind, setKind] = useState<RelationKind>("relacionado")
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState<Record<string, number>>({})
 
   const presence = useMemo(() => presenceOf(entity, snap), [entity, snap])
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const map = new Map<string, typeof presence>()
+    for (const p of presence) {
+      if (q && !(summaryOf(p.ref, snap)?.title ?? "").toLowerCase().includes(q)) continue
+      map.set(p.via, [...(map.get(p.via) ?? []), p])
+    }
+    return map
+  }, [presence, query, snap])
   const blockers = useMemo(
     () => blockersOf(entity, snap.relations, (r) => summaryOf(r, snap)?.done ?? true),
     [entity, snap],
@@ -62,26 +76,47 @@ export function ConnectionsPanel({ entity, className, bare = false }: { entity: 
       {presence.length === 0 ? (
         <p className="t-desc text-xs">Ainda não está ligado a nada. Conecte a tarefas, leads, produtos, conteúdos, notas ou mapas.</p>
       ) : (
-        <ul className="grid gap-1.5">
-          {presence.map((p) => (
-            <li key={`${refKey(p.ref)}-${p.via}`} className="group flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-accent/50">
-              {/* Empilhado: "como está ligado" em cima, nome embaixo — cabe em colunas estreitas. */}
-              <div className="grid min-w-0 flex-1">
-                <span className="truncate text-xs text-muted-foreground">{p.via}</span>
-                <EntityChip entity={p.ref} />
-              </div>
-              {p.relationId && (
-                <button
-                  onClick={() => disconnect(p.relationId!)}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
-                  aria-label="Remover conexão"
-                >
-                  <XIcon className="size-3.5" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Muitas conexões (ex.: 159 leads de um produto): busca + grupos por tipo, com o rótulo
+              uma vez no cabeçalho do grupo e "mostrar mais" no lugar de uma lista infinita. */}
+          {presence.length > 10 && (
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Buscar entre ${presence.length} conexões`} className="h-8 text-xs" />
+          )}
+          {[...groups.entries()].map(([via, list]) => {
+            const limit = open[via] ?? PAGE
+            return (
+              <section key={via} className="grid gap-1">
+                <p className="t-label flex items-center justify-between">
+                  <span className="truncate">{via}</span>
+                  <span className="tabular">{list.length}</span>
+                </p>
+                <ul className="grid gap-0.5">
+                  {list.slice(0, limit).map((p) => (
+                    <li key={`${refKey(p.ref)}-${p.via}`} className="group flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-accent/50">
+                      <div className="min-w-0 flex-1">
+                        <EntityChip entity={p.ref} />
+                      </div>
+                      {p.relationId && (
+                        <button
+                          onClick={() => disconnect(p.relationId!)}
+                          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
+                          aria-label="Remover conexão"
+                        >
+                          <XIcon className="size-3.5" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {list.length > limit && (
+                  <button type="button" onClick={() => setOpen({ ...open, [via]: limit + PAGE })} className="action-link justify-self-start text-xs">
+                    Mostrar mais {Math.min(PAGE, list.length - limit)} de {list.length - limit}
+                  </button>
+                )}
+              </section>
+            )
+          })}
+        </>
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-t pt-3">

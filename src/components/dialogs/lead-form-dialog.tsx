@@ -110,6 +110,7 @@ export function LeadFormDialog() {
           <DialogDescription>Só o essencial: quem é, quanto vale e qual o próximo passo.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} onKeyDown={submitOnModEnter} className="grid gap-4">
+          <p className="t-label -mb-2">Quem é</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nome *" htmlFor="lead-name">
               <Input
@@ -124,16 +125,21 @@ export function LeadFormDialog() {
             <Field label="Empresa" htmlFor="lead-company">
               <Input id="lead-company" placeholder="Opcional" value={company} onChange={(e) => setCompany(e.target.value)} />
             </Field>
-            <Field label="Valor estimado *" htmlFor="lead-value">
-              <MoneyInput id="lead-value" value={valueText} onChange={(t) => setValueText(t)} />
-            </Field>
             <Field label="WhatsApp / contato" htmlFor="lead-contact">
               <Input id="lead-contact" placeholder="(11) 90000-0000 ou e-mail" value={contact} onChange={(e) => setContact(e.target.value)} />
             </Field>
             <Field label="Site" hint="opcional" htmlFor="lead-site">
               <Input id="lead-site" placeholder="https://…" inputMode="url" value={website} onChange={(e) => setWebsite(e.target.value)} />
             </Field>
+            <Field label="Valor estimado *" htmlFor="lead-value">
+              <MoneyInput id="lead-value" value={valueText} onChange={(t) => setValueText(t)} />
+            </Field>
+            <Field label="Produto de interesse" hint="opcional">
+              <ProductSelect value={productId} onChange={setProductId} />
+            </Field>
           </div>
+
+          <p className="t-label -mb-2">Próximo passo</p>
 
           <div className="grid gap-3 rounded-lg border border-dashed bg-muted/40 p-3">
             <Field label="Próxima ação *" hint="obrigatória — todo lead precisa de um próximo passo" htmlFor="lead-action">
@@ -161,9 +167,6 @@ export function LeadFormDialog() {
             </Field>
           </div>
 
-          <Field label="Produto de interesse" hint="opcional · rastreia leads por produto">
-            <ProductSelect value={productId} onChange={setProductId} />
-          </Field>
 
           {tried && invalid && (
             <p className="text-sm text-destructive">
