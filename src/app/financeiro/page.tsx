@@ -63,7 +63,7 @@ export default function FinancePage() {
         }
       />
       <div className="page-container flex flex-wrap items-end gap-2">
-        <SectionTabs className="flex-1" value={tab} onChange={setTab} options={[
+        <SectionTabs value={tab} onChange={setTab} options={[
           { value: "visao", label: "Visão geral" },
           { value: "movimentacoes", label: "Movimentações" },
           { value: "pagar", label: "Contas a pagar" },

@@ -77,7 +77,7 @@ export function Segmented<T extends string>({
   )
 }
 
-/** Abas = SEÇÕES da página (sublinhado laranja que desliza até a aba ativa). Para filtro/modo, Segmented. */
+/** Abas = SEÇÕES da página (cápsula com pílula que desliza até a aba ativa). Para filtro/modo, Segmented. */
 export function SectionTabs<T extends string>({
   value,
   onChange,
@@ -90,8 +90,23 @@ export function SectionTabs<T extends string>({
   className?: string
 }) {
   const { ref, rect } = useActiveRect(value)
+  // Cápsula flutuante (tab bar do iPadOS): a pílula preenchida desliza até a aba ativa.
   return (
-    <div ref={ref} role="tablist" className={cn("relative flex flex-wrap gap-1 border-b text-sm", className)}>
+    <div
+      ref={ref}
+      role="tablist"
+      className={cn(
+        "relative flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-full border bg-card p-1 text-sm shadow-card [scrollbar-width:none]",
+        className,
+      )}
+    >
+      {rect && (
+        <span
+          aria-hidden
+          className="absolute top-1 bottom-1 rounded-full bg-primary shadow-[0_4px_12px_-6px_rgb(0_0_0/0.5)] transition-[left,width] duration-(--dur-3) ease-(--ease-std)"
+          style={{ left: rect.left, width: rect.width }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.value}
@@ -100,14 +115,14 @@ export function SectionTabs<T extends string>({
           aria-selected={value === o.value}
           data-active={value === o.value ? "" : undefined}
           onClick={() => onChange(o.value)}
-          className={cn("inline-flex items-center gap-1.5 px-3 py-2 transition-colors duration-(--dur-1)", value === o.value ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
+          className={cn(
+            "relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-4 whitespace-nowrap transition-[color,transform] duration-(--dur-2) active:scale-[0.97]",
+            value === o.value ? "font-medium text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
         >
           {o.label}
         </button>
       ))}
-      {rect && (
-        <span aria-hidden className="absolute -bottom-px h-0.5 rounded-full bg-highlight transition-[left,width] duration-(--dur-3) ease-(--ease-std)" style={{ left: rect.left, width: rect.width }} />
-      )}
     </div>
   )
 }
