@@ -4,7 +4,7 @@ import { Segmented, SectionTabs } from "@/components/shared/fields"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { GlobeIcon, LoaderIcon, CopyIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
+import { GlobeIcon, LoaderIcon, CopyIcon, ArrowLeftIcon, ArrowRightIcon, BarChart3Icon, Building2Icon, CheckIcon, ExternalLinkIcon, KeyboardIcon, MessageCircleIcon, PartyPopperIcon, PhoneIcon, TimerIcon, Undo2Icon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { isLikelyMobile, whatsappLink, whatsappNumber, whatsappProblem, type WhatsappTarget } from "@/lib/domain/contact"
 import { openWhatsapp, useWhatsappTarget } from "@/lib/whatsapp-open"
@@ -20,7 +20,7 @@ import { approveLead, funnelSent, undoReview } from "@/lib/services/ai-office"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { EmptyState, PageHeader } from "@/components/shared/layout"
+import { EmptyState, Led, PageHeader } from "@/components/shared/layout"
 import { AnalysisBlock } from "@/components/prospecting/review-panel"
 import { RejectLeadDialog } from "@/components/prospecting/reject-dialog"
 import { FunnelTab, type FunnelPending } from "@/components/prospecting/funnel-tab"
@@ -148,31 +148,30 @@ export default function ProspectingPage() {
           </div>
         }
       />
-      <div className="page-body is-narrow grid gap-4">
+      <div className="page-body grid gap-4">
         {/* Faixa única de progresso da sessão: quanto falta na fila de hoje? */}
-        <div className="grid gap-2 rounded-2xl border bg-card px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="tabular text-sm font-semibold">
-              {done} / {done + queue.length}
-            </span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Progresso da sessão" aria-valuemin={0} aria-valuemax={done + queue.length} aria-valuenow={done}>
-              <div className="h-full rounded-full bg-highlight transition-[width] duration-(--dur-4) ease-(--ease-std)" style={{ width: `${done + queue.length ? (done / (done + queue.length)) * 100 : 0}%` }} />
-            </div>
+        <div className="relative flex items-center gap-5 overflow-hidden rounded-2xl border bg-card px-5 py-4 shadow-card">
+          <Led corner="top" />
+          <ProgressRing value={done} total={done + queue.length} />
+          <div className="relative min-w-0">
+            <p className="tabular text-lg font-semibold">
+              {done} / {done + queue.length} <span className="text-sm font-medium text-muted-foreground">empresas analisadas</span>
+            </p>
+            <p className="tabular mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span>
+                <span className="font-semibold text-success">{stats.contacted}</span> contatados hoje
+              </span>
+              <span>
+                <span className="font-semibold text-foreground">{stats.rejected}</span> descartados hoje
+              </span>
+              <span>
+                <span className="font-semibold text-foreground">{queue.length}</span> restantes
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <TimerIcon className="size-3.5" /> {done ? `${duration(elapsed)} · média ${duration(elapsed / done)}` : "—"}
+              </span>
+            </p>
           </div>
-          <p className="tabular flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              <span className="font-semibold text-success">{stats.contacted}</span> contatados hoje
-            </span>
-            <span>
-              <span className="font-semibold text-foreground">{stats.rejected}</span> descartados hoje
-            </span>
-            <span>
-              <span className="font-semibold text-foreground">{queue.length}</span> restantes
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <TimerIcon className="size-3" /> {done ? `${duration(elapsed)} · média ${duration(elapsed / done)}` : "—"}
-            </span>
-          </p>
         </div>
 
         {/* Filtros com rótulo, logo acima das abas (antes soltos no cabeçalho). */}
@@ -225,6 +224,7 @@ export default function ProspectingPage() {
 
         {tab === "fila" &&
           (current ? (
+            <div className="grid items-start gap-4 lg:grid-cols-2">
             <div className="relative">
               {/* Pilha atrás do card: comunica "fila". */}
               {queue.length > 1 && <span aria-hidden className="absolute inset-x-3 -bottom-2 h-full rounded-2xl border bg-card/70" />}
@@ -237,6 +237,20 @@ export default function ProspectingPage() {
                   <LeadCard firstMessage={firstMessage} whatsTarget={whatsTarget} lead={leaving.lead} position={index} total={queue.length} onPrev={() => {}} onNext={() => {}} onApprove={() => {}} onReject={() => {}} blocked />
                 </div>
               )}
+            </div>
+            <section className="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-card sm:p-6">
+              <Led corner="top" />
+              <header className="relative mb-4 flex items-start gap-3">
+                <BarChart3Icon className="mt-0.5 size-5 shrink-0 text-highlight" />
+                <div>
+                  <h2 className="text-lg font-semibold">Análise comercial</h2>
+                  <p className="text-sm text-muted-foreground">Diagnóstico da empresa e oportunidade de abordagem.</p>
+                </div>
+              </header>
+              <div className="relative rounded-xl border bg-background/40 p-4">
+                <AnalysisBlock lead={current} />
+              </div>
+            </section>
             </div>
           ) : (
             <EmptyState icon={PartyPopperIcon} title="Fila zerada" description={scope === "meus" ? "Nenhum lead seu esperando revisão. Veja “Todos” ou importe mais." : "Nenhum lead esperando revisão."} className="py-16" />
@@ -338,7 +352,7 @@ function LeadCard({
   blocked: boolean
 }) {
   return (
-    <article className="grid gap-5 rounded-2xl border bg-card p-5 shadow-lift sm:p-6">
+    <article className="grid gap-5 rounded-2xl border bg-card p-5 shadow-card sm:p-6">
       <header className="flex items-center justify-between gap-3">
         <span className="t-label">
           Lead {position} / {total}
@@ -353,12 +367,17 @@ function LeadCard({
         </div>
       </header>
 
-      <div>
-        <Link href={`/pipeline/${lead.id}`} className="text-2xl font-semibold tracking-tight hover:underline">
-          {lead.name}
-        </Link>
-        <p className="mt-1 text-sm text-muted-foreground">{[lead.company, lead.segment, lead.city].filter(Boolean).join(" · ") || "Sem segmento/cidade"}</p>
-        <FunnelContext lead={lead} />
+      <div className="flex items-start gap-4">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl border bg-muted/50 text-highlight">
+          <Building2Icon className="size-7" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <Link href={`/pipeline/${lead.id}`} className="text-2xl font-semibold tracking-tight hover:underline">
+            {lead.name}
+          </Link>
+          <p className="mt-1 text-sm text-muted-foreground">{[lead.company, lead.segment, lead.city].filter(Boolean).join(" · ") || "Sem segmento/cidade"}</p>
+          <FunnelContext lead={lead} />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -372,21 +391,32 @@ function LeadCard({
         <WhatsChip lead={lead} target={whatsTarget} message={firstMessage(lead)} />
       </div>
 
-      <section className="rounded-xl bg-muted/40 p-4">
-        <p className="t-label mb-2">Análise</p>
-        <AnalysisBlock lead={lead} compact />
-      </section>
-
       <div className="grid gap-2 sm:grid-cols-2">
         <Button size="lg" variant="outline" onClick={onReject} disabled={blocked}>
           <XIcon /> Descartar <Kbd>D</Kbd>
         </Button>
-        <Button size="lg" onClick={onApprove} disabled={blocked}>
+        <Button size="lg" variant="brand" onClick={onApprove} disabled={blocked}>
           <MessageCircleIcon /> Aprovar e contatar <Kbd>A</Kbd>
         </Button>
       </div>
       {blocked && <p className="-mt-2 text-center text-xs text-muted-foreground">Confirme o envio acima para seguir.</p>}
     </article>
+  )
+}
+
+/** Anel com a % analisada na sessão (mock). */
+function ProgressRing({ value, total }: { value: number; total: number }) {
+  const pct = total ? value / total : 0
+  const r = 26
+  const c = 2 * Math.PI * r
+  return (
+    <span className="relative flex size-16 shrink-0 items-center justify-center" role="progressbar" aria-label="Progresso da sessão" aria-valuemin={0} aria-valuemax={total} aria-valuenow={value}>
+      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90">
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--muted)" strokeWidth="5" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--highlight)" strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} className="transition-[stroke-dashoffset] duration-(--dur-4) ease-(--ease-std)" />
+      </svg>
+      <span className="tabular text-sm font-semibold">{Math.round(pct * 100)}%</span>
+    </span>
   )
 }
 
