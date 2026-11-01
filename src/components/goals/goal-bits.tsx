@@ -25,9 +25,35 @@ export function useGoalValue(goal: Goal) {
 
 export const formatGoal = (g: Pick<Goal, "source">, n: number) => (g.source === "receita" ? money(n) : String(n))
 
-export function GoalRow({ goal, className }: { goal: Goal; className?: string }) {
+export function GoalRow({ goal, className, size = "compact" }: { goal: Goal; className?: string; size?: "compact" | "large" }) {
   const v = useGoalValue(goal)
   const pct = Math.round(v.pct * 100)
+  if (size === "large") {
+    const ended = goal.end < new Date().toISOString().slice(0, 10)
+    // Linha grande da página Metas (mock): nome e situação à esquerda, % em destaque à direita, barra com brilho.
+    return (
+      <Link href={`/metas/${goal.id}`} className={cn("grid gap-4 rounded-xl px-5 py-4 transition-colors hover:bg-accent/40", className)}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="truncate text-lg font-semibold">{goal.title}</p>
+            {ended && <span className="mt-1.5 inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Meta encerrada</span>}
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={cn("tabular text-2xl font-bold tracking-tight", pct >= 100 && "text-success")}>{pct}%</p>
+            <p className="tabular text-sm text-muted-foreground">
+              {formatGoal(goal, v.value)} de {formatGoal(goal, v.target)}
+            </p>
+          </div>
+        </div>
+        <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn("h-full rounded-full transition-[width] duration-500", pct >= 100 ? "bg-success" : "bg-gradient-to-r from-brand to-[#ff8a57] shadow-[0_0_12px_var(--brand)]")}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+      </Link>
+    )
+  }
   return (
     <Link href={`/metas/${goal.id}`} className={cn("grid gap-1.5 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50", className)}>
       <div className="flex items-baseline justify-between gap-3">
