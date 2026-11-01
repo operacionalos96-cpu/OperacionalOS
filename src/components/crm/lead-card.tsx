@@ -1,5 +1,6 @@
 "use client"
 
+import { MessageCircleIcon } from "lucide-react"
 import { TEMPERATURES, isOpenStage } from "@/lib/domain/constants"
 import type { Lead } from "@/lib/domain/types"
 import { delayTone, leadDelayDays, leadUrgency } from "@/lib/domain/rules"
@@ -21,7 +22,7 @@ export function DelayChip({ lead, now }: { lead: Lead; now: Date }) {
   return (
     <span
       className={cn(
-        "tabular shrink-0 rounded px-1 py-px text-[11px] font-medium",
+        "tabular shrink-0 rounded-md px-1.5 py-px text-[11px] font-semibold",
         tone === "danger" ? "bg-danger-soft text-danger" : tone === "warning" ? "bg-warning-soft text-warning" : "bg-muted text-muted-foreground",
       )}
       title={leadUrgency(lead, now) === "parado" ? "Dias sem atividade" : "Dias com a próxima ação vencida"}
@@ -42,14 +43,14 @@ export function LeadCard({ lead, dragging = false, showOwner = true }: { lead: L
   return (
     <div
       className={cn(
-        "group rounded-lg border bg-card p-2.5 text-left shadow-xs transition-[box-shadow,border-color] duration-(--dur-1) hover:border-foreground/20 hover:shadow-sm",
+        "group rounded-xl border bg-card p-3.5 text-left shadow-card transition-[box-shadow,border-color,translate] duration-(--dur-1) hover:-translate-y-px hover:border-foreground/20",
         dragging && "rotate-[1.5deg] shadow-lift ring-1 ring-foreground/10",
         !open && "opacity-80",
       )}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
             <TemperatureDot lead={lead} />
             <span className="truncate">{lead.name}</span>
           </p>
@@ -59,7 +60,8 @@ export function LeadCard({ lead, dragging = false, showOwner = true }: { lead: L
       </div>
 
       {open ? (
-        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MessageCircleIcon className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">
             {lead.nextAction.text} · {dueLabel(lead.nextAction.dueDate, now)}
           </span>

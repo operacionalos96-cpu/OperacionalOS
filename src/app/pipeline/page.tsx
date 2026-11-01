@@ -68,7 +68,7 @@ function Pipeline() {
             <Button variant="outline" onClick={() => setImporting(true)}>
               <FileSpreadsheetIcon /> Importar planilha
             </Button>
-            <Button onClick={() => openLeadForm()}>
+            <Button variant="brand" onClick={() => openLeadForm()}>
               <PlusIcon /> Novo lead
             </Button>
           </>

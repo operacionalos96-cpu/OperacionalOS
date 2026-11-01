@@ -136,10 +136,11 @@
   --info-soft: oklch(0.5 0 0 / 8%);
 
   /* Estágios = rampa SEQUENCIAL neutra (ordem do funil); só "ganho" é verde. */
-  --stage-novo: oklch(0.82 0 0);
-  --stage-contato: oklch(0.68 0 0);
-  --stage-proposta: oklch(0.52 0 0);
-  --stage-negociacao: oklch(0.34 0 0);
+  /* Etapas do funil com cor própria (mock do Pipeline): novo laranja, contato azul, proposta cinza, negociação coral. */
+  --stage-novo: var(--hzk-orange);
+  --stage-contato: oklch(0.62 0.15 245);
+  --stage-proposta: oklch(0.6 0.01 255);
+  --stage-negociacao: oklch(0.62 0.19 25);
 
   --shadow-card: 0 1px 2px oklch(0.3 0.04 255 / 4%), 0 10px 30px -14px oklch(0.3 0.06 255 / 14%);
   --sheen-color: color-mix(in oklch, var(--hzk-orange) 9%, transparent);
@@ -200,10 +201,10 @@
   --info: #9aa4b5;
   --info-soft: rgb(255 255 255 / 6%);
 
-  --stage-novo: #4a5568;
-  --stage-contato: #6b778a;
-  --stage-proposta: #9aa4b5;
-  --stage-negociacao: #d3d9e3;
+  --stage-novo: #f06a36;
+  --stage-contato: #3ba4f0;
+  --stage-proposta: #8c96a8;
+  --stage-negociacao: #ef4f4f;
 
   /* Aresta de vidro: 1px de luz no topo do card dá a sensação de camada sobre o fundo. */
   --shadow-card: inset 0 1px 0 rgb(255 255 255 / 5%), 0 12px 32px -18px rgb(0 0 0 / 70%);
