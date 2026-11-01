@@ -4,7 +4,10 @@ import { Suspense, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { leadMatches } from "@/lib/domain/contact"
 import { isDiscarded } from "@/lib/domain/prospecting"
-import { FileSpreadsheetIcon, KanbanIcon, PlusIcon, SearchIcon, UserPlusIcon } from "lucide-react"
+import { ChevronDownIcon, FileSpreadsheetIcon, KanbanIcon, ListIcon, PlusIcon, SearchIcon, UserPlusIcon, UsersIcon } from "lucide-react"
+import type { Stage } from "@/lib/domain/types"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { UserAvatar } from "@/components/shared/user-avatar"
 import { leadsNeedingAction } from "@/lib/domain/rules"
 import { useStore } from "@/lib/store"
 import { openLeadForm } from "@/lib/ui-store"
@@ -72,16 +75,24 @@ function Pipeline() {
         }
       >
         <div className="flex flex-wrap items-center gap-2">
+          {/* Modo de visualização (ícones) separado do filtro de dono (menu com avatar). */}
           <Segmented
             value={view}
             onChange={(v) => setParam("view", v === "acao" ? "acao" : null)}
             options={[
-              { value: "quadro", label: "Quadro" },
+              {
+                value: "quadro",
+                label: (
+                  <>
+                    <KanbanIcon className="size-3.5" /> Quadro
+                  </>
+                ),
+              },
               {
                 value: "acao",
                 label: (
                   <>
-                    Precisa de ação
+                    <ListIcon className="size-3.5" /> Precisa de ação
                     {needsCount > 0 && (
                       <span className="tabular rounded-full bg-danger-soft px-1.5 text-xs font-semibold text-danger">{needsCount}</span>
                     )}
@@ -90,14 +101,23 @@ function Pipeline() {
               },
             ]}
           />
-          <Segmented
-            value={owner}
-            onChange={(v) => setParam("dono", v === "meus" ? "meus" : null)}
-            options={[
-              { value: "todos", label: "Todos" },
-              { value: "meus", label: "Meus" },
-            ]}
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                {owner === "meus" ? <UserAvatar userId={meId} /> : <UsersIcon className="size-4" />}
+                {owner === "meus" ? "Meus leads" : "Todos os donos"}
+                <ChevronDownIcon className="size-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => setParam("dono", null)}>
+                <UsersIcon /> Todos os donos
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setParam("dono", "meus")}>
+                <UserAvatar userId={meId} /> Meus leads
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div className="relative ml-auto w-full sm:w-56">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Nome, empresa ou WhatsApp…" value={query} onChange={(e) => setQuery(e.target.value)} className="h-8 pl-8" />
@@ -119,9 +139,9 @@ function Pipeline() {
             className="py-24"
           />
         ) : view === "quadro" ? (
-          <Kanban leads={leads} />
+          <Kanban leads={leads} showOwner={owner === "todos"} focusStage={(params.get("etapa") as Stage | null) ?? null} />
         ) : (
-          <NeedsActionList leads={leads} />
+          <NeedsActionList leads={leads} showOwner={owner === "todos"} />
         )}
       </div>
       <ImportLeadsDialog open={importing} onClose={() => setImporting(false)} />

@@ -71,7 +71,7 @@ export function MapOutline({ map }: { map: MindMap }) {
 
   return (
     <div className="h-full overflow-y-auto">
-      <ol className="mx-auto grid max-w-3xl gap-0.5 px-4 py-6 sm:px-6">
+      <ol className="page-body is-narrow grid gap-0.5 pt-6">
         {!editable && <li className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Somente leitura: abra no modo Mapa uma vez para atualizar o formato.</li>}
         {rows.map((r) => {
           const n = r.node

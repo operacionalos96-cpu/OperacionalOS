@@ -4,11 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   BriefcaseIcon,
-  CalendarDaysIcon,
-  CalendarRangeIcon,
-  ClipboardListIcon,
   CrownIcon,
-  GitForkIcon,
   PlusIcon,
   UserPlusIcon,
   UsersIcon,
@@ -26,9 +22,10 @@ import { OrgTreeView } from "@/components/org/org-tree-view"
 import { TeamOverview } from "@/components/hzk/team-overview"
 import { TeamFeedPanel } from "@/components/dashboard/team-panels"
 import { TeamWeek } from "@/components/hzk/team-week"
+import { SectionTabs } from "@/components/shared/fields"
 import type { OrgRole } from "@/lib/domain/org"
 
-type TabType = "responsabilidades" | "semana" | "membros" | "cargos" | "hierarquia"
+type TabType = "responsabilidades" | "semana" | "agenda" | "membros" | "cargos" | "hierarquia"
 
 export default function EquipePage() {
   const { canAdmin } = useAccess()
@@ -78,7 +75,7 @@ export default function EquipePage() {
         actions={headerActions}
       />
 
-      <div className="mx-auto grid w-full max-w-5xl gap-6 p-4 sm:p-6">
+      <div className="page-body grid gap-6">
         {/* Métricas da Organização */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-2xs">
@@ -112,82 +109,19 @@ export default function EquipePage() {
           </div>
         </div>
 
-        {/* Seletor de Abas */}
-        <div className="flex flex-wrap items-center gap-1 border-b pb-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("responsabilidades")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTab === "responsabilidades"
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <ClipboardListIcon className="h-3.5 w-3.5" />
-            Responsabilidades
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("semana")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTab === "semana"
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <CalendarRangeIcon className="h-3.5 w-3.5" />
-            Semana do time
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push("/agenda")}
-            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <CalendarDaysIcon className="h-3.5 w-3.5" />
-            Agenda
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("membros")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTab === "membros"
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <UsersIcon className="h-3.5 w-3.5" />
-            Membros ({members.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("cargos")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTab === "cargos"
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <BriefcaseIcon className="h-3.5 w-3.5" />
-            Cargos & Funções ({orgRoles.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("hierarquia")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTab === "hierarquia"
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <GitForkIcon className="h-3.5 w-3.5" />
-            Árvore Hierárquica
-          </button>
-        </div>
+        {/* Seções da página (abas com sublinhado); Agenda leva para a página Agenda. */}
+        <SectionTabs
+          value={activeTab}
+          onChange={(v) => (v === "agenda" ? router.push("/agenda") : setActiveTab(v))}
+          options={[
+            { value: "responsabilidades", label: "Responsabilidades" },
+            { value: "semana", label: "Semana do time" },
+            { value: "agenda" as TabType, label: "Agenda" },
+            { value: "membros", label: `Membros (${members.length})` },
+            { value: "cargos", label: `Cargos e funções (${orgRoles.length})` },
+            { value: "hierarquia", label: "Árvore hierárquica" },
+          ]}
+        />
 
         {/* Aba 0 (HZK OS): responsabilidades e feitos de cada pessoa */}
         {activeTab === "responsabilidades" && (

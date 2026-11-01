@@ -32,7 +32,7 @@ export default function DecisionsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/decisoes" actions={newButton} />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
+      <div className="page-body is-narrow grid gap-4">
         {decisions.length === 0 ? (
           <EmptyState icon={ScaleIcon} title="Nenhuma decisão ainda" description="Quando algo precisar ser escolhido, registre aqui: o app mostra quem decide e guarda o motivo." action={newButton} className="py-20" />
         ) : (

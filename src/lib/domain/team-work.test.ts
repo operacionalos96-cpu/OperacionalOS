@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_AREAS } from "./areas"
-import { personWork } from "./team-work"
+import { personWork, collapseDone } from "./team-work"
 import type { Activity, Lead, Task } from "./types"
 
 const NOW = new Date("2026-10-31T15:00:00Z")
@@ -40,5 +40,20 @@ describe("responsabilidades e feitos por pessoa", () => {
   it("período maior traz o que ficou de fora", () => {
     const m = personWork("u2", { tasks, items, activities, areas: DEFAULT_AREAS, people }, NOW, 30)
     expect(m.done.some((d) => d.id === "f")).toBe(true)
+  })
+})
+
+describe("histórico agrupado", () => {
+  it("3+ eventos automáticos iguais em sequência viram uma linha; o resto fica igual", () => {
+    const e = (id: string, title: string, kind: "lead" | "tarefa" = "lead") => ({ kind, id, title, at: "2026-11-02T10:00:00" })
+    const rows = collapseDone([
+      e("1", "Ana — Responsável alterado para Gabriel"),
+      e("2", "Bia — Responsável alterado para Gabriel"),
+      e("3", "Caio — Responsável alterado para Gabriel"),
+      e("4", "Roteiro", "tarefa"),
+      e("5", "Duda — Lead criado"),
+    ])
+    expect(rows.map((r) => r.count)).toEqual([3, 1, 1])
+    expect(rows[0]).toMatchObject({ text: "Responsável alterado para Gabriel" })
   })
 })

@@ -40,7 +40,7 @@ import { useContentAccounts, useContentItems, useProducts } from "@/lib/modules"
 import { cn } from "@/lib/utils"
 import { setContentStage } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
-import { Segmented } from "@/components/shared/fields"
+import { Segmented, SectionTabs } from "@/components/shared/fields"
 import { EmptyState, GroupLabel, PageHeader, Panel, StatCard } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
@@ -83,8 +83,7 @@ function Content() {
           )
         }
       >
-        <Segmented
-          className="w-fit"
+        <SectionTabs
           value={tab}
           onChange={(v) => router.replace(v === "producao" ? pathname : `${pathname}?aba=${v}`, { scroll: false })}
           options={[
@@ -142,7 +141,7 @@ function Production({ onNew }: { onNew: () => void }) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col">
-        <div className="flex flex-wrap items-center gap-2 px-4 pt-4 sm:px-6">
+        <div className="page-container flex flex-wrap items-center gap-2 pt-3">
           <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
         </div>
       <EmptyState
@@ -162,7 +161,22 @@ function Production({ onNew }: { onNew: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 px-4 pt-4 sm:px-6">
+      {/* Trilha de etapas com contagem: onde a produção está travando? */}
+      <ol className="page-container flex flex-wrap items-center gap-1 pt-3 text-xs" aria-label="Etapas">
+        {CONTENT_STAGES.filter((st) => st.id !== "publicado").map((st, i) => {
+          const n = visible.filter((v) => v.stage === st.id).length
+          return (
+            <li key={st.id} className="flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground/50" aria-hidden>→</span>}
+              <span className={cn("rounded-full px-2 py-0.5", n ? "bg-foreground/10 font-medium text-foreground" : "text-muted-foreground")}>
+                {st.label} <span className="tabular">{n}</span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+      {/* 2º nível = filtro (pílulas menores), não aba: Visão geral, Gabriel, HZK… */}
+      <div className="page-container flex flex-wrap items-center gap-2 pt-3">
         <Segmented size="sm" value={brand} onChange={setBrand} options={[{ value: "todos", label: "Visão geral" }, ...brands.map((b) => ({ value: b, label: b }))]} />
         <label className="flex items-center gap-2 text-xs text-muted-foreground">Conta
           <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="h-8 rounded-md border bg-card px-2 text-xs text-foreground" aria-label="Filtrar produção por conta">
@@ -307,7 +321,7 @@ function Accounts({
   const platforms = PLATFORMS.filter((p) => accounts.some((a) => a.platform === p.id))
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 p-4 sm:p-6">
+    <div className="page-body flex flex-col gap-5">
       <div className="flex items-start gap-3 rounded-xl border border-dashed bg-card/50 p-4">
         <PlugIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <p className="t-desc">
@@ -453,7 +467,7 @@ function Metrics() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
+    <div className="page-body flex flex-col gap-5">
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
         <label className="grid gap-1 text-xs text-muted-foreground">Frente
           <select value={brand} onChange={(e) => setBrand(e.target.value)} className="h-8 min-w-32 rounded-md border bg-background px-2 text-sm text-foreground"><option value="todos">Visão geral</option>{brands.map((b) => <option key={b} value={b}>{b}</option>)}</select>

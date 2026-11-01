@@ -47,7 +47,7 @@ export default function ProductsPage() {
         />
       </PageHeader>
 
-      <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
+      <div className="page-body">
         {rows.length === 0 ? (
           <EmptyState
             icon={PackageIcon}
@@ -60,7 +60,7 @@ export default function ProductsPage() {
             }
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-auto-cards gap-4">
             {rows.map(({ product, stats }, i) => (
               <Link
                 key={product.id}

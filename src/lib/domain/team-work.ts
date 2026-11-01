@@ -75,3 +75,25 @@ export function personWork(
     done,
   }
 }
+
+/** Linha do histórico já agrupada: uma entrada, ou várias automáticas iguais em sequência. */
+export type DoneRow = { entry: DoneEntry; count: 1 } | { entry: DoneEntry; count: number; text: string; items: DoneEntry[] }
+
+/**
+ * Agrupa eventos automáticos repetidos em sequência ("Lead: X — Responsável alterado para Gabriel"
+ * ×70 vira "70 leads · Responsável alterado para Gabriel"). Só apresentação: o registro não muda.
+ */
+export function collapseDone(entries: DoneEntry[], min = 3): DoneRow[] {
+  const out: DoneRow[] = []
+  const textOf = (e: DoneEntry) => (e.kind === "lead" && e.title.includes(" — ") ? e.title.slice(e.title.lastIndexOf(" — ") + 3) : null)
+  let i = 0
+  while (i < entries.length) {
+    const t = textOf(entries[i])
+    let j = i + 1
+    while (t && j < entries.length && textOf(entries[j]) === t) j++
+    if (t && j - i >= min) out.push({ entry: entries[i], count: j - i, text: t, items: entries.slice(i, j) })
+    else for (let k = i; k < j; k++) out.push({ entry: entries[k], count: 1 })
+    i = j
+  }
+  return out
+}

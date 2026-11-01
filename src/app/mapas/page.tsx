@@ -90,7 +90,7 @@ export default function MapsPage() {
           </div>
         )}
       </PageHeader>
-      <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
+      <div className="page-body">
         {maps.length === 0 ? (
           <EmptyState
             icon={LayoutGridIcon}
@@ -100,7 +100,7 @@ export default function MapsPage() {
             className="py-20"
           />
         ) : shown.length === 0 ? (
-          <p className="py-16 text-center text-muted-foreground">Nada deste tipo ainda.</p>
+          <EmptyState icon={LayoutGridIcon} title="Nada deste tipo ainda" description="Troque o filtro acima ou crie um novo mapa ou lousa." action={<div className="flex gap-2">{actions}</div>} className="py-16" />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((m) => (

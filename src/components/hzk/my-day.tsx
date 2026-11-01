@@ -312,7 +312,7 @@ function PlanRow({ item, first, index }: { item: PlanItem; first?: boolean; inde
       }}
       style={{ transform: CSS.Transform.toString(transform), transition, "--i": index } as React.CSSProperties}
       className={cn(
-        "guided relative overflow-hidden rounded-xl border bg-background transition-colors",
+        "guided group/row relative overflow-hidden rounded-xl border bg-background transition-colors",
         isDragging && "z-10 shadow-lift",
         (first || item.badges.includes("fazendo")) && "border-highlight/70",
         open && "shadow-card",
@@ -345,7 +345,7 @@ function PlanRow({ item, first, index }: { item: PlanItem; first?: boolean; inde
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="min-w-0 flex-1 text-left">
               <span className="block truncate text-sm font-medium">{t.title}</span>
               <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                {item.badges.map((b) => (
+                {item.badges.filter((b) => !(b === "atrasada" && item.group === "atrasado")).map((b) => (
                   <span key={b} className={cn("rounded-full px-1.5 py-px font-medium", BADGE[b].className)}>
                     {BADGE[b].label}
                   </span>
@@ -360,7 +360,7 @@ function PlanRow({ item, first, index }: { item: PlanItem; first?: boolean; inde
               onClick={() => void finish()}
               aria-label={`Concluir: ${t.title}`}
               title="Concluir"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground hover:border-success hover:bg-success/10 hover:text-success"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground opacity-0 transition-opacity duration-(--dur-1) group-hover/row:opacity-100 hover:border-success hover:bg-success/10 hover:text-success focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
             >
               <CheckIcon className="size-4" />
             </button>

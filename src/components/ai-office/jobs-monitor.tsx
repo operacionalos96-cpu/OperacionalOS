@@ -58,6 +58,7 @@ export function JobsMonitor() {
 
   return (
     <div className="grid gap-3">
+      <StatusSummary jobs={jobs} agentName={(id) => agents.find((a) => a.id === id)?.name ?? id} />
       <div className="flex flex-wrap gap-1">
         {FILTERS.map((f) => (
           <button key={f.id} onClick={() => setFilter(f.id)} className={cn("rounded-full border px-3 py-1 text-xs", filter === f.id ? "border-brand bg-accent font-medium" : "text-muted-foreground hover:text-foreground", f.id === "dead_letter" && count("dead_letter") > 0 && "border-danger/50 text-danger")}>
@@ -70,33 +71,50 @@ export function JobsMonitor() {
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-card text-left text-xs text-muted-foreground">
               <tr className="border-b">
-                <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
                 <th className="px-3 py-2 font-medium">Agente</th>
                 <th className="px-3 py-2 font-medium">Entidade</th>
                 <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 text-right font-medium">Prior.</th>
-                <th className="px-3 py-2 text-right font-medium">Tent.</th>
-                <th className="px-3 py-2 font-medium">Criado</th>
+                <th className="px-3 py-2 text-right font-medium">Prior. · tent.</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Criado</th>
                 <th className="px-3 py-2 font-medium">Duração</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">ID</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((j) => (
                 <tr key={j.public_id} onClick={() => setOpen(j)} className="cursor-pointer border-b last:border-0 hover:bg-accent/40">
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{j.public_id.slice(0, 12)}…</td>
                   <td className="px-3 py-2">{JOB_TYPES[j.job_type]?.label ?? j.job_type}</td>
                   <td className="px-3 py-2">{agents.find((a) => a.id === j.agent_id)?.name ?? j.agent_id}</td>
-                  <td className="max-w-40 truncate px-3 py-2">{entityName(j)}</td>
-                  <td className={cn("px-3 py-2 font-medium", statusTone(j.status))}>{STATUS_LABEL[j.status] ?? j.status}</td>
-                  <td className="tabular px-3 py-2 text-right">{j.priority}</td>
-                  <td className="tabular px-3 py-2 text-right">
-                    {j.attempt_count}/{j.max_attempts}
+                  <td className="max-w-64 truncate px-3 py-2">{entityName(j)}</td>
+                  <td className="px-3 py-2">
+                    {/* Status como pílula com ponto (nunca só a cor do texto). */}
+                    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium whitespace-nowrap", statusTone(j.status))}>
+                      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                      {STATUS_LABEL[j.status] ?? j.status}
+                    </span>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{relative(j.created_at)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{jobDuration(j)}</td>
+                  <td className="tabular px-3 py-2 text-right text-muted-foreground">
+                    {j.priority} · {j.attempt_count}/{j.max_attempts}
+                  </td>
+                  <td className="hidden px-3 py-2 whitespace-nowrap text-muted-foreground lg:table-cell">{relative(j.created_at)}</td>
+                  <td className="tabular px-3 py-2 whitespace-nowrap text-muted-foreground">{jobDuration(j)}</td>
+                  <td className="hidden px-3 py-2 xl:table-cell">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void navigator.clipboard?.writeText(j.public_id)
+                        toast.success("ID copiado")
+                      }}
+                      title="Copiar o ID"
+                      className="action-link font-mono text-xs"
+                    >
+                      {j.public_id.slice(0, 10)}…
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -208,6 +226,45 @@ function Field({ k, v }: { k: string; v: React.ReactNode }) {
     <div className="min-w-0">
       <dt className="text-muted-foreground">{k}</dt>
       <dd className="truncate">{v}</dd>
+    </div>
+  )
+}
+
+/** A fila está andando? Barra empilhada por status + duração média por agente (dados já carregados). */
+function StatusSummary({ jobs, agentName }: { jobs: JobRow[]; agentName: (id: string) => string }) {
+  const groups = [
+    { id: "fila", label: "Na fila", color: "var(--muted-foreground)", match: (s: string) => ["queued", "retry_scheduled", "claimed", "running"].includes(s) },
+    { id: "ok", label: "Concluídos", color: "var(--success)", match: (s: string) => s === "completed" },
+    { id: "erro", label: "Falharam", color: "var(--danger)", match: (s: string) => ["failed", "dead_letter", "cancelled"].includes(s) },
+  ].map((g) => ({ ...g, count: jobs.filter((j) => g.match(j.status)).length }))
+  const total = Math.max(1, jobs.length)
+  const byAgent = new Map<string, number[]>()
+  for (const j of jobs) {
+    const start = j.started_at ?? j.claimed_at
+    const end = j.completed_at
+    if (start && end) byAgent.set(j.agent_id, [...(byAgent.get(j.agent_id) ?? []), new Date(end).getTime() - new Date(start).getTime()])
+  }
+  if (!jobs.length) return null
+  return (
+    <div className="grid gap-2 rounded-xl border bg-card p-4">
+      <div className="flex h-3 overflow-hidden rounded-full bg-muted" aria-hidden>
+        {groups.map((g) => (
+          <span key={g.id} className="grow-x h-full" style={{ width: `${(g.count / total) * 100}%`, background: g.color }} />
+        ))}
+      </div>
+      <p className="tabular flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {groups.map((g) => (
+          <span key={g.id} className="inline-flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ background: g.color }} />
+            {g.label} <span className="font-semibold text-foreground">{g.count}</span>
+          </span>
+        ))}
+        {[...byAgent.entries()].map(([id, ms]) => (
+          <span key={id}>
+            {agentName(id)}: média {duration(ms.reduce((a, b) => a + b, 0) / ms.length)}
+          </span>
+        ))}
+      </p>
     </div>
   )
 }

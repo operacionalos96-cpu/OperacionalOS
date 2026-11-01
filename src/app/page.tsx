@@ -40,7 +40,7 @@ export default function HomePage() {
   const at = (i: number) => ({ "--i": i }) as React.CSSProperties
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-8">
+    <div className="page-body flex flex-col gap-5 pt-6">
       <header className="guided flex flex-wrap items-end justify-between gap-3" style={at(0)}>
         <div className="flex min-w-0 items-center gap-4">
           {/* O orbe do guia: o humor mostra o dia (atraso = foco; tudo entregue = festa). Toque abre o guia. */}
@@ -108,8 +108,8 @@ export default function HomePage() {
         <WeeklyNudge />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-5">
-        <div className="flex min-w-0 flex-col gap-5 lg:col-span-3">
+      <div className="grid gap-4 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8">
           <div className="guided" style={at(3)}>
             <DayPlanPanel day={day} />
           </div>
@@ -117,7 +117,7 @@ export default function HomePage() {
             <WaitingForYou day={day} />
           </div>
         </div>
-        <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
           <div className="guided" style={at(4)}>
             <AgendaToday day={day} />
           </div>

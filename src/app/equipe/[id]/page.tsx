@@ -1,8 +1,8 @@
 "use client"
 
+import { cn } from "@/lib/utils"
 import { use, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeftIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { dueLabel } from "@/lib/format"
 import { eventsOfDay } from "@/lib/domain/calendar"
@@ -11,9 +11,8 @@ import { useCalendarEvents, useDailyPlans, useMemberRoles, useOrgRoles } from "@
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
 import { openTaskDetail } from "@/lib/ui-store"
-import { Button } from "@/components/ui/button"
 import { Segmented } from "@/components/shared/fields"
-import { DoneLine, usePersonWork } from "@/components/hzk/team-overview"
+import { DoneRows, usePersonWork } from "@/components/hzk/team-overview"
 import { PeriodOfDay } from "@/components/hzk/doing-now"
 import { PresenceBadge } from "@/components/hzk/presence-badge"
 import { EventRow } from "@/components/hzk/event-row"
@@ -47,18 +46,32 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
       <PageHeader
         title={user.name}
         description={titles.length ? titles.join(" · ") : "Membro da equipe"}
-        actions={
-          <Button asChild variant="outline">
-            <Link href="/equipe">
-              <ArrowLeftIcon /> Equipe
-            </Link>
-          </Button>
-        }
+        back={{ href: "/equipe", label: "Equipe" }}
       />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-card">
-          <PresenceBadge memberId={id} showDetail className="text-sm" />
-          {todayPlan?.focus && <span className="t-desc text-sm">· Foco de hoje: {todayPlan.focus}</span>}
+      <div className="page-body is-narrow grid gap-4">
+        {/* Cabeçalho do perfil: avatar grande, status e os mesmos três contadores do card da Equipe. */}
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-4 py-4 shadow-card">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white" style={{ backgroundColor: user.color }}>
+            {user.initials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <PresenceBadge memberId={id} showDetail className="text-sm" />
+            {todayPlan?.focus && <p className="t-desc mt-0.5 text-sm">Foco de hoje: {todayPlan.focus}</p>}
+          </div>
+          <dl className="tabular grid grid-cols-3 gap-4 text-center text-xs">
+            <div>
+              <dt className="text-muted-foreground">Em andamento</dt>
+              <dd className="text-lg font-semibold">{doing.length}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Atrasadas</dt>
+              <dd className={cn("text-lg font-semibold", w.overdue.length > 0 && "text-danger")}>{w.overdue.length}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Decisões</dt>
+              <dd className="text-lg font-semibold">{waiting.length}</dd>
+            </div>
+          </dl>
         </div>
 
         <Panel title="Agenda de hoje">
@@ -144,9 +157,7 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
         >
           {done.length ? (
             <ul className="grid gap-2 p-4">
-              {done.map((d) => (
-                <DoneLine key={`${d.kind}:${d.id}`} entry={d} />
-              ))}
+              <DoneRows entries={done} />
             </ul>
           ) : (
             <p className="t-desc p-4 text-sm">Nada concluído no período.</p>

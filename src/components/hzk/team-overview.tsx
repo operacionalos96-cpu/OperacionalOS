@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { AlertTriangleIcon, ArrowRightIcon, CheckCircle2Icon, MessageSquareIcon, ScaleIcon } from "lucide-react"
-import { personWork, type DoneEntry, type PersonWork } from "@/lib/domain/team-work"
+import { collapseDone, personWork, type DoneEntry, type PersonWork } from "@/lib/domain/team-work"
 import { relative } from "@/lib/format"
 import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"
@@ -50,6 +50,7 @@ export function TeamOverview() {
           ]}
         />
       </div>
+      <TeamLoad />
       <div className="grid gap-4 lg:grid-cols-2">
         {team.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.name} color={u.color} initials={u.initials} days={Number(days)} />
@@ -110,10 +111,8 @@ function PersonCard({ id, name, color, initials, days }: { id: string; name: str
           </p>
           {w.done.length ? (
             <ul className="grid gap-1.5">
-              {w.done.slice(0, 4).map((d) => (
-                <DoneLine key={`${d.kind}:${d.id}`} entry={d} />
-              ))}
-              {w.done.length > 4 && <li className="t-desc text-xs">e mais {w.done.length - 4} na página da pessoa</li>}
+              <DoneRows entries={w.done} limit={4} />
+              {collapseDone(w.done).length > 4 && <li className="t-desc text-xs">e mais na página da pessoa</li>}
             </ul>
           ) : (
             <p className="t-desc text-sm">Nada concluído no período.</p>
@@ -146,5 +145,65 @@ export function DoneLine({ entry }: { entry: DoneEntry }) {
       </span>
       <span className="t-desc shrink-0 text-xs">{relative(entry.at)}</span>
     </li>
+  )
+}
+
+/** O histórico com os eventos automáticos repetidos agrupados numa linha ("70 leads · … · ver"). */
+export function DoneRows({ entries, limit }: { entries: DoneEntry[]; limit?: number }) {
+  const rows = collapseDone(entries).slice(0, limit)
+  return (
+    <>
+      {rows.map((row) =>
+        row.count === 1 ? (
+          <DoneLine key={`${row.entry.kind}:${row.entry.id}`} entry={row.entry} />
+        ) : (
+          <li key={`grupo:${row.entry.id}`} className="text-sm">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-start gap-2">
+                <MessageSquareIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{row.count} leads</span> <span className="text-muted-foreground">· {"text" in row ? row.text : ""}</span>{" "}
+                  <span className="action-link text-xs group-open:hidden">ver</span>
+                </span>
+                <span className="t-desc shrink-0 text-xs">{relative(row.entry.at)}</span>
+              </summary>
+              <ul className="mt-1.5 ml-6 grid gap-1">{"items" in row && row.items.map((e) => <DoneLine key={e.id} entry={e} />)}</ul>
+            </details>
+          </li>
+        ),
+      )}
+    </>
+  )
+}
+
+/** A carga está equilibrada? Barras por pessoa (em andamento + atrasadas), na cor do avatar. */
+function TeamLoad() {
+  const team = useTeam()
+  const tasks = useStore((s) => s.tasks)
+  const items = useStore((s) => s.items)
+  const activities = useStore((s) => s.activities)
+  const areas = useAreaList()
+  const people = usePeople()
+  const rows = useMemo(
+    () => team.map((u) => ({ u, w: personWork(u.id, { tasks, items, activities, areas, people }, new Date(), 1) })),
+    [team, tasks, items, activities, areas, people],
+  )
+  const max = Math.max(1, ...rows.map((r) => r.w.open.length))
+  return (
+    <section className="grid gap-2 rounded-2xl border bg-card p-4" aria-label="Carga do time">
+      <p className="t-label">Carga do time</p>
+      {rows.map(({ u, w }) => (
+        <div key={u.id} className="grid grid-cols-[6rem_1fr_auto] items-center gap-3 text-sm">
+          <span className="truncate">{u.name}</span>
+          <span className="flex h-3 overflow-hidden rounded-full bg-muted" title={`${w.open.length - w.overdue.length} em dia · ${w.overdue.length} atrasadas`}>
+            <span className="grow-x h-full" style={{ width: `${((w.open.length - w.overdue.length) / max) * 100}%`, background: u.color }} />
+            <span className="grow-x h-full opacity-60" style={{ width: `${(w.overdue.length / max) * 100}%`, background: `repeating-linear-gradient(45deg, ${u.color}, ${u.color} 3px, transparent 3px, transparent 6px)` }} />
+          </span>
+          <span className="tabular text-xs text-muted-foreground">
+            {w.open.length} · <span className={w.overdue.length ? "text-danger" : undefined}>{w.overdue.length} atrasadas</span>
+          </span>
+        </div>
+      ))}
+    </section>
   )
 }

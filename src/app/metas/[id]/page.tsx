@@ -1,14 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react"
+import { PencilIcon, Trash2Icon } from "lucide-react"
 import { GOAL_SOURCES } from "@/lib/domain/insights"
 import { useGoals, useProducts } from "@/lib/modules"
 import { Button } from "@/components/ui/button"
-import { Panel, NotFound } from "@/components/shared/layout"
+import { Panel, NotFound, Breadcrumb } from "@/components/shared/layout"
 import { GoalDialog, GoalRow } from "@/components/goals/goal-bits"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { ContextPanel } from "@/components/entities/context-panel"
@@ -34,15 +33,10 @@ export default function GoalPage() {
   const source = GOAL_SOURCES.find((s) => s.id === goal.source)
   const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
   return (
-    <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_20rem]">
+    <div className="page-body grid gap-4 lg:grid-cols-[1fr_20rem]">
       <div className="grid h-fit gap-4">
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="icon-sm" aria-label="Voltar às metas">
-            <Link href="/metas">
-              <ArrowLeftIcon />
-            </Link>
-          </Button>
-          <p className="t-label">Meta</p>
+          <Breadcrumb href="/metas" label="Metas" current="Meta" />
           <div className="ml-auto flex gap-1">
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
               <PencilIcon /> Editar

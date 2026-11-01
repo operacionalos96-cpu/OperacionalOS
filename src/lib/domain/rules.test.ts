@@ -7,6 +7,11 @@ import {
   checklistProgress,
   compareTasks,
   dayProgress,
+  meaningfulPct,
+  delayBand,
+  delayHistogram,
+  delayTone,
+  weekProgress,
   dueBucket,
   expensesByCategory,
   goalProgress,
@@ -232,5 +237,38 @@ describe("tarefas colaborativas", () => {
     expect(isTaskFor(shared, "u2")).toBe(true)
     expect(dayProgress([shared], "u2", NOW).total).toBe(1)
     expect(isTaskFor({ ...base, ownerId: "u1" }, "u2")).toBe(false)
+  })
+})
+
+describe("variação percentual com sentido", () => {
+  it("some quando a base é pequena demais (|%| > 300%)", () => {
+    expect(meaningfulPct(0.12)).toBe(0.12)
+    expect(meaningfulPct(-2.5)).toBe(-2.5)
+    expect(meaningfulPct(110)).toBeNull()
+    expect(meaningfulPct(null)).toBeNull()
+  })
+})
+
+describe("atraso do lead", () => {
+  it("tom, faixa e histograma", () => {
+    expect([3, 7, 29, 30].map(delayTone)).toEqual(["neutral", "warning", "warning", "danger"])
+    expect([14, 15, 29, 30].map(delayBand)).toEqual(["ate14", "15-29", "15-29", "30+"])
+    expect(delayHistogram([0, 7, 8, 20, 45, 31]).map((b) => b.count)).toEqual([2, 1, 1, 2])
+  })
+})
+
+describe("faixa da semana", () => {
+  it("por dia: concluídas do que vencia naquele dia", () => {
+    const now = new Date("2025-10-15T12:00:00") // quarta
+    const tasks: Task[] = [
+      { id: "a", title: "a", ownerId: "u1", dueDate: "2025-10-13", done: true, createdAt: "" },
+      { id: "b", title: "b", ownerId: "u1", dueDate: "2025-10-13", done: false, createdAt: "" },
+      { id: "c", title: "c", ownerId: "u1", dueDate: "2025-10-15", done: true, createdAt: "" },
+      { id: "d", title: "d", ownerId: "u2", dueDate: "2025-10-15", done: false, createdAt: "" },
+    ]
+    const w = weekProgress(tasks, "u1", now)
+    expect(w).toHaveLength(7)
+    expect(w[0]).toMatchObject({ date: "2025-10-13", done: 1, total: 2, pct: 0.5 })
+    expect(w[2]).toMatchObject({ date: "2025-10-15", pct: 1, today: true })
   })
 })

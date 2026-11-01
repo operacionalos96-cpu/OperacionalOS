@@ -1,5 +1,6 @@
 "use client"
 
+import { SectionTabs } from "@/components/shared/fields"
 import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 import { ActivityIcon, BotIcon, FlaskConicalIcon, LightbulbIcon, PlusIcon } from "lucide-react"
@@ -65,21 +66,17 @@ export default function AiOfficePage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/ai-office" />
-      <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6">
-        <div className="flex gap-1 border-b text-sm">
-          {(
-            [
-              ["workforce", "AI Workforce"],
-              ["jobs", `Jobs${jobs.some((j) => j.status === "dead_letter") ? " ⚠" : ""}`],
-              ["webhooks", "Webhooks"],
-              ["workers", "Workers"],
-            ] as const
-          ).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={cn("-mb-px border-b-2 px-3 py-2", tab === id ? "border-brand font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="page-body grid gap-4">
+        <SectionTabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "workforce", label: "AI Workforce" },
+            { value: "jobs", label: `Jobs${jobs.some((j) => j.status === "dead_letter") ? " ⚠" : ""}` },
+            { value: "webhooks", label: "Webhooks" },
+            { value: "workers", label: "Workers" },
+          ]}
+        />
         {opsMissing && tab !== "workforce" && <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0011 no Supabase para ativar a fila, os workers e os webhooks.</p>}
         {tab === "jobs" && <JobsMonitor />}
         {tab === "webhooks" && <WebhooksPanel />}

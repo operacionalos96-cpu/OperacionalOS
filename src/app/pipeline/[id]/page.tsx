@@ -1,11 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import {
-  ArrowLeftIcon,
-  CheckIcon,
+import { CheckIcon,
   ClockIcon,
   MoreHorizontalIcon,
   PlusIcon,
@@ -33,7 +30,7 @@ import { Chip, DueDateField, OwnerToggle, ProductSelect, TemperatureToggle } fro
 import { InlineText } from "@/components/shared/inline-edit"
 import { ReviewPanel } from "@/components/prospecting/review-panel"
 import { LeadVideoCard } from "@/components/prospecting/lead-video-card"
-import { NotFound } from "@/components/shared/layout"
+import { NotFound, Breadcrumb } from "@/components/shared/layout"
 import { AvatarStack, UserAvatar } from "@/components/shared/user-avatar"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
@@ -57,13 +54,9 @@ function LeadDetail({ lead }: { lead: Lead }) {
   const updateLead = useStore((s) => s.updateLead)
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
+    <div className="page-body flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-          <Link href="/pipeline">
-            <ArrowLeftIcon /> Pipeline
-          </Link>
-        </Button>
+        <Breadcrumb href="/pipeline" label="Pipeline" current={lead.name} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label="Mais opções">

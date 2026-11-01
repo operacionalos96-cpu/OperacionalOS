@@ -17,6 +17,7 @@ import { useAccess } from "@/lib/use-access"
 import { useAreaList, useCeoLimit, usePeople } from "@/lib/use-hzk"
 import { useTeam } from "@/lib/use-team"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Field, MoneyInput } from "@/components/shared/fields"
 import { Input } from "@/components/ui/input"
 import { PageHeader, Panel } from "@/components/shared/layout"
@@ -31,18 +32,14 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader page="/configuracoes" />
-      <div className="mx-auto grid w-full max-w-3xl gap-4 p-4 sm:p-6">
+      <div className="page-body is-medium grid gap-4">
         {!canAdmin && (
           <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm text-muted-foreground">
             <LockIcon className="size-4" /> Só a gestão muda estas configurações. Você pode consultar.
           </p>
         )}
-        <Panel title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela.">
-          <ul className="divide-y">
-            {areas.map((a) => (
-              <AreaRow key={a.id} area={a} editable={canAdmin} ownerName={ownerLabel(a, people)} />
-            ))}
-          </ul>
+        <Panel title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela. Compare de relance quem é dono de quê.">
+          <AreasMatrix areas={areas} editable={canAdmin} ownerName={(a) => ownerLabel(a, people)} />
         </Panel>
         <CeoLimitPanel editable={canAdmin} />
         <DailyMeetingPanel editable={canAdmin} />
@@ -56,68 +53,84 @@ const CEO_VALUE = "cargo:ceo"
 const refValue = (r?: PersonRef) => (!r ? "" : "role" in r ? CEO_VALUE : r.memberId)
 const refFrom = (v: string): PersonRef | undefined => (!v ? undefined : v === CEO_VALUE ? { role: "ceo" } : { memberId: v })
 
-function AreaRow({ area, editable, ownerName }: { area: Area; editable: boolean; ownerName: string }) {
+/**
+ * Áreas em matriz (Briefing UI/UX): linhas = áreas; colunas = Dono, Quem aprova e Apoio. Select
+ * customizado para um só, chips de avatar para vários — cabe numa tela, no lugar de 9 blocos repetidos.
+ */
+function AreasMatrix({ areas, editable, ownerName }: { areas: Area[]; editable: boolean; ownerName: (a: Area) => string }) {
   const save = useAreas((s) => s.save)
   const team = useTeam()
-  const set = (patch: Partial<Area>) => {
+  const set = (area: Area, patch: Partial<Area>) => {
     save({ ...area, ...patch })
     toast.success(`${area.name} atualizada`)
   }
-  const select = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-  const personOptions = (
-    <>
-      <option value={CEO_VALUE}>CEO (quem tiver o cargo)</option>
-      {team.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.name}
-        </option>
-      ))}
-    </>
+  const NONE = "nenhum"
+  const person = (value: string, onChange: (v: string) => void, emptyLabel: string) => (
+    <Select value={value || NONE} onValueChange={(v) => onChange(v === NONE ? "" : v)} disabled={!editable}>
+      <SelectTrigger className="h-9 w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE}>{emptyLabel}</SelectItem>
+        <SelectItem value={CEO_VALUE}>CEO (quem tiver o cargo)</SelectItem>
+        {team.map((u) => (
+          <SelectItem key={u.id} value={u.id}>
+            {u.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
   return (
-    <li className="grid gap-3 px-4 py-4">
-      <div>
-        <p className="font-semibold">{area.name}</p>
-        {area.description && <p className="t-desc text-sm">{area.description}</p>}
-      </div>
-      {editable ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Dono">
-            <select className={select} value={refValue(area.owner)} onChange={(e) => set({ owner: refFrom(e.target.value) })}>
-              <option value="">Sem dono</option>
-              {personOptions}
-            </select>
-          </Field>
-          <Field label="Quem aprova">
-            <select className={select} value={refValue(area.approver)} onChange={(e) => set({ approver: refFrom(e.target.value) })}>
-              <option value="">O próprio dono</option>
-              {personOptions}
-            </select>
-          </Field>
-          <Field label="Apoio">
-            <select
-              className={select}
-              multiple
-              value={area.supportIds ?? []}
-              onChange={(e) => set({ supportIds: [...e.target.selectedOptions].map((o) => o.value) })}
-              size={Math.min(3, team.length)}
-            >
-              {team.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Dono: <span className="font-medium text-foreground">{ownerName}</span>
-          {area.supportIds?.length ? ` · apoio: ${area.supportIds.map((id) => getUser(id).name).join(", ")}` : ""}
-        </p>
-      )}
-      {area.approvalNote && <p className="t-desc text-xs">{area.approvalNote}</p>}
-    </li>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead className="text-left">
+          <tr className="border-b">
+            <th className="t-label px-4 py-2 font-medium">Área</th>
+            <th className="t-label w-44 px-2 py-2 font-medium">Dono</th>
+            <th className="t-label w-44 px-2 py-2 font-medium">Quem aprova</th>
+            <th className="t-label px-2 py-2 font-medium">Apoio</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {areas.map((area) => (
+            <tr key={area.id} className="align-middle">
+              <td className="px-4 py-2.5">
+                <p className="font-medium">{area.name}</p>
+                {area.approvalNote && <p className="t-desc text-xs">{area.approvalNote}</p>}
+              </td>
+              <td className="px-2 py-2.5">{editable ? person(refValue(area.owner), (v) => set(area, { owner: refFrom(v) }), "Sem dono") : ownerName(area)}</td>
+              <td className="px-2 py-2.5">{person(refValue(area.approver), (v) => set(area, { approver: refFrom(v) }), "O próprio dono")}</td>
+              <td className="px-2 py-2.5">
+                <div className="flex flex-wrap gap-1">
+                  {team.map((u) => {
+                    const on = !!area.supportIds?.includes(u.id)
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={!editable}
+                        onClick={() => set(area, { supportIds: on ? area.supportIds!.filter((x) => x !== u.id) : [...(area.supportIds ?? []), u.id] })}
+                        className={cn(
+                          "inline-flex h-7 items-center gap-1.5 rounded-full border pr-2.5 pl-0.5 text-xs transition-colors",
+                          on ? "border-foreground/25 bg-foreground/10 font-medium" : "text-muted-foreground opacity-70 hover:opacity-100",
+                        )}
+                      >
+                        <span className="flex size-6 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: u.color }}>
+                          {u.initials}
+                        </span>
+                        {u.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

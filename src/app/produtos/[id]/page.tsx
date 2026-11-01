@@ -5,9 +5,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  ArrowDownLeftIcon,
-  ArrowLeftIcon,
-  ArrowUpRightIcon,
+  ArrowDownLeftIcon, ArrowUpRightIcon,
   ClapperboardIcon,
   ExternalLinkIcon,
   KanbanIcon,
@@ -31,7 +29,7 @@ import { openLeadForm, openTxForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { EmptyState, Panel, StatCard, NotFound } from "@/components/shared/layout"
+import { EmptyState, Panel, StatCard, NotFound, Breadcrumb } from "@/components/shared/layout"
 import { UserAvatar } from "@/components/shared/user-avatar"
 import { CountUp } from "@/components/shared/count-up"
 import { ProductFormDialog } from "@/components/products/product-form-dialog"
@@ -82,10 +80,8 @@ export default function ProductPage() {
 
   return (
     <div className="flex flex-col">
-      <header className="flex flex-col gap-3 border-b px-4 py-4 sm:px-6">
-        <Link href="/produtos" className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeftIcon className="size-3.5" /> Produtos
-        </Link>
+      <header className="page-container flex flex-col gap-3 pt-6 pb-3">
+        <Breadcrumb href="/produtos" label="Produtos" current={product.name} />
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -109,7 +105,7 @@ export default function ProductPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
+      <div className="page-body flex flex-col gap-5">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard metric="leads-produto" icon={UsersIcon} style={{ "--i": 0 } as React.CSSProperties}>
             <p className="t-value mt-3">
@@ -117,6 +113,24 @@ export default function ProductPage() {
             </p>
             <p className="t-desc mt-1 text-xs">
               {stats.openLeads} abertos · {stats.wonLeads} ganhos · {stats.lostLeads} perdidos
+            </p>
+            {/* Funil do produto: este produto converte? */}
+            <div className="mt-3 grid gap-1" aria-hidden>
+              {[
+                { label: "Leads", n: stats.leads, color: "var(--stage-contato)" },
+                { label: "Ganhos", n: stats.wonLeads, color: "var(--chart-in)" },
+                { label: "Perdidos", n: stats.lostLeads, color: "var(--chart-out)" },
+              ].map((f) => (
+                <span key={f.label} className="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">{f.label}</span>
+                  <span className="h-1.5 rounded-full bg-muted">
+                    <span className="grow-x block h-full rounded-full" style={{ width: `${stats.leads ? (f.n / stats.leads) * 100 : 0}%`, background: f.color }} />
+                  </span>
+                  <span className="tabular text-right">{f.n}</span>
+                </span>
+              ))}
+            </div>
+            <p className="sr-only">
             </p>
           </StatCard>
           <StatCard

@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ConnectionsPanel } from "@/components/entities/connections-panel"
 import { Button } from "@/components/ui/button"
-import { MoneyInput, Segmented } from "@/components/shared/fields"
+import { MoneyInput, Segmented, SectionTabs } from "@/components/shared/fields"
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/shared/layout"
 import { CountUp } from "@/components/shared/count-up"
 import { UserAvatar } from "@/components/shared/user-avatar"
@@ -62,8 +62,8 @@ export default function FinancePage() {
           </>
         }
       />
-      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6">
-        <Segmented size="sm" value={tab} onChange={setTab} options={[
+      <div className="page-container flex flex-wrap items-end gap-2">
+        <SectionTabs className="flex-1" value={tab} onChange={setTab} options={[
           { value: "visao", label: "Visão geral" },
           { value: "movimentacoes", label: "Movimentações" },
           { value: "pagar", label: "Contas a pagar" },
@@ -73,9 +73,8 @@ export default function FinancePage() {
           <input type="month" aria-label="Período dos indicadores financeiros" value={period} onChange={(e) => setPeriod(e.target.value || format(now, "yyyy-MM"))} className="h-8 rounded-md border bg-card px-2 text-sm text-foreground" />
         </label>
       </div>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
+      <div className="page-body flex flex-col gap-5">
         {tab === "visao" && <>
-        <p className="text-sm text-muted-foreground first-letter:uppercase">Mostrando {format(periodDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard
             label={period < format(now, "yyyy-MM") ? `Saldo ao fim de ${format(periodDate, "MMMM", { locale: ptBR })}` : undefined}
@@ -158,18 +157,33 @@ export default function FinancePage() {
 function PlannedVsRealized({ stats }: { stats: { planned: ReturnType<typeof plannedStats>; month: { income: number; expense: number; net: number }; balance: number } }) {
   const { planned, month } = stats
   const projected = stats.balance + planned.netOpen
+  const max = Math.max(1, month.income + planned.incomeOpen, month.expense + planned.expenseOpen)
+  // Barras pareadas (briefing): realizado sólido + previsto em contorno — quanto ainda vai entrar/sair?
+  const row = (label: string, realized: number, open: number, overdue: number, color: string) => (
+    <div className="grid gap-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="tabular text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{money(realized)}</span> realizado · {money(open)} previsto
+          {overdue > 0 && <span className="text-danger"> ({money(overdue)} vencido)</span>}
+        </span>
+      </div>
+      <div className="flex h-3 overflow-hidden rounded-full bg-muted" aria-hidden>
+        <span className="grow-x h-full" style={{ width: `${(realized / max) * 100}%`, background: color }} />
+        <span className="h-full rounded-r-full border-2 border-l-0" style={{ width: `${(open / max) * 100}%`, borderColor: color }} />
+      </div>
+    </div>
+  )
   return (
-    <Panel title="Previsto vs realizado" description="Realizado já passou pelo caixa. Previsto são contas com vencimento no período ainda não baixadas.">
-      <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <div className="px-4 py-3"><p className="t-label">Entradas</p>
-          <p className="tabular mt-1 text-sm">Realizado <span className="font-semibold text-success">{money(month.income)}</span></p>
-          <p className="tabular text-sm">A receber <span className="font-semibold">{money(planned.incomeOpen)}</span>{planned.incomeOverdue > 0 && <span className="ml-1 text-xs text-danger">({money(planned.incomeOverdue)} vencido)</span>}</p></div>
-        <div className="px-4 py-3"><p className="t-label">Saídas</p>
-          <p className="tabular mt-1 text-sm">Realizado <span className="font-semibold">{money(month.expense)}</span></p>
-          <p className="tabular text-sm">A pagar <span className="font-semibold">{money(planned.expenseOpen)}</span>{planned.expenseOverdue > 0 && <span className="ml-1 text-xs text-danger">({money(planned.expenseOverdue)} vencido)</span>}</p></div>
-        <div className="px-4 py-3"><p className="t-label">Caixa</p>
-          <p className="tabular mt-1 text-sm">Efetivo <span className="font-semibold">{money(stats.balance)}</span></p>
-          <p className={cn("tabular text-sm", projected < 0 && "text-danger")}>Projetado se tudo for baixado <span className="font-semibold">{money(projected)}</span></p></div>
+    <Panel title="Previsto vs realizado" description="Sólido = já passou pelo caixa. Contorno = contas do período ainda não baixadas.">
+      <div className="grid gap-4 p-4">
+        {row("Entradas", month.income, planned.incomeOpen, planned.incomeOverdue, "var(--chart-in)")}
+        {row("Saídas", month.expense, planned.expenseOpen, planned.expenseOverdue, "var(--chart-out)")}
+        <p className="tabular border-t pt-3 text-sm">
+          Caixa efetivo <span className="font-semibold">{money(stats.balance)}</span>
+          <span className="text-muted-foreground"> · projetado se tudo for baixado </span>
+          <span className={cn("font-semibold", projected < 0 && "text-danger")}>{money(projected)}</span>
+        </p>
       </div>
     </Panel>
   )
