@@ -10,8 +10,11 @@ import type { DailyPlan } from "./presence"
 /** Configuração do time (team_settings, documento "time"). */
 export interface TeamSettings {
   id: string
-  /** Reunião diária: horário ("07:30") e link (Meet, Zoom…). */
-  daily?: { time?: string; link?: string }
+  /**
+   * Reunião diária: horário ("07:30"), link (Meet, Zoom…) e quem fica FORA dela. Guardamos os de
+   * fora (e não os de dentro) para quem entrar no time participar por padrão.
+   */
+  daily?: { time?: string; link?: string; excludedIds?: string[] }
   /** Abas de cada pessoa ajustadas pelo owner (ADR 0012). Sem entrada = padrão pelas áreas. */
   pagesByMember?: Record<string, string[]>
   updatedAt?: string
@@ -19,6 +22,12 @@ export interface TeamSettings {
 export const TEAM_SETTINGS_ID = "time"
 /** Horário da reunião diária enquanto o time não salvar outro em Configurações. */
 export const DAILY_DEFAULT_TIME = "07:30"
+
+/** Quem participa da reunião diária: o time, menos quem foi tirado em Configurações. */
+export function dailyParticipants(teamIds: string[], settings: TeamSettings | undefined): string[] {
+  const out = new Set(settings?.daily?.excludedIds ?? [])
+  return teamIds.filter((id) => !out.has(id))
+}
 
 export interface DailyState {
   /** Quem conta hoje (time menos quem está ausente). */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CalendarEvent } from "./calendar"
-import { dailyState } from "./daily"
+import { dailyParticipants, dailyState } from "./daily"
 import { myDay, planCandidates, reorder } from "./my-day"
 import { presenceOf, type DailyPlan } from "./presence"
 import type { Task } from "./types"
@@ -154,6 +154,15 @@ describe("reunião diária", () => {
   it("quem está ausente na agenda não trava a daily", () => {
     const folga = ev({ kind: "ausencia", ownerId: "u3", start: at("00:00").toISOString(), end: at("23:59").toISOString() })
     expect(dailyState(team, [p("u1", { checkedInAt: "x" }), p("u2", { checkedInAt: "x" })], [folga], at("09:10"))).toMatchObject({ phase: "liberado", expected: ["u1", "u2"] })
+  })
+
+  it("quem foi tirado da daily (Configurações) não participa nem trava; quem entra no time participa", () => {
+    const settings = { id: "time", daily: { excludedIds: ["u3"] } }
+    expect(dailyParticipants(team, settings)).toEqual(["u1", "u2"])
+    expect(dailyParticipants([...team, "u4"], settings)).toEqual(["u1", "u2", "u4"])
+    expect(dailyParticipants(team, undefined)).toEqual(team)
+    const ids = dailyParticipants(team, settings)
+    expect(dailyState(ids, [p("u1", { checkedInAt: "x" }), p("u2", { checkedInAt: "x" })], [], at("09:10")).phase).toBe("liberado")
   })
 })
 
