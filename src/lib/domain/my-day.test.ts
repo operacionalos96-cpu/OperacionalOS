@@ -4,7 +4,7 @@ import { dailyState } from "./daily"
 import { myDay, planCandidates, reorder } from "./my-day"
 import { presenceOf, type DailyPlan } from "./presence"
 import type { Task } from "./types"
-import { doingNow, minutesText, periodOfDay, startTask, stopTask, syncWithStatus } from "./work-sessions"
+import { dayChanges, doingNow, endPause, minutesText, pauseLabel, pausedNow, pauseWork, periodOfDay, startTask, stopTask, syncWithStatus } from "./work-sessions"
 
 // Segunda-feira, 2 de novembro de 2026, horário local.
 const at = (hhmm: string, day = "2026-11-02") => new Date(`${day}T${hhmm}:00`)
@@ -76,6 +76,66 @@ describe("fazendo agora e período do dia", () => {
     const p = startTask(plan({ checkedInAt: at("08:55").toISOString() }), { id: "t1", title: "Roteiro" }, at("09:00"))
     expect(presenceOf("u2", at("10:00"), { events: [], online: true, plan: p })).toMatchObject({ status: "online", detail: "Fazendo: Roteiro", since: "09:00" })
     expect(presenceOf("u2", at("10:00"), { events: [], online: false, plan: p })).toMatchObject({ status: "expediente", detail: "Fazendo: Roteiro" })
+  })
+})
+
+describe("pausa com motivo (ADR 0015)", () => {
+  it("pausar fecha a tarefa e abre a pausa; começar de novo fecha a pausa", () => {
+    let p = startTask(plan(), { id: "t1", title: "Roteiro" }, at("09:00"))
+    p = pauseWork(p, "almoco", undefined, at("12:00"))
+    expect(doingNow(p)).toBeUndefined()
+    expect(p.sessions?.[0].end).toBe(at("12:00").toISOString())
+    expect(pausedNow(p)).toMatchObject({ reason: "almoco", start: at("12:00").toISOString() })
+    p = startTask(p, { id: "t1", title: "Roteiro" }, at("13:10"))
+    expect(pausedNow(p)).toBeUndefined()
+    expect(p.pauses?.[0].end).toBe(at("13:10").toISOString())
+    expect(doingNow(p)?.start).toBe(at("13:10").toISOString())
+  })
+
+  it("trocar o motivo fecha a pausa anterior; voltar sem tarefa só fecha a pausa", () => {
+    let p = pauseWork(plan(), "intervalo", undefined, at("10:00"))
+    p = pauseWork(p, "outro", "  banco  ", at("10:15"))
+    expect(p.pauses?.map((x) => !!x.end)).toEqual([true, false])
+    expect(pauseLabel(pausedNow(p)!)).toBe("banco")
+    expect(pauseLabel({ reason: "saude", note: "dentista" })).toBe("Médico / dentista: dentista")
+    p = endPause(p, at("11:00"))
+    expect(pausedNow(p)).toBeUndefined()
+    expect(endPause(p, at("11:05"))).toBe(p)
+  })
+
+  it("o time vê \"Em pausa · Almoço desde 12:00\", mesmo com o app fechado; a agenda vence", () => {
+    const p = pauseWork(plan({ checkedInAt: at("08:55").toISOString() }), "almoco", undefined, at("12:00"))
+    expect(presenceOf("u2", at("12:30"), { events: [], online: true, plan: p })).toMatchObject({ status: "pausa", detail: "Almoço", since: "12:00" })
+    expect(presenceOf("u2", at("12:30"), { events: [], online: false, plan: p }).status).toBe("pausa")
+    expect(presenceOf("u2", at("12:30"), { events: [ev({ start: at("12:00").toISOString(), end: at("13:00").toISOString() })], online: true, plan: p }).status).toBe("reuniao")
+    expect(presenceOf("u2", at("12:30"), { events: [], online: false, plan: { ...p, closedAt: at("12:20").toISOString() } }).status).toBe("offline")
+  })
+
+  it("pausas aparecem no período do dia, sem contar como tempo trabalhado", () => {
+    let p = startTask(plan(), { id: "t1", title: "Roteiro" }, at("09:00"))
+    p = pauseWork(p, "academia", undefined, at("10:00"))
+    const [manha] = periodOfDay(p, at("10:45"))
+    expect(manha.minutes).toBe(60)
+    expect(manha.pauses).toEqual([{ label: "Academia", start: at("10:00").toISOString(), minutes: 45, running: true }])
+  })
+})
+
+describe("avisos para CEO e founders: o que mudou no dia de alguém", () => {
+  it("check-in, início de tarefa e pausa viram avisos; regravar o mesmo dia não repete", () => {
+    const antes = plan()
+    const checkin = { ...antes, checkedInAt: at("09:00").toISOString(), focus: "Proposta" }
+    expect(dayChanges(antes, checkin)).toEqual([{ kind: "checkin", focus: "Proposta" }])
+    const comecou = startTask(checkin, { id: "t1", title: "Roteiro" }, at("09:05"))
+    expect(dayChanges(checkin, comecou)).toEqual([{ kind: "start", title: "Roteiro" }])
+    const pausou = pauseWork(comecou, "almoco", undefined, at("12:00"))
+    expect(dayChanges(comecou, pausou)).toEqual([{ kind: "pause", label: "Almoço" }])
+    expect(dayChanges(pausou, { ...pausou, focus: "outra" })).toEqual([])
+    expect(dayChanges(comecou, stopTask(comecou, at("10:00")))).toEqual([])
+  })
+
+  it("linha nova do dia já com check-in e tarefa conta como os dois avisos", () => {
+    const novo = startTask(plan({ checkedInAt: at("09:00").toISOString() }), { id: "t1", title: "Roteiro" }, at("09:01"))
+    expect(dayChanges(undefined, novo).map((c) => c.kind)).toEqual(["checkin", "start"])
   })
 })
 

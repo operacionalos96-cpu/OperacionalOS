@@ -1,14 +1,15 @@
 /**
  * Presença do time (ADR 0009): on, off ou em compromisso — um status por pessoa, por prioridade.
  *   1 ausente · 2 em reunião · 3 em compromisso · 4 em foco   (automático, pela agenda)
- *   5 online                                                  (automático, app aberto agora)
- *   6 no expediente                                           (semiautomático, check-in do dia até fechar o dia)
- *   7 offline
+ *   5 em pausa                                                (pausou com motivo: almoço, academia…)
+ *   6 online                                                  (automático, app aberto agora)
+ *   7 no expediente                                           (semiautomático, check-in do dia até fechar o dia)
+ *   8 offline
  * Regras puras, testadas em presence.test.ts.
  */
 import { format } from "date-fns"
 import { involves, type CalendarEvent, type EventKind } from "./calendar"
-import type { WorkSession } from "./work-sessions"
+import { pauseLabel, pausedNow, type Pause, type WorkSession } from "./work-sessions"
 
 /** Check-in do dia (tabela daily_plans): um botão + o foco de hoje; o ritual de fechar o dia usa a mesma linha. */
 export interface DailyPlan {
@@ -26,6 +27,8 @@ export interface DailyPlan {
   noteFromYesterday?: string
   /** "Fazendo agora" e o período do dia (src/lib/domain/work-sessions.ts). */
   sessions?: WorkSession[]
+  /** Pausas com motivo (almoço, academia…) — ADR 0015. */
+  pauses?: Pause[]
   /** Pronto para a reunião diária (src/lib/domain/daily.ts). */
   readyAt?: string
   updatedAt?: string
@@ -33,13 +36,14 @@ export interface DailyPlan {
 
 export const planId = (memberId: string, day: Date) => `${memberId}:${format(day, "yyyy-MM-dd")}`
 
-export type PresenceStatus = "ausente" | "reuniao" | "compromisso" | "foco" | "online" | "expediente" | "offline"
+export type PresenceStatus = "ausente" | "reuniao" | "compromisso" | "foco" | "pausa" | "online" | "expediente" | "offline"
 
 export const PRESENCE: Record<PresenceStatus, { label: string; tone: "danger" | "warning" | "brand" | "success" | "info" | "muted" }> = {
   ausente: { label: "Ausente", tone: "muted" },
   reuniao: { label: "Em reunião", tone: "warning" },
   compromisso: { label: "Em compromisso", tone: "warning" },
   foco: { label: "Em foco", tone: "brand" },
+  pausa: { label: "Em pausa", tone: "warning" },
   online: { label: "Online", tone: "success" },
   expediente: { label: "No expediente", tone: "info" },
   offline: { label: "Offline", tone: "muted" },
@@ -77,6 +81,9 @@ export function presenceOf(memberId: string, now: Date, src: { events: CalendarE
   }
   // O que está fazendo agora (tarefa começada hoje) vira o detalhe do status.
   const p = src.plan?.date === format(now, "yyyy-MM-dd") ? src.plan : undefined
+  // Pausa com motivo vale mesmo com o app fechado (saiu para almoçar): "Em pausa · Almoço desde 12:10".
+  const pause = pausedNow(p)
+  if (pause && !p?.closedAt) return { status: "pausa", label: PRESENCE.pausa.label, detail: pauseLabel(pause), since: format(new Date(pause.start), "HH:mm") }
   const doing = p?.sessions?.find((s) => !s.end)
   const doingDetail = doing ? `Fazendo: ${doing.title}` : undefined
   if (src.online) return { status: "online", label: PRESENCE.online.label, detail: doingDetail, since: doing && format(new Date(doing.start), "HH:mm") }

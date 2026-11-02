@@ -10,6 +10,8 @@ import { supabaseBrowser } from "@/lib/supabase/client"
 /**
  * "Online" automático (ADR 0009): cada aba aberta entra num canal de presença do Supabase com o
  * team_id da pessoa e some sozinha ao fechar. Nada é gravado no banco.
+ * ADR 0015: ao voltar para a aba ou para a internet, a pessoa se anuncia de novo na hora; ao
+ * fechar a aba, sai na hora (antes esperava o servidor perceber a queda).
  */
 export const useOnline = create<{ ids: Set<string> }>(() => ({ ids: new Set() }))
 
@@ -22,11 +24,17 @@ export function startPresence(meId: string) {
     return
   }
   const channel = supabaseBrowser().channel("presenca-time", { config: { presence: { key: meId } } })
+  let joined = false
+  const announce = () => joined && void channel.track({ desde: new Date().toISOString() })
   channel
     .on("presence", { event: "sync" }, () => useOnline.setState({ ids: new Set(Object.keys(channel.presenceState())) }))
     .subscribe((status) => {
-      if (status === "SUBSCRIBED") void channel.track({ desde: new Date().toISOString() })
+      joined = status === "SUBSCRIBED"
+      announce()
     })
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && announce())
+  window.addEventListener("online", announce)
+  window.addEventListener("pagehide", () => void channel.untrack())
 }
 
 /** Relógio que anda de minuto em minuto: o status muda sozinho quando uma reunião começa ou acaba. */

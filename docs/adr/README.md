@@ -31,3 +31,5 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0011](0011-check-in-semanal.md) | Check-in semanal e Semana do time | Aceito |
 | [0012](0012-abas-por-pessoa.md) | Abas por pessoa e fase da tarefa junto com o tempo | Aceito |
 | [0013](0013-layout-e-movimento.md) | Sistema de layout e movimento (Briefing de UI/UX) | Aceito |
+| [0014](0014-identidade-dos-mocks.md) | Identidade dos mocks: abas em cápsula, luz discreta e leitura para qualquer um | Aceito |
+| [0015](0015-pausa-e-avisos.md) | Online confiável, pausa com motivo e avisos para CEO e founders | Aceito |

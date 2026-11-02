@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { format } from "date-fns"
 import { myDay, type MyDay } from "@/lib/domain/my-day"
 import { planId, type DailyPlan } from "@/lib/domain/presence"
-import { doingNow, stopTask, syncWithStatus, type WorkSession } from "@/lib/domain/work-sessions"
+import { doingNow, endPause, lastSession, pausedNow, pauseWork, stopTask, syncWithStatus, type Pause, type PauseReason, type WorkSession } from "@/lib/domain/work-sessions"
 import { setTaskStatus } from "@/lib/actions"
 import type { Task } from "@/lib/domain/types"
 import { useCalendarEvents, useDailyPlans } from "@/lib/modules"
@@ -45,17 +45,39 @@ export function syncDoing(taskId: string, next: "afazer" | "andamento" | "feito"
 
 /**
  * "Fazendo agora": começar e concluir passam pelas MESMAS ações do círculo de status (fase + tempo
- * juntos); pausar só fecha o tempo (a tarefa continua em andamento).
+ * juntos); pausar só fecha o tempo (a tarefa continua em andamento). Pausa com motivo (ADR 0015):
+ * fecha o tempo e mostra ao time por que a pessoa parou; voltar retoma a última tarefa.
  */
-export function useDoing(): { doing?: WorkSession; start(task: Task): void; pause(): void; complete(task: Task): void } {
+export function useDoing(): {
+  doing?: WorkSession
+  paused?: Pause
+  start(task: Task): void
+  pause(): void
+  pauseFor(reason: PauseReason, note?: string): void
+  resume(): void
+  complete(task: Task): void
+} {
   const meId = useStore((s) => s.meId)
   const plans = useDailyPlans((s) => s.items)
   const save = useDailyPlans((s) => s.save)
+  const today = () => dayRow(useDailyPlans.getState().items, meId, new Date())
+  const row = dayRow(plans, meId, new Date())
   return {
-    doing: doingNow(dayRow(plans, meId, new Date())),
+    doing: doingNow(row),
+    paused: pausedNow(row),
     start: (task) => setTaskStatus(task.id, "andamento"),
     pause() {
-      save(stopTask(dayRow(useDailyPlans.getState().items, meId, new Date()), new Date()))
+      save(stopTask(today(), new Date()))
+    },
+    pauseFor(reason, note) {
+      save(pauseWork(today(), reason, note, new Date()))
+    },
+    resume() {
+      const last = lastSession(today())
+      const task = last && useStore.getState().tasks.find((t) => t.id === last.taskId && !t.done)
+      // Voltar = retomar a última tarefa (a mesma ação do status fecha a pausa); sem tarefa, só fecha a pausa.
+      if (task) setTaskStatus(task.id, "andamento")
+      else save(endPause(today(), new Date()))
     },
     complete: (task) => setTaskStatus(task.id, "feito"),
   }
