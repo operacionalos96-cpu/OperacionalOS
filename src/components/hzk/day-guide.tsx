@@ -9,8 +9,8 @@ import { ArrowRightIcon, CalendarClockIcon, CheckIcon, ChevronDownIcon, ChevronL
 import { getUser } from "@/config/team"
 import { BECAME_LABEL, checkInStreak, dayPlan, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
 import { needsCheckIn, planId, type DailyPlan } from "@/lib/domain/presence"
-import { useCalendarEvents, useCheckins, useDailyPlans } from "@/lib/modules"
-import { dailyState } from "@/lib/domain/daily"
+import { useCalendarEvents, useCheckins, useDailyPlans, useTeamSettings } from "@/lib/modules"
+import { TEAM_SETTINGS_ID, dailyParticipants, dailyState } from "@/lib/domain/daily"
 import { useTeam } from "@/lib/use-team"
 import { weeklyAsk } from "@/lib/domain/weekly"
 import { useMinute } from "@/lib/presence"
@@ -70,6 +70,7 @@ export function DayGuide() {
   const loaded = useDailyPlans((s) => s.loaded)
   const checkins = useCheckins((s) => s.items)
   const plans = useDailyPlans((s) => s.items)
+  const teamSettings = useTeamSettings((s) => s.items.find((x) => x.id === TEAM_SETTINGS_ID))
   const save = useDailyPlans((s) => s.save)
   const now = useMinute()
   const work = usePersonWork(meId, 1)
@@ -244,12 +245,12 @@ export function DayGuide() {
   const SCREENS: Screen[] = ["ola", "direcao", "lista", "fecho"]
   const idx = SCREENS.indexOf(screen)
   const planned = day.planItems.filter((x) => x.task.plannedFor === today)
-  const daily = dailyState(
+  const dailyIds = dailyParticipants(
     team.map((u) => u.id),
-    plans,
-    events,
-    now,
+    teamSettings,
   )
+  const inDaily = dailyIds.includes(meId)
+  const daily = dailyState(dailyIds, plans, events, now)
   const names = (ids: string[]) => ids.map((id) => getUser(id).name).join(", ")
   const step = (k: number) => ({ "--i": k }) as React.CSSProperties
 
@@ -477,14 +478,16 @@ export function DayGuide() {
                   <>
                     <h2 className="text-xl font-semibold">{allDone ? "Tudo entregue. Mandou bem!" : "Pronto para o dia"}</h2>
                     {weekly && <WeeklyCheckinCard kind={weekly} />}
-                    <p className="flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm">
-                      <VideoIcon className="size-4 shrink-0 text-highlight" />
-                      {daily.phase === "checkin"
-                        ? `Reunião diária: falta o check-in de ${names(daily.missingCheckIn)}.`
-                        : daily.phase === "todos"
-                          ? "Reunião diária: todos prontos."
-                          : "Reunião diária liberada: marque que está pronto na Início."}
-                    </p>
+                    {inDaily && (
+                      <p className="flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm">
+                        <VideoIcon className="size-4 shrink-0 text-highlight" />
+                        {daily.phase === "checkin"
+                          ? `Reunião diária: falta o check-in de ${names(daily.missingCheckIn)}.`
+                          : daily.phase === "todos"
+                            ? "Reunião diária: todos prontos."
+                            : "Reunião diária liberada: marque que está pronto na Início."}
+                      </p>
+                    )}
                     <div className="flex flex-wrap justify-end gap-2">
                       {canClose && (
                         <Button variant="outline" onClick={() => go("fechar")}>
