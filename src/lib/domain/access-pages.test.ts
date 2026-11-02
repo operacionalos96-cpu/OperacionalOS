@@ -19,10 +19,10 @@ describe("abas por pessoa", () => {
     expect(defaultPages("u9", "operator", DEFAULT_AREAS, people).sort()).toEqual([...BASE_PAGES].sort())
   })
 
-  it("a CEO (admin) vê as abas das áreas dela, o que entra de dinheiro e Configurações", () => {
+  it("a CEO (admin) vê as abas das áreas dela e Configurações", () => {
     const ceo = defaultPages("u3", "admin", DEFAULT_AREAS, { ...people, ceoId: "u3" })
     expect(ceo.sort()).toEqual(
-      [...BASE_PAGES, "/financeiro", "/pipeline", "/clientes", "/metas", "/mapas", "/configuracoes"].sort(),
+      [...BASE_PAGES, "/financeiro", "/metas", "/mapas", "/configuracoes"].sort(),
     )
   })
 

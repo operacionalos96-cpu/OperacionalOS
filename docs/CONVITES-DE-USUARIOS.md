@@ -36,8 +36,8 @@ CEO passa a ir para ela.
 
 ### O que ela vê no menu
 
-Regra em `src/lib/domain/access-pages.ts` (ADR 0012). Para mudar só para ela, use **Configurações →
-O que cada um vê**.
+Ajustado à mão em **Configurações → O que cada um vê** (ADR 0012). O padrão das áreas dela também
+traria Mapas; o ajuste tira. A Início aparece para todo mundo e não desliga.
 
 | Aba | Para que ela usa |
 | --- | --- |
@@ -48,13 +48,10 @@ O que cada um vê**.
 | Decisões | Decide o que é dela: dinheiro acima do limite, contratos, contratação e estratégia |
 | Equipe | Acompanha o que cada um tem e o que fez |
 | Financeiro | Entradas, saídas, contas a pagar e a receber, meta do mês |
-| Pipeline | O dinheiro que ainda vai entrar (negócios em andamento) |
-| Clientes | Quem já pagou e quanto |
 | Metas | As metas da empresa e o progresso delas |
-| Mapas | Planejamento e estratégia em lousa ou mapa |
 | Configurações | Dono de cada área e o limite de gasto que vai para ela |
 
-Ela **não** vê Prospecção, Produtos, Conteúdos, AI Office e Cofre (o Cofre é só para `owner`).
+Ela **não** vê Prospecção, Pipeline, Clientes, Produtos, Conteúdos, Mapas, AI Office e Cofre (o Cofre é só para `owner`).
 
 ### Roteiro do onboarding (30 min)
 
@@ -63,8 +60,7 @@ Ela **não** vê Prospecção, Produtos, Conteúdos, AI Office e Cofre (o Cofre 
 3. **Configurações:** conferir as áreas dela e definir o **limite de gasto** que precisa da CEO.
 4. **Decisões:** abrir uma decisão de exemplo e escolher uma opção direto no card.
 5. **Financeiro:** registrar uma entrada, uma conta a pagar e dar baixa.
-6. **Pipeline e Clientes:** ver o que está para entrar e quem já comprou.
-7. **Equipe:** ver as responsabilidades de cada um e responder o foco da semana.
+6. **Equipe:** ver as responsabilidades de cada um e responder o foco da semana.
 
 Cada página tem o botão **Como usar** com os passos dela.
 
