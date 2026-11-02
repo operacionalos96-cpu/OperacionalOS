@@ -79,4 +79,12 @@ describe("vídeo personalizado — funil editável", () => {
     expect(stepMediaFor(lead({ video: { status: "descartado" } }), steps, 3).media?.path).toBe("funil/d.mp4")
     expect(stepMediaFor(lead({ video: v }), steps, 2).media).toBeNull() // áudio sem arquivo
   })
+
+  it("passo personalizado sem vídeo do lead nem arquivo reserva explica o motivo (não pede para subir arquivo)", () => {
+    const noFile = SETE
+    expect(stepMediaFor(lead({}), noFile, 3)).toMatchObject({ media: null, note: expect.stringMatching(/ainda não foi pedido/) })
+    expect(stepMediaFor(lead({ video: { status: "erro" } }), noFile, 3).note).toMatch(/falhou/)
+    expect(stepMediaFor(lead({ video: { status: "descartado" } }), noFile, 3).note).toMatch(/descartado/)
+    expect(stepMediaFor(lead({}), noFile, 2).note).toBeUndefined() // áudio do funil: sem nota, segue pedindo o arquivo
+  })
 })

@@ -119,7 +119,11 @@ export function stepMediaFor(lead: Pick<Lead, "video" | "name">, steps: StepLike
   if (v?.status === "analisando") return { media: null, note: "O site deste lead está sendo analisado para o vídeo personalizado." }
   if (v?.status === "gerando") return { media: null, note: "O vídeo personalizado deste lead está sendo gerado. Volte em alguns minutos." }
   if (v?.status === "pronto") return { media: null, note: "Vídeo personalizado pronto — aprove na página do lead (Pipeline) para liberar aqui." }
-  return { media: step.media ?? null }
+  // Sem vídeo do lead: usa o arquivo reserva do passo; sem reserva, diz o motivo (não "suba o arquivo").
+  if (step?.media) return { media: step.media }
+  if (v?.status === "erro") return { media: null, note: "O vídeo personalizado deste lead falhou. Veja o motivo na página do lead (Pipeline)." }
+  if (v?.status === "descartado") return { media: null, note: "O vídeo personalizado deste lead foi descartado. Envie outro vídeo ou pule este passo." }
+  return { media: null, note: "O vídeo personalizado deste lead ainda não foi pedido. Ele é pedido quando o lead responde ao passo anterior." }
 }
 
 const slug = (s: string) =>
