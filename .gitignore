@@ -47,3 +47,4 @@ next-env.d.ts
 /workers/video/node_modules
 /workers/video/.trabalho
 backups/
+.claude/feedback-lido.txt

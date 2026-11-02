@@ -371,7 +371,7 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {compact ? (
-          <Button size="icon" className="size-10 rounded-full shadow-lg [--btn-bg:var(--brand)] [--btn-fg:white]" aria-label="Novo" title="Novo">
+          <Button variant="brand" size="icon" className="size-10 rounded-full shadow-lg" aria-label="Novo" title="Novo">
             <PlusIcon className="size-5" />
           </Button>
         ) : (

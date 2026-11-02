@@ -472,6 +472,23 @@
   }
 }
 
+/* Botão tonal (padrão): o laranja da marca bem suave no fundo e mais escuro no texto (contraste
+ * AA nos dois temas). Ação comum sem pesar a tela; o laranja sólido fica para a ação principal. */
+@utility btn-tonal {
+  color: color-mix(in oklch, var(--brand), var(--foreground) 32%);
+  background: color-mix(in oklch, var(--brand) 11%, var(--card));
+  border-color: color-mix(in oklch, var(--brand) 28%, transparent);
+  transition: transform 180ms var(--ease-out), background-color 180ms, border-color 180ms;
+  &:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--brand) 17%, var(--card));
+    border-color: color-mix(in oklch, var(--brand) 45%, transparent);
+  }
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
 /* Botão de superfície: fundo do card + borda fina; no hover a borda e o tom clareiam. */
 @utility btn-surface {
   background: var(--card);
