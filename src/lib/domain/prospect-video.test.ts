@@ -24,9 +24,10 @@ const SETE = [st("a", "texto"), st("b", "texto"), st("c", "audio"), st("d", "vid
 
 describe("vídeo personalizado — funil editável", () => {
   it("funil antigo (sem 'source'): 1º vídeo = diagnóstico, 2º = visão, demais = arquivo", () => {
-    expect(videoStepIndex(DEFAULT_FUNNEL)).toBe(3)
-    expect([3, 4].map((i) => videoSourceAt(DEFAULT_FUNNEL, i))).toEqual(["diagnostico", "visao"])
-    expect(videoSourceAt([...DEFAULT_FUNNEL, st("x", "video")], 5)).toBe("arquivo")
+    const antigo = [...DEFAULT_FUNNEL, st("m5", "video")]
+    expect(videoStepIndex(antigo)).toBe(3)
+    expect([3, 4].map((i) => videoSourceAt(antigo, i))).toEqual(["diagnostico", "visao"])
+    expect(videoSourceAt([...antigo, st("x", "video")], 5)).toBe("arquivo")
     expect(videoSourceAt(DEFAULT_FUNNEL, 0)).toBeNull()
   })
 

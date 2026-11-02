@@ -1,0 +1,51 @@
+{
+  "teste": true,
+  "empresa": "Serrana Contabilidade (fictícia)",
+  "cidade": "Cidade Exemplo",
+  "segmento": "contabilidade",
+  "url": "serrana-exemplo.test",
+  "especialidade": "Contabilidade para pequenas empresas",
+  "diferencial": "Atendimento próximo há muitos anos",
+  "cor": "#0a4d8c",
+  "pontos": [
+    {
+      "kind": "clareza",
+      "text": "a primeira tela mostra \"Bem-vindo\", sem dizer o que a empresa faz nem para quem",
+      "short": "Topo sem proposta clara",
+      "impacto": "Quem chega precisa procurar para entender o que vocês oferecem.",
+      "print": "home.png",
+      "foco": [
+        0,
+        118,
+        1440,
+        520
+      ]
+    },
+    {
+      "kind": "hierarquia",
+      "text": "o conteúdo aparece em parágrafos corridos, sem títulos separando os assuntos",
+      "short": "Texto sem hierarquia",
+      "impacto": "Fica mais difícil achar a informação certa com uma leitura rápida.",
+      "print": "pagina.png",
+      "foco": [
+        40,
+        680,
+        1200,
+        640
+      ]
+    },
+    {
+      "kind": "contato",
+      "text": "o telefone aparece só no rodapé, depois de toda a página",
+      "short": "Contato no fim da página",
+      "impacto": "O próximo passo fica longe de quem já decidiu falar com vocês.",
+      "print": "pagina.png",
+      "foco": [
+        0,
+        1284,
+        700,
+        134
+      ]
+    }
+  ]
+}
