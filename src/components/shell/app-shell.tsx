@@ -43,7 +43,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { LeadFormDialog } from "@/components/dialogs/lead-form-dialog"
 import { TaskFormDialog } from "@/components/dialogs/task-form-dialog"
 import { TransactionFormDialog } from "@/components/dialogs/transaction-form-dialog"
@@ -186,13 +185,17 @@ function PageGate({ pathname, children }: { pathname: string; children: React.Re
 
 const PIN_KEY = "hzk-os-sidebar-fixa"
 /** Tempo com o mouse parado em cima da barra até ela abrir (evita abrir só de passar por cima). */
-const HOVER_OPEN_MS = 1000
+const HOVER_OPEN_MS = 250
 
 /**
- * Barra lateral (Briefing UI/UX, ADR 0013): a pílula escura de sempre, agora em grupos
- * (Dia a dia · Vendas · Criação · Gestão; Sistema no rodapé fixo). Ao passar o mouse (ou focar
- * pelo teclado) ela se expande sobre o conteúdo, sem empurrá-lo, mostrando rótulos e nomes dos
- * grupos (o mouse precisa ficar 1 s em cima); "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
+ * Barra lateral (Briefing UI/UX, ADR 0013): a pílula escura de sempre, em grupos (Dia a dia · Vendas ·
+ * Criação · Gestão; Sistema no rodapé fixo). Com o mouse 0,25 s em cima (ou foco pelo teclado) ela se
+ * expande sobre o conteúdo, sem empurrá-lo; "fixar" a mantém aberta. O indicador laranja desliza até
+ * o item ativo.
+ *
+ * Animação fluida: o conteúdo tem SEMPRE a mesma arrumação (largura fixa de 220 px, ícones na mesma
+ * coluna, rótulos já no lugar). Abrir/fechar só muda a largura visível da pílula (que corta o resto)
+ * e a opacidade dos rótulos — nada salta de posição no meio da transição.
  */
 function Sidebar() {
   const pathname = usePathname()
@@ -201,6 +204,7 @@ function Sidebar() {
   const hydrated = useStore((s) => s.hydrated)
   const [hover, setHover] = useState(false)
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const pointerInside = useRef(false)
   useEffect(() => () => clearTimeout(hoverTimer.current), [])
   const [pinned, setPinned] = useState(false)
   useEffect(() => {
@@ -219,6 +223,11 @@ function Sidebar() {
   const main = sections.filter((s) => s.title !== "Sistema")
   const system = sections.find((s) => s.title === "Sistema")
 
+  // Rótulo que aparece com a barra aberta (só opacidade: nunca muda a posição de nada).
+  const fade = cn("whitespace-nowrap transition-opacity duration-(--dur-2)", open ? "opacity-100 delay-75" : "pointer-events-none opacity-0")
+  // Linha da barra: a pílula de 36 px cresce até a largura toda; o ícone fica sempre no centro dos 64 px.
+  const row = cn("ml-3.5 transition-[width] duration-(--dur-4) ease-(--ease-std)", open ? "w-[192px]" : "w-9")
+
   const item = (it: NavItem) => {
     const active = isActive(pathname, it.href)
     const badge = hydrated ? (badges[it.href] ?? 0) : 0
@@ -229,18 +238,20 @@ function Sidebar() {
         aria-label={it.label}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "group/nav relative flex h-9 shrink-0 items-center rounded-full text-sidebar-foreground/60 transition-[background-color,color] duration-(--dur-1) hover:bg-sidebar-accent hover:text-sidebar-foreground",
-          open ? "w-full gap-3 px-2.5" : "w-9 justify-center",
+          "group/nav relative flex h-9 shrink-0 items-center overflow-hidden rounded-full text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+          row,
           active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
         )}
       >
-        <it.icon className="size-[18px] shrink-0 transition-transform duration-(--dur-1) group-hover/nav:scale-110" />
-        {open && <span className="nav-label truncate text-sm font-medium">{it.label}</span>}
+        <span className="flex size-9 shrink-0 items-center justify-center">
+          <it.icon className="size-[18px] transition-transform duration-(--dur-1) group-hover/nav:scale-110" />
+        </span>
+        <span className={cn("truncate pr-3 text-sm font-medium", fade)}>{it.label}</span>
         {badge > 0 && (
           <span
             className={cn(
-              "tabular flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar",
-              open ? "ml-auto" : "absolute -top-0.5 -right-0.5",
+              "tabular absolute flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar transition-[top,right] duration-(--dur-4) ease-(--ease-std)",
+              open ? "top-2.5 right-2.5" : "top-0 right-0",
             )}
           >
             {badge > 99 ? "99+" : badge}
@@ -250,12 +261,16 @@ function Sidebar() {
     )
   }
 
+  // Título do grupo: mesma altura aberto ou fechado (linha fina fechada, nome aberto) — nada pula.
   const group = (s: (typeof sections)[number], i: number) => (
-    <div key={s.title ?? i} className={cn("flex w-full flex-col gap-1", open ? "items-stretch" : "items-center")}>
-      {open ? (
-        <p className="nav-label px-2.5 pt-2 pb-0.5 text-[11px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">{s.title}</p>
-      ) : (
-        i > 0 && <span className="my-1.5 h-px w-6 bg-sidebar-foreground/10" aria-hidden />
+    <div key={s.title ?? i} className="flex w-full flex-col gap-1">
+      {(s.title || i > 0) && (
+        <div className="relative h-6 shrink-0" aria-hidden={!open}>
+          {i > 0 && <span className={cn("absolute top-1/2 left-5 h-px w-6 bg-sidebar-foreground/10 transition-opacity duration-(--dur-2)", open && "opacity-0")} />}
+          {s.title && (
+            <p className={cn("absolute bottom-0.5 left-6 text-[11px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase", fade)}>{s.title}</p>
+          )}
+        </div>
       )}
       {s.items.map(item)}
     </div>
@@ -267,61 +282,82 @@ function Sidebar() {
         onPointerEnter={(e) => {
           // Só o mouse espera: passar por cima a caminho de outra coisa não abre a barra.
           if (e.pointerType !== "mouse") return
+          pointerInside.current = true
           clearTimeout(hoverTimer.current)
           hoverTimer.current = setTimeout(() => setHover(true), HOVER_OPEN_MS)
         }}
-        onPointerLeave={() => {
+        onPointerLeave={(e) => {
+          if (e.pointerType !== "mouse") return
+          pointerInside.current = false
           clearTimeout(hoverTimer.current)
           setHover(false)
         }}
         // Teclado (Tab) abre na hora; foco por clique não conta.
         onFocus={(e) => e.target.matches(":focus-visible") && setHover(true)}
-        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
+        // Perder o foco só fecha se o mouse não está em cima: clicar num espaço vazio da barra ou
+        // num link (a navegação tira o foco) não pode fechá-la com o mouse ainda ali.
+        onBlur={(e) => !pointerInside.current && !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
         className={cn(
-          "absolute inset-y-3 left-3 z-40 flex flex-col gap-2.5 overflow-hidden rounded-[28px] bg-sidebar py-3.5 text-sidebar-foreground shadow-lift transition-[width] duration-(--dur-4) ease-(--ease-std)",
-          open ? "w-[220px] px-2.5" : "w-16 items-center",
+          "absolute inset-y-3 left-3 z-40 overflow-hidden rounded-[28px] bg-sidebar text-sidebar-foreground shadow-lift transition-[width] duration-(--dur-4) ease-(--ease-std) will-change-[width]",
+          open ? "w-[220px]" : "w-16",
         )}
       >
-        <div className={cn("flex items-center gap-2", open && "px-1")}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
-          <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 shrink-0 rounded-full ring-2 ring-sidebar-border" />
-          {open && (
-            <>
-              <span className="nav-label flex-1 truncate text-sm font-semibold">Operacional OS</span>
-              <button
-                type="button"
-                onClick={togglePin}
-                aria-pressed={pinned}
-                aria-label={pinned ? "Soltar a barra lateral" : "Fixar a barra lateral aberta"}
-                title={pinned ? "Soltar" : "Fixar aberta"}
-                className="nav-label rounded-full p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              >
-                {pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}
-              </button>
-            </>
+        {/* Conteúdo com largura fixa: a pílula só revela mais ou menos dele. */}
+        <div className="flex h-full w-[220px] flex-col gap-2.5 py-3.5">
+          <div className="flex items-center gap-2 pl-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
+            <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 shrink-0 rounded-full ring-2 ring-sidebar-border" />
+            <span className={cn("flex-1 truncate text-sm font-semibold", fade)}>Operacional OS</span>
+            <button
+              type="button"
+              onClick={togglePin}
+              tabIndex={open ? 0 : -1}
+              aria-pressed={pinned}
+              aria-label={pinned ? "Soltar a barra lateral" : "Fixar a barra lateral aberta"}
+              title={pinned ? "Soltar" : "Fixar aberta"}
+              className={cn("mr-3 rounded-full p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground", fade)}
+            >
+              {pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}
+            </button>
+          </div>
+
+          {/* Novo e Buscar sempre em coluna, nos mesmos lugares; o rótulo da busca só aparece. */}
+          <div className="flex flex-col gap-1.5 pl-3">
+            <NewMenu compact />
+          </div>
+          <button
+            type="button"
+            onClick={() => useUI.getState().set({ paletteOpen: true })}
+            aria-label="Buscar (Ctrl K)"
+            title="Buscar (Ctrl K)"
+            className={cn("flex h-9 shrink-0 items-center overflow-hidden rounded-full text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground", row)}
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center">
+              <SearchIcon className="size-[18px]" />
+            </span>
+            <span className={cn("flex flex-1 items-center pr-2 text-sm font-medium", fade)}>
+              Buscar
+              <kbd className="ml-auto rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] text-sidebar-foreground/60" aria-hidden>
+                Ctrl K
+              </kbd>
+            </span>
+          </button>
+
+          <ScrollHint open={open} pathname={pathname}>
+            {main.map(group)}
+          </ScrollHint>
+
+          {/* Sistema: rodapé fixo, fora da rolagem. */}
+          {system && (
+            <div className="mx-3 border-t border-sidebar-foreground/10 pt-2">
+              <div className="-mx-3">{group({ ...system, title: null }, 0)}</div>
+            </div>
           )}
+          <div className="flex flex-col gap-2 pl-3">
+            <DoingRail />
+            <AccountMenu />
+          </div>
         </div>
-
-        <div className={cn("flex gap-1.5", open ? "flex-row items-center px-1" : "flex-col items-center")}>
-          <NewMenu compact />
-          <RailButton label="Buscar (Ctrl K)" onClick={() => useUI.getState().set({ paletteOpen: true })}>
-            <SearchIcon className="size-[18px]" />
-          </RailButton>
-          {open && (
-            <kbd className="nav-label ml-auto rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] text-sidebar-foreground/60" aria-hidden>
-              Ctrl K
-            </kbd>
-          )}
-        </div>
-
-        <ScrollHint open={open} pathname={pathname}>
-          {main.map(group)}
-        </ScrollHint>
-
-        {/* Sistema: rodapé fixo, fora da rolagem. */}
-        {system && <div className="w-full border-t border-sidebar-foreground/10 pt-2">{group({ ...system, title: open ? system.title : null }, 0)}</div>}
-        <DoingRail />
-        <AccountMenu />
       </div>
     </aside>
   )
@@ -359,25 +395,6 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-const RAIL_BUTTON =
-  "flex size-10 items-center justify-center rounded-full text-sidebar-foreground/55 transition-[background-color,color] duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-
-/** Botão redondo da barra lateral, com o nome no balão à direita. */
-function RailButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button onClick={onClick} aria-label={label} className={RAIL_BUTTON}>
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={10}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
   )
 }
 
@@ -504,7 +521,7 @@ function ScrollHint({ children, open, pathname }: { children: React.ReactNode; o
   }, [])
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
-      <nav ref={ref} className={cn("relative flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-y-auto [scrollbar-width:none]", open ? "items-stretch" : "items-center")}>
+      <nav ref={ref} className="relative flex min-h-0 w-full flex-1 flex-col items-start gap-0.5 overflow-y-auto [scrollbar-width:none]">
         {mark !== null && (
           <span
             aria-hidden
