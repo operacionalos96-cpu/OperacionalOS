@@ -1,29 +1,118 @@
 "use client"
 
+import { useState } from "react"
 import { format } from "date-fns"
-import { PauseIcon, PlayIcon } from "lucide-react"
+import { CalendarHeartIcon, CoffeeIcon, DumbbellIcon, MoreHorizontalIcon, PauseIcon, PlayIcon, StethoscopeIcon, UtensilsIcon } from "lucide-react"
 import type { Task } from "@/lib/domain/types"
-import { PERIOD_LABEL, minutesText, periodOfDay } from "@/lib/domain/work-sessions"
+import { PAUSE_REASONS, PERIOD_LABEL, minutesText, pauseLabel, periodOfDay, type PauseReason } from "@/lib/domain/work-sessions"
 import { planId } from "@/lib/domain/presence"
 import { useDailyPlans } from "@/lib/modules"
 import { useMinute } from "@/lib/presence"
 import { useDoing } from "@/lib/use-my-day"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+
+const REASON_ICON: Record<PauseReason, React.ComponentType<{ className?: string }>> = {
+  almoco: UtensilsIcon,
+  intervalo: CoffeeIcon,
+  academia: DumbbellIcon,
+  saude: StethoscopeIcon,
+  pessoal: CalendarHeartIcon,
+  outro: MoreHorizontalIcon,
+}
+
+/**
+ * Pausar com motivo (ADR 0015): o time vê "Em pausa · Almoço desde 12:10" e o registro fica no dia
+ * da pessoa. "Só pausar a tarefa" continua existindo para parar sem sair (trocar de assunto, etc.).
+ */
+export function PauseMenu({ children, side = "bottom", align = "end" }: { children: React.ReactNode; side?: "bottom" | "right" | "top"; align?: "start" | "end" | "center" }) {
+  const { doing, pause, pauseFor } = useDoing()
+  const [open, setOpen] = useState(false)
+  const [other, setOther] = useState<string | null>(null)
+  const choose = (reason: PauseReason, note?: string) => {
+    pauseFor(reason, note)
+    setOpen(false)
+    setOther(null)
+  }
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (!o) setOther(null)
+      }}
+    >
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-3">
+        <p className="text-sm font-semibold">Pausar por quê?</p>
+        <p className="t-desc mb-3 text-xs">O time vê o motivo e desde quando. Fica registrado no seu dia.</p>
+        {other === null ? (
+          <div className="grid grid-cols-2 gap-2">
+            {PAUSE_REASONS.map((r) => {
+              const Icon = REASON_ICON[r.id]
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => (r.id === "outro" ? setOther("") : choose(r.id))}
+                  className="flex h-16 flex-col items-center justify-center gap-1 rounded-xl border bg-background/60 px-2 text-center text-xs font-medium transition-colors hover:border-highlight hover:text-highlight"
+                >
+                  <Icon className="size-5" />
+                  {r.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <form
+            className="grid gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (other.trim()) choose("outro", other)
+            }}
+          >
+            <Input autoFocus placeholder="Ex.: banco, buscar filho na escola" value={other} onChange={(e) => setOther(e.target.value)} maxLength={60} />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setOther(null)}>
+                Voltar
+              </Button>
+              <Button type="submit" size="sm" variant="brand" disabled={!other.trim()}>
+                Pausar
+              </Button>
+            </div>
+          </form>
+        )}
+        {doing && other === null && (
+          <button
+            type="button"
+            onClick={() => {
+              pause()
+              setOpen(false)
+            }}
+            className="action-link mt-3 w-full text-center text-xs"
+          >
+            Só pausar a tarefa (sem sair)
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /** ▶ Começar / ⏸ Pausar: marca para o time que você está fazendo esta tarefa agora (ADR 0010). */
 export function DoingButton({ task, compact, className }: { task: Task; compact?: boolean; className?: string }) {
-  const { doing, start, pause } = useDoing()
+  const { doing, start } = useDoing()
   if (task.done) return null
   const active = doing?.taskId === task.id
-  const label = active ? "Pausar" : "Começar"
-  const hint = active ? "Pausar: o time deixa de ver esta tarefa como \"fazendo agora\"" : "Começar: o time vê que você está fazendo esta tarefa agora"
-  return compact ? (
+  const hint = active ? "Pausar: escolha o motivo (almoço, academia…) ou só pause a tarefa" : "Começar: o time vê que você está fazendo esta tarefa agora"
+  const trigger = compact ? (
     <button
       type="button"
-      onClick={() => (active ? pause() : start(task))}
-      aria-label={`${label}: ${task.title}`}
+      onClick={active ? undefined : () => start(task)}
+      aria-label={`${active ? "Pausar" : "Começar"}: ${task.title}`}
       title={hint}
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full border transition-colors",
@@ -34,32 +123,50 @@ export function DoingButton({ task, compact, className }: { task: Task; compact?
       {active ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
     </button>
   ) : (
-    <Button type="button" size="sm" variant={active ? "default" : "outline"} onClick={() => (active ? pause() : start(task))} title={hint} className={className}>
+    <Button type="button" size="sm" variant={active ? "default" : "outline"} onClick={active ? undefined : () => start(task)} title={hint} className={className}>
       {active ? <PauseIcon /> : <PlayIcon />} {active ? "Pausar" : "Começar agora"}
     </Button>
   )
+  return active ? <PauseMenu>{trigger}</PauseMenu> : trigger
 }
 
-/** Na barra lateral: o que você está fazendo agora, com um clique para pausar. */
+/**
+ * Na barra lateral: fazendo uma tarefa → ⏸ abre os motivos; em pausa → ▶ "Voltar" (retoma a última
+ * tarefa); parado → botão discreto de pausa, para sair para o almoço mesmo sem tarefa aberta.
+ */
 export function DoingRail() {
-  const { doing, pause } = useDoing()
-  if (!doing) return null
+  const { doing, paused, resume } = useDoing()
+  if (paused) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" onClick={resume} aria-label={`Em pausa: ${pauseLabel(paused)}. Voltar ao trabalho`} className="relative flex size-9 items-center justify-center rounded-full bg-warning text-black">
+            <PlayIcon className="size-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={10}>
+          Em pausa: {pauseLabel(paused)} (desde {format(new Date(paused.start), "HH:mm")}). Clique para voltar.
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button type="button" onClick={pause} aria-label={`Fazendo: ${doing.title}. Pausar`} className="relative flex size-9 items-center justify-center rounded-full bg-highlight text-white">
+    <PauseMenu side="right" align="end">
+      {doing ? (
+        <button type="button" aria-label={`Fazendo: ${doing.title}. Pausar`} title={`Fazendo: ${doing.title} (desde ${format(new Date(doing.start), "HH:mm")}). Clique para pausar.`} className="relative flex size-9 items-center justify-center rounded-full bg-highlight text-white">
           <span className="absolute inset-0 animate-ping rounded-full bg-highlight/40 motion-reduce:hidden" aria-hidden />
           <PauseIcon className="relative size-4" />
         </button>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={10}>
-        Fazendo: {doing.title} (desde {format(new Date(doing.start), "HH:mm")}). Clique para pausar.
-      </TooltipContent>
-    </Tooltip>
+      ) : (
+        <button type="button" aria-label="Pausar (almoço, academia…)" title="Pausar (almoço, academia…)" className="flex size-9 items-center justify-center rounded-full text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+          <CoffeeIcon className="size-[18px]" />
+        </button>
+      )}
+    </PauseMenu>
   )
 }
 
-/** Período do dia de uma pessoa: o que fez de manhã, à tarde e à noite, e quanto tempo (página da pessoa). */
+/** Período do dia de uma pessoa: o que fez de manhã, à tarde e à noite, quanto tempo e as pausas (página da pessoa). */
 export function PeriodOfDay({ memberId }: { memberId: string }) {
   const now = useMinute()
   const plan = useDailyPlans((s) => s.items.find((p) => p.id === planId(memberId, now)))
@@ -80,6 +187,14 @@ export function PeriodOfDay({ memberId }: { memberId: string }) {
                   {t.title}
                 </span>
                 <span className="tabular shrink-0 text-xs text-muted-foreground">{minutesText(t.minutes)}</span>
+              </li>
+            ))}
+            {p.pauses.map((x) => (
+              <li key={x.start} className="flex items-baseline justify-between gap-2 text-muted-foreground">
+                <span className={cn("min-w-0 truncate", x.running && "font-medium text-warning")}>
+                  ⏸ {x.label} · {format(new Date(x.start), "HH:mm")}
+                </span>
+                <span className="tabular shrink-0 text-xs">{minutesText(x.minutes)}</span>
               </li>
             ))}
           </ul>

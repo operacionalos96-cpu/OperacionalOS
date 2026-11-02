@@ -54,6 +54,7 @@ import { DayGuide } from "@/components/hzk/day-guide"
 import { DoingRail } from "@/components/hzk/doing-now"
 import { PresenceDot } from "@/components/hzk/presence-badge"
 import { startPresence } from "@/lib/presence"
+import { startPresenceAlerts } from "@/lib/presence-alerts"
 import { startAutomations } from "@/lib/automations"
 import { startEventFeed } from "@/lib/event-service"
 import { NAV, NAV_SECTIONS, isActive, type NavItem } from "./nav"
@@ -86,6 +87,8 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
     startEventFeed()
     // Presença do time (ADR 0009): avisa "estou com o app aberto" enquanto a aba estiver aberta.
     startPresence(useStore.getState().meId)
+    // Pop-up (e som no check-in) para CEO e founders quando alguém começa, pausa ou faz check-in (ADR 0015).
+    startPresenceAlerts(useStore.getState().meId, (href) => router.push(href))
   }, [hydrated, router])
 
   useGlobalShortcuts()
