@@ -262,6 +262,10 @@
     @apply font-sans;
     font-feature-settings: "cv11", "ss01";
   }
+  /* Monitor grande: tudo (texto, cards, espaços em rem) cresce um pouco, para encher a tela e ser
+   * legível de longe — 17 px a partir de 1920, 18 px a partir de 2400 (padrão do navegador: 16). */
+  @media (min-width: 1920px) { html { font-size: 106.25%; } }
+  @media (min-width: 2400px) { html { font-size: 112.5%; } }
   ::selection {
     background: var(--brand-soft);
   }
@@ -708,11 +712,13 @@
 
 /* ---------- Grade de página (Briefing UI/UX, ADR 0013) ----------
  * Cabeçalho, filtros e conteúdo na MESMA borda esquerda. Fluido ao lado da barra lateral, margem
- * de 32 px (24 abaixo de 1280), teto de 1600 px centralizado: o vazio que sobra fica nas duas
- * bordas, nunca dentro do conteúdo. "is-narrow" (720 px) só onde a leitura pede, alinhado à esquerda.
+ * de 32 px (24 abaixo de 1280, 48 a partir de 1920). Teto de 2400 px: em monitor grande o conteúdo
+ * ocupa a tela em vez de deixar faixas vazias (pedido de 01/11). "is-narrow"/"is-medium" só onde a
+ * leitura pede, alinhados à esquerda, em rem (crescem junto com a escala de monitor grande).
  */
-:root { --gutter: 24px; --page-max: 1600px; }
+:root { --gutter: 24px; --page-max: 2400px; }
 @media (min-width: 1280px) { :root { --gutter: 32px; } }
+@media (min-width: 1920px) { :root { --gutter: 48px; } }
 /* Em @layer components: utilitários (pt-6, gap-*) continuam podendo ajustar cada página. */
 @layer components {
   .page-container {
@@ -727,8 +733,8 @@
     margin-inline: auto;
     padding: 12px var(--gutter) 48px;
   }
-  .page-body.is-narrow { padding-right: max(var(--gutter), calc(100% - 720px - var(--gutter))); }
-  .page-body.is-medium { padding-right: max(var(--gutter), calc(100% - 1100px - var(--gutter))); }
+  .page-body.is-narrow { padding-right: max(var(--gutter), calc(100% - 45rem - var(--gutter))); }
+  .page-body.is-medium { padding-right: max(var(--gutter), calc(100% - 68.75rem - var(--gutter))); }
 }
 /* Cards que se adaptam ao espaço: mais colunas conforme a tela cresce. */
 @utility grid-auto-cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
