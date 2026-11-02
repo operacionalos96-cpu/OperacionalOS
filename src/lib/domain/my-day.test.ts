@@ -4,7 +4,7 @@ import { dailyParticipants, dailyState } from "./daily"
 import { myDay, planCandidates, reorder } from "./my-day"
 import { presenceOf, type DailyPlan } from "./presence"
 import type { Task } from "./types"
-import { dayChanges, doingNow, endPause, minutesText, pauseLabel, pausedNow, pauseWork, periodOfDay, startTask, stopTask, syncWithStatus } from "./work-sessions"
+import { dayChanges, doingNow, endPause, ROUTINES, routineOf, minutesText, pauseLabel, pausedNow, pauseWork, periodOfDay, startTask, stopTask, syncWithStatus } from "./work-sessions"
 
 // Segunda-feira, 2 de novembro de 2026, horário local.
 const at = (hhmm: string, day = "2026-11-02") => new Date(`${day}T${hhmm}:00`)
@@ -206,5 +206,19 @@ describe("fase da tarefa e tempo: uma regra só", () => {
   it("concluir outra tarefa não mexe no tempo de quem está rodando", () => {
     const p = syncWithStatus(plan(), t1, "andamento", at("09:00"))
     expect(syncWithStatus(p, t2, "feito", at("09:30"))).toBe(p)
+  })
+})
+
+describe("rotina (Prospecção) como fazendo agora (ADR 0017)", () => {
+  it("entra na linha do dia como sessão, fecha a pausa e pausa com motivo igual a uma tarefa", () => {
+    let p = pauseWork(plan(), "almoco", undefined, at("12:00"))
+    p = startTask(p, ROUTINES.prospeccao, at("13:00"))
+    expect(doingNow(p)).toMatchObject({ taskId: "rotina:prospeccao", title: "Prospecção", areaId: "comercial" })
+    expect(pausedNow(p)).toBeUndefined()
+    expect(presenceOf("u2", at("13:30"), { events: [], plan: p, online: true }).detail).toBe("Fazendo: Prospecção")
+    p = pauseWork(p, "intervalo", undefined, at("15:00"))
+    expect(doingNow(p)).toBeUndefined()
+    expect(routineOf(p.sessions?.at(-1)?.taskId)).toBe(ROUTINES.prospeccao)
+    expect(routineOf("t1")).toBeUndefined()
   })
 })

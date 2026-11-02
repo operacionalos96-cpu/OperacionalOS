@@ -39,6 +39,24 @@ export interface Pause {
   end?: string
 }
 
+/**
+ * Rotinas: trabalho de todo dia que não é uma tarefa do quadro (ex.: Prospecção). Entram na linha
+ * do dia como uma sessão comum, com id "rotina:…", então o time vê "Fazendo: Prospecção" e a pausa
+ * funciona igual. Nunca mudam a fase de uma tarefa.
+ */
+export interface Routine {
+  id: `rotina:${string}`
+  title: string
+  areaId: string
+  href: string
+}
+
+export const ROUTINES = {
+  prospeccao: { id: "rotina:prospeccao", title: "Prospecção", areaId: "comercial", href: "/prospeccao" },
+} satisfies Record<string, Routine>
+
+export const routineOf = (taskId: string | undefined): Routine | undefined => Object.values(ROUTINES).find((r) => r.id === taskId)
+
 export const doingNow = (plan: DailyPlan | undefined): WorkSession | undefined => plan?.sessions?.find((s) => !s.end)
 export const pausedNow = (plan: DailyPlan | undefined): Pause | undefined => plan?.pauses?.find((p) => !p.end)
 

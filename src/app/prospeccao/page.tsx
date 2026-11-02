@@ -24,6 +24,9 @@ import { EmptyState, Led, PageHeader } from "@/components/shared/layout"
 import { AnalysisBlock } from "@/components/prospecting/review-panel"
 import { RejectLeadDialog } from "@/components/prospecting/reject-dialog"
 import { FunnelTab, type FunnelPending } from "@/components/prospecting/funnel-tab"
+import { RoutineButton } from "@/components/hzk/doing-now"
+import { ROUTINES } from "@/lib/domain/work-sessions"
+import { startRoutine } from "@/lib/use-my-day"
 
 /**
  * Modo Prospecção: revisar dezenas de leads o mais rápido possível.
@@ -67,7 +70,9 @@ export default function ProspectingPage() {
     if (current && current.id !== currentId) setCurrentId(current.id)
   }, [current, currentId])
 
+  // Decidir um lead é prospectar: se ainda não está marcado, vira o "fazendo agora" do online.
   const countDecision = () => {
+    startRoutine(ROUTINES.prospeccao)
     session.current.start ??= Date.now()
     session.current.done++
   }
@@ -145,6 +150,7 @@ export default function ProspectingPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SiteInfoButton leads={leads} />
+            <RoutineButton routine={ROUTINES.prospeccao} />
           </div>
         }
       />
