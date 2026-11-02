@@ -185,12 +185,14 @@ function PageGate({ pathname, children }: { pathname: string; children: React.Re
 }
 
 const PIN_KEY = "hzk-os-sidebar-fixa"
+/** Tempo com o mouse parado em cima da barra até ela abrir (evita abrir só de passar por cima). */
+const HOVER_OPEN_MS = 1000
 
 /**
  * Barra lateral (Briefing UI/UX, ADR 0013): a pílula escura de sempre, agora em grupos
  * (Dia a dia · Vendas · Criação · Gestão; Sistema no rodapé fixo). Ao passar o mouse (ou focar
  * pelo teclado) ela se expande sobre o conteúdo, sem empurrá-lo, mostrando rótulos e nomes dos
- * grupos; "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
+ * grupos (o mouse precisa ficar 1 s em cima); "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
  */
 function Sidebar() {
   const pathname = usePathname()
@@ -198,6 +200,8 @@ function Sidebar() {
   const badges = useBadges()
   const hydrated = useStore((s) => s.hydrated)
   const [hover, setHover] = useState(false)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(hoverTimer.current), [])
   const [pinned, setPinned] = useState(false)
   useEffect(() => {
     try {
@@ -260,9 +264,18 @@ function Sidebar() {
   return (
     <aside className={cn("relative hidden shrink-0 transition-[width] duration-(--dur-4) ease-(--ease-std) md:block", pinned ? "w-[244px]" : "w-[76px]")}>
       <div
-        onPointerEnter={() => setHover(true)}
-        onPointerLeave={() => setHover(false)}
-        onFocus={() => setHover(true)}
+        onPointerEnter={(e) => {
+          // Só o mouse espera: passar por cima a caminho de outra coisa não abre a barra.
+          if (e.pointerType !== "mouse") return
+          clearTimeout(hoverTimer.current)
+          hoverTimer.current = setTimeout(() => setHover(true), HOVER_OPEN_MS)
+        }}
+        onPointerLeave={() => {
+          clearTimeout(hoverTimer.current)
+          setHover(false)
+        }}
+        // Teclado (Tab) abre na hora; foco por clique não conta.
+        onFocus={(e) => e.target.matches(":focus-visible") && setHover(true)}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
         className={cn(
           "absolute inset-y-3 left-3 z-40 flex flex-col gap-2.5 overflow-hidden rounded-[28px] bg-sidebar py-3.5 text-sidebar-foreground shadow-lift transition-[width] duration-(--dur-4) ease-(--ease-std)",

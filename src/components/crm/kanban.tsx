@@ -187,9 +187,12 @@ function Column({
   )
 }
 
-/** Rolagem do quadro embaixo: setas + trilho com a parte visível em laranja (a barra nativa fica escondida). */
+/** Rolagem do quadro embaixo: setas + trilho arrastável com a parte visível em laranja (a barra nativa fica escondida). */
 function BoardScroller({ board }: { board: React.RefObject<HTMLDivElement | null> }) {
   const [bar, setBar] = useState({ left: 0, width: 1 })
+  const [dragging, setDragging] = useState(false)
+  const track = useRef<HTMLDivElement>(null)
+  const grabAt = useRef(0)
   useEffect(() => {
     const el = board.current
     if (!el) return
@@ -205,14 +208,55 @@ function BoardScroller({ board }: { board: React.RefObject<HTMLDivElement | null
   }, [board])
   if (bar.width >= 0.999) return null
   const step = (dir: number) => board.current?.scrollBy({ left: dir * 320, behavior: "smooth" })
+
+  // Posição do ponteiro no trilho → scrollLeft do quadro (mantém o ponto pego da barra sob o mouse).
+  function scrollToPointer(clientX: number, grab: number) {
+    const el = board.current
+    const t = track.current?.getBoundingClientRect()
+    if (!el || !t) return
+    const ratio = (clientX - t.left) / t.width - grab
+    el.scrollLeft = Math.max(0, Math.min(1 - bar.width, ratio)) * el.scrollWidth
+  }
+  function onTrackDown(e: React.PointerEvent<HTMLDivElement>) {
+    const t = track.current?.getBoundingClientRect()
+    if (!t) return
+    const at = (e.clientX - t.left) / t.width
+    // Pegou a barra: arrasta do ponto onde pegou. Clicou fora: centraliza a barra ali e já arrasta.
+    const onThumb = at >= bar.left && at <= bar.left + bar.width
+    grabAt.current = onThumb ? at - bar.left : bar.width / 2
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(true)
+    scrollToPointer(e.clientX, grabAt.current)
+  }
+  function onTrackMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragging) scrollToPointer(e.clientX, grabAt.current)
+  }
+  function onTrackUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    setDragging(false)
+  }
   const arrow = "flex size-8 shrink-0 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:text-foreground"
   return (
     <div className="page-container flex items-center gap-3 pb-3">
       <button type="button" onClick={() => step(-1)} aria-label="Colunas à esquerda" className={arrow}>
         <ChevronLeftIcon className="size-4" />
       </button>
-      <div className="relative h-1.5 flex-1 rounded-full bg-muted" aria-hidden>
-        <span className="absolute inset-y-0 rounded-full bg-highlight transition-[left] duration-(--dur-1)" style={{ left: `${bar.left * 100}%`, width: `${bar.width * 100}%` }} />
+      {/* Trilho: arrastar a barra laranja ou clicar num ponto rola o quadro (área de toque de 24 px). */}
+      <div
+        ref={track}
+        onPointerDown={onTrackDown}
+        onPointerMove={onTrackMove}
+        onPointerUp={onTrackUp}
+        onPointerCancel={onTrackUp}
+        className="group/track relative flex h-6 flex-1 cursor-pointer touch-none items-center"
+        aria-hidden
+      >
+        <div className="relative h-1.5 w-full rounded-full bg-muted transition-[height] group-hover/track:h-2">
+          <span
+            className={cn("absolute inset-y-0 rounded-full bg-highlight", dragging ? "cursor-grabbing" : "cursor-grab")}
+            style={{ left: `${bar.left * 100}%`, width: `${bar.width * 100}%` }}
+          />
+        </div>
       </div>
       <button type="button" onClick={() => step(1)} aria-label="Colunas à direita" className={arrow}>
         <ChevronRightIcon className="size-4" />
