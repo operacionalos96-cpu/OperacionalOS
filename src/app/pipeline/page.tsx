@@ -8,7 +8,8 @@ import { ChevronDownIcon, FileSpreadsheetIcon, KanbanIcon, ListIcon, PlusIcon, S
 import type { Stage } from "@/lib/domain/types"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/shared/user-avatar"
-import { leadsNeedingAction } from "@/lib/domain/rules"
+import { followupsDue } from "@/lib/domain/funnel"
+import { useFunnel } from "@/lib/funnel-store"
 import { useStore } from "@/lib/store"
 import { openLeadForm } from "@/lib/ui-store"
 import { Button } from "@/components/ui/button"
@@ -57,7 +58,8 @@ function Pipeline() {
     return allLeads.filter((l) => !isDiscarded(l) && (owner === "todos" || l.ownerId === meId) && leadMatches(l, query))
   }, [allLeads, owner, meId, query])
 
-  const needsCount = leadsNeedingAction(leads, new Date()).length
+  const steps = useFunnel((s) => s.steps)
+  const needsCount = followupsDue(leads, steps, new Date()).length
 
   return (
     <div className="flex h-full min-h-0 flex-col">

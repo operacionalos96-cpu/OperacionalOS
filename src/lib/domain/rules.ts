@@ -46,6 +46,15 @@ export function isStale(lead: Lead, now: Date) {
   return isOpenStage(lead.stage) && daysSince(lead.lastActivityAt, now) >= STALE_AFTER_DAYS
 }
 
+/**
+ * Ordem dos cards em cada coluna do Pipeline: o que você adicionou ou mexeu por último fica em cima.
+ * Criar, mover de etapa, registrar contato ou concluir a próxima ação atualizam lastActivityAt.
+ * O card só ganha selo quando há follow-up vencido (FollowUpChip); a urgência fica na aba "Precisa de ação".
+ */
+export function boardOrder(leads: Lead[]): Lead[] {
+  return [...leads].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt) || b.createdAt.localeCompare(a.createdAt))
+}
+
 export type LeadUrgency = "vencida" | "hoje" | "parado"
 
 /** Por que este lead precisa de atenção (ou null se está em dia). */
