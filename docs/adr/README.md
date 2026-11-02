@@ -33,3 +33,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0013](0013-layout-e-movimento.md) | Sistema de layout e movimento (Briefing de UI/UX) | Aceito |
 | [0014](0014-identidade-dos-mocks.md) | Identidade dos mocks: abas em cápsula, luz discreta e leitura para qualquer um | Aceito |
 | [0015](0015-pausa-e-avisos.md) | Online confiável, pausa com motivo e avisos para CEO e founders | Aceito |
+| [0016](0016-worker-do-tempo-real-na-csp.md) | Worker do tempo real liberado na CSP | Aceito |
