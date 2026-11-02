@@ -2,6 +2,7 @@
 
 import { create } from "zustand"
 import type { Lead, SiteInfo } from "@/lib/domain/types"
+import { needsSiteInfo } from "@/lib/domain/prospecting"
 import { useStore } from "@/lib/store"
 
 /**
@@ -20,8 +21,8 @@ interface RunnerState {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** Precisa ler: tem site e ainda não foi lido (ou a IA estava fora da última vez). */
-export const needsSiteInfo = (l: Lead) => !!l.website && (!l.siteInfo || (!!l.siteInfo.error && /IA/.test(l.siteInfo.error)))
+/** Regra de quem precisa ler o site: src/lib/domain/prospecting.ts (só leads em "Novo"). */
+export { needsSiteInfo }
 
 export async function readSite(leadId: string): Promise<{ siteInfo?: SiteInfo; erro?: string; retry?: boolean }> {
   const res = await fetch("/api/leads/site-info", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ leadId }), cache: "no-store" })

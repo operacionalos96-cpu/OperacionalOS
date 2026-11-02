@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { approvePatch, contactedPatch, dayStats, duration, greeting, isDiscarded, prospectQueue, rejectPatch, rejectionLabel } from "./prospecting"
+import { approvePatch, contactedPatch, dayStats, duration, greeting, isDiscarded, needsSiteInfo, prospectQueue, rejectPatch, rejectionLabel } from "./prospecting"
 import type { Lead } from "./types"
 
 const lead = (p: Partial<Lead>): Lead => ({
@@ -89,5 +89,17 @@ describe("dados para aprendizado", () => {
     const cd = conversionData(leads)
     expect(cd.bySegment[0]).toEqual({ segment: "Clínica", total: 2, approved: 1, rejected: 1, contacted: 1, proposal: 1, won: 0, lost: 0 })
     expect(cd.rejectionReasons).toEqual({ site_bom: 1 })
+  })
+})
+
+describe("ler sites", () => {
+  it("só lê o site de leads em Novo, não descartados e ainda não lidos", () => {
+    const site = "https://empresa.com.br"
+    expect(needsSiteInfo(lead({ website: site }))).toBe(true)
+    expect(needsSiteInfo(lead({ website: site, stage: "contato" }))).toBe(false)
+    expect(needsSiteInfo(lead({ website: site, stage: "proposta" }))).toBe(false)
+    expect(needsSiteInfo(lead({ website: site, review: { status: "rejected" } as Lead["review"] }))).toBe(false)
+    expect(needsSiteInfo(lead({ website: site, siteInfo: { segment: "contabilidade", checkedAt: "2026-11-01T10:00:00Z" } }))).toBe(false)
+    expect(needsSiteInfo(lead({}))).toBe(false)
   })
 })

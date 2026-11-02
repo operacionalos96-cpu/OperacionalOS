@@ -38,6 +38,14 @@ export function prospectQueue<L extends Lead>(leads: L[], ownerId?: string): L[]
     .sort((a, b) => q(b) - q(a) || site(a) - site(b) || a.createdAt.localeCompare(b.createdAt))
 }
 
+/**
+ * Precisa ler o site: lead em "Novo" (ainda não contatado nem descartado), com site, que ainda não
+ * foi lido (ou a IA estava fora da última vez). A leitura serve para personalizar a 1ª mensagem;
+ * quem já passou de "Novo" não precisa dela.
+ */
+export const needsSiteInfo = (l: Pick<Lead, "stage" | "website" | "siteInfo" | "review">) =>
+  l.stage === "novo" && !isDiscarded(l) && !!l.website && (!l.siteInfo || (!!l.siteInfo.error && /IA/.test(l.siteInfo.error)))
+
 /** Já recebeu o 1º contato: pelo ENVIEI/extensão ou porque foi movido de "Novo" no Pipeline. */
 export const wasContacted = (l: Pick<Lead, "contactStatus" | "stage">) => l.contactStatus === "contacted" || l.stage !== "novo"
 
