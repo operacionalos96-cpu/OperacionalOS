@@ -15,6 +15,9 @@ const supabaseOrigin = (() => {
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  // O heartbeat do tempo real roda num Worker criado de um blob (ADR 0015). Sem isto o navegador
+  // bloqueia o Worker e o Supabase fecha a conexão de vez: sem online e sem avisos (ADR 0016).
+  "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
   "font-src 'self' data:",
