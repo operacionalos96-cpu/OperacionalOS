@@ -154,8 +154,7 @@ export function DoingRail() {
     <PauseMenu side="right" align="end">
       {doing ? (
         <button type="button" aria-label={`Fazendo: ${doing.title}. Pausar`} title={`Fazendo: ${doing.title} (desde ${format(new Date(doing.start), "HH:mm")}). Clique para pausar.`} className="relative flex size-9 items-center justify-center rounded-full bg-highlight text-white">
-          <span className="absolute inset-0 animate-ping rounded-full bg-highlight/40 motion-reduce:hidden" aria-hidden />
-          <PauseIcon className="relative size-4" />
+          <PauseIcon className="size-4" />
         </button>
       ) : (
         <button type="button" aria-label="Pausar (almoço, academia…)" title="Pausar (almoço, academia…)" className="flex size-9 items-center justify-center rounded-full text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
