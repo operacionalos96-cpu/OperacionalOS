@@ -11,7 +11,7 @@ lead aceita o áudio (respondeu ao passo antes do vídeo) ou o áudio foi enviad
 job render_prospect_video (1 por lead) ──► este worker (na máquina de vocês)
         │  abre o site REAL · print desktop, página inteira e celular
         │  mede problemas que dá para provar (com a área exata na página)
-        │  escolhe os 2 mais fortes · renderiza o modelo (template/) · sobe o MP4
+        │  3 pontos (análise do Claude) · renderiza o modelo DX-001 (dx/) · sobe o MP4
         ▼
 lead.video = "Pronto para revisar"  →  Pipeline › lead › Vídeo de análise › Assistir › Aprovar
         ▼
@@ -46,7 +46,9 @@ O diferencial do vídeo também vem do texto do site ("desde 2009", "mais de 15 
    copy .env.example .env      (cole o token em OOS_WORKER_TOKEN)
    npm start
    ```
-   Precisa de Edge ou Chrome e do `ffmpeg` instalados. Deixe rodando (ele espera trabalho sem gastar nada).
+   Precisa de Edge ou Chrome instalado. Deixe rodando (ele espera trabalho sem gastar nada).
+4. **Modelo do vídeo (DX-001), uma vez:** `cd dx` e `npm ci`. O primeiro render baixa o navegador do Remotion (precisa de internet).
+   O Remotion é grátis para empresas com até 3 pessoas; acima disso, é pago (remotion.dev/license).
 
 ## Testar um site sem mexer no sistema
 
@@ -54,9 +56,16 @@ O diferencial do vídeo também vem do texto do site ("desde 2009", "mais de 15 
 node testar.js https://site-da-empresa.com.br --nome "Empresa X" --segmento contabilidade --cidade Campinas
 ```
 
-Mostra o que foi medido e gera o vídeo em `.trabalho/teste-…/`. Use `--stills 5,20,40` para só conferir imagens.
+Mostra o que foi medido e gera o vídeo em `.trabalho/teste-…/` (cerca de 4 min; `--escala 0.5` faz uma prévia mais rápida).
 
-## Mudar o vídeo para todos (os 80%)
+## O vídeo: modelo DX-001 (70% fixo, 30% do lead)
 
-- Textos: `template/roteiro.json` (`*palavra*` = destaque verde)
-- Visual e animação: `template/index.html`
+O funil tem um vídeo só, o de diagnóstico. Ele é o modelo DX-001 em `dx/` (Remotion). Narração, 3D, sons e tempos (114 s) são fixos e iguais para todo lead;
+cada lead só troca os prints, o nome, o endereço e os 3 pontos na tela. O worker grava o `dados.json` na pasta de trabalho
+(ao lado de `home.png`, `pagina.png` e `mobile.png`) e chama `dx/gerar_video.mjs`. O contrato completo está em `dx/LEIA-ME.md`.
+
+- Limites por ponto: `short` até 48 caracteres, `text` até 220, `impacto` até 180 (os mesmos que o servidor aplica na análise).
+- Lead rejeitado pelo modelo (ex.: faltou um print) vira falha sem nova tentativa; falha do render tenta mais uma vez.
+- O render usa metade dos núcleos do PC: com 8 abas em paralelo num PC de 8 núcleos ele falhava de vez em quando.
+  Para mudar: `node dx/gerar_video.mjs <pasta> <saida.mp4> --concorrencia=4`.
+- Roteiro, narração ou 3D novos vêm do estúdio da HZK como um pacote novo: substitua `dx/` inteiro, mantendo esta seção em dia.

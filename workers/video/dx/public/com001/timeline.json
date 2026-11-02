@@ -1,0 +1,598 @@
+{
+ "fps": 30,
+ "duracao": 136.0,
+ "quadros": 4080,
+ "falas": [
+  {
+   "id": "a1",
+   "ini": 0.6,
+   "fim": 6.36,
+   "arquivo": "a1.mp3",
+   "pausas": [
+    0.91,
+    1.95
+   ]
+  },
+  {
+   "id": "a2",
+   "ini": 6.7,
+   "fim": 13.9,
+   "arquivo": "a2.mp3",
+   "pausas": [
+    2.54,
+    3.66
+   ]
+  },
+  {
+   "id": "a3",
+   "ini": 14.2,
+   "fim": 23.96,
+   "arquivo": "a3.mp3",
+   "pausas": [
+    4.08,
+    6.34,
+    6.72
+   ]
+  },
+  {
+   "id": "a4",
+   "ini": 24.3,
+   "fim": 27.98,
+   "arquivo": "a4.mp3",
+   "pausas": [
+    1.37
+   ]
+  },
+  {
+   "id": "b1",
+   "ini": 29.6,
+   "fim": 37.52,
+   "arquivo": "b1.mp3",
+   "pausas": [
+    3.24
+   ]
+  },
+  {
+   "id": "b2",
+   "ini": 37.8,
+   "fim": 45.8,
+   "arquivo": "b2.mp3",
+   "pausas": []
+  },
+  {
+   "id": "b3",
+   "ini": 46.1,
+   "fim": 57.06,
+   "arquivo": "b3.mp3",
+   "pausas": [
+    2.74,
+    3.51,
+    8.78
+   ]
+  },
+  {
+   "id": "c1",
+   "ini": 59.8,
+   "fim": 72.04,
+   "arquivo": "c1.mp3",
+   "pausas": [
+    4.05,
+    5.87,
+    8.59
+   ]
+  },
+  {
+   "id": "c2",
+   "ini": 72.4,
+   "fim": 80.08,
+   "arquivo": "c2.mp3",
+   "pausas": [
+    2.45
+   ]
+  },
+  {
+   "id": "c3",
+   "ini": 80.4,
+   "fim": 89.76,
+   "arquivo": "c3.mp3",
+   "pausas": [
+    3.58,
+    3.8
+   ]
+  },
+  {
+   "id": "c4",
+   "ini": 90.1,
+   "fim": 98.82,
+   "arquivo": "c4.mp3",
+   "pausas": [
+    1.2,
+    3.38,
+    6.51
+   ]
+  },
+  {
+   "id": "c5",
+   "ini": 99.2,
+   "fim": 106.0,
+   "arquivo": "c5.mp3",
+   "pausas": []
+  },
+  {
+   "id": "d1",
+   "ini": 107.2,
+   "fim": 121.92,
+   "arquivo": "d1.mp3",
+   "pausas": [
+    4.08,
+    6.86,
+    7.89,
+    10.19
+   ]
+  },
+  {
+   "id": "d2",
+   "ini": 122.3,
+   "fim": 125.42,
+   "arquivo": "d2.mp3",
+   "pausas": [
+    1.24,
+    1.95
+   ]
+  },
+  {
+   "id": "d3",
+   "ini": 125.8,
+   "fim": 134.2,
+   "arquivo": "d3.mp3",
+   "pausas": [
+    1.78,
+    4.23,
+    5.69,
+    6.51
+   ]
+  }
+ ],
+ "legendas": [
+  {
+   "t0": 0.6,
+   "t1": 2.122,
+   "texto": "Seu negócio tem *valor*."
+  },
+  {
+   "t0": 2.549,
+   "t1": 4.051,
+   "texto": "Mas quem procura por ele"
+  },
+  {
+   "t0": 4.051,
+   "t1": 4.737,
+   "texto": "na internet"
+  },
+  {
+   "t0": 4.737,
+   "t1": 6.172,
+   "texto": "consegue perceber isso?"
+  },
+  {
+   "t0": 6.7,
+   "t1": 7.741,
+   "texto": "Talvez você ainda"
+  },
+  {
+   "t0": 7.741,
+   "t1": 8.85,
+   "texto": "não tenha um *site*."
+  },
+  {
+   "t0": 9.243,
+   "t1": 10.221,
+   "texto": "Ou já tenha um,"
+  },
+  {
+   "t0": 10.363,
+   "t1": 11.891,
+   "texto": "mas ele não acompanhe mais"
+  },
+  {
+   "t0": 11.891,
+   "t1": 12.932,
+   "texto": "o que sua empresa"
+  },
+  {
+   "t0": 12.932,
+   "t1": 13.728,
+   "texto": "oferece hoje."
+  },
+  {
+   "t0": 14.2,
+   "t1": 15.873,
+   "texto": "Informações *desatualizadas*,"
+  },
+  {
+   "t0": 15.873,
+   "t1": 17.423,
+   "texto": "uma apresentação *confusa*,"
+  },
+  {
+   "t0": 17.423,
+   "t1": 18.121,
+   "texto": "dificuldade para"
+  },
+  {
+   "t0": 18.277,
+   "t1": 19.81,
+   "texto": "encontrar o *contato*…"
+  },
+  {
+   "t0": 19.81,
+   "t1": 21.852,
+   "texto": "Tudo isso pode atrapalhar"
+  },
+  {
+   "t0": 21.852,
+   "t1": 22.968,
+   "texto": "quem quer conhecer"
+  },
+  {
+   "t0": 22.968,
+   "t1": 23.773,
+   "texto": "seu trabalho."
+  },
+  {
+   "t0": 24.3,
+   "t1": 25.334,
+   "texto": "Por que *não*"
+  },
+  {
+   "t0": 25.101,
+   "t1": 26.825,
+   "texto": "tornar esse caminho"
+  },
+  {
+   "t0": 26.825,
+   "t1": 27.772,
+   "texto": "mais simples?"
+  },
+  {
+   "t0": 29.6,
+   "t1": 30.797,
+   "texto": "Um site é um espaço"
+  },
+  {
+   "t0": 30.797,
+   "t1": 32.57,
+   "texto": "para apresentar sua empresa,"
+  },
+  {
+   "t0": 32.837,
+   "t1": 34.278,
+   "texto": "explicar o que você faz"
+  },
+  {
+   "t0": 34.278,
+   "t1": 35.979,
+   "texto": "e ajudar possíveis clientes"
+  },
+  {
+   "t0": 35.979,
+   "t1": 37.366,
+   "texto": "a dar o *próximo passo*."
+  },
+  {
+   "t0": 37.8,
+   "t1": 39.316,
+   "texto": "A *identidade*, os *textos*"
+  },
+  {
+   "t0": 39.316,
+   "t1": 40.305,
+   "texto": "e a *organização*"
+  },
+  {
+   "t0": 40.305,
+   "t1": 41.294,
+   "texto": "das informações"
+  },
+  {
+   "t0": 41.294,
+   "t1": 42.942,
+   "texto": "precisam trabalhar juntos"
+  },
+  {
+   "t0": 42.942,
+   "t1": 44.195,
+   "texto": "para que as pessoas"
+  },
+  {
+   "t0": 44.195,
+   "t1": 45.645,
+   "texto": "entendam sua proposta."
+  },
+  {
+   "t0": 46.1,
+   "t1": 47.077,
+   "texto": "Cada negócio tem"
+  },
+  {
+   "t0": 47.077,
+   "t1": 48.521,
+   "texto": "suas particularidades."
+  },
+  {
+   "t0": 48.842,
+   "t1": 50.527,
+   "texto": "Por isso, criar ou renovar"
+  },
+  {
+   "t0": 50.527,
+   "t1": 52.176,
+   "texto": "um site começa por entender"
+  },
+  {
+   "t0": 52.176,
+   "t1": 53.215,
+   "texto": "o que sua empresa"
+  },
+  {
+   "t0": 53.215,
+   "t1": 54.426,
+   "texto": "precisa mostrar"
+  },
+  {
+   "t0": 54.131,
+   "t1": 55.748,
+   "texto": "e o que seu cliente"
+  },
+  {
+   "t0": 55.748,
+   "t1": 56.847,
+   "texto": "precisa *encontrar*."
+  },
+  {
+   "t0": 59.8,
+   "t1": 60.871,
+   "texto": "Pense em alguém que"
+  },
+  {
+   "t0": 60.871,
+   "t1": 61.829,
+   "texto": "acabou de receber"
+  },
+  {
+   "t0": 61.829,
+   "t1": 64.032,
+   "texto": "uma *indicação* do seu trabalho."
+  },
+  {
+   "t0": 63.854,
+   "t1": 65.226,
+   "texto": "O interesse já existe."
+  },
+  {
+   "t0": 65.673,
+   "t1": 67.015,
+   "texto": "Agora, essa pessoa quer"
+  },
+  {
+   "t0": 67.015,
+   "t1": 68.171,
+   "texto": "conhecer sua empresa,"
+  },
+  {
+   "t0": 68.393,
+   "t1": 69.942,
+   "texto": "entender o que você oferece"
+  },
+  {
+   "t0": 69.942,
+   "t1": 70.844,
+   "texto": "e descobrir como"
+  },
+  {
+   "t0": 70.844,
+   "t1": 71.859,
+   "texto": "entrar em contato."
+  },
+  {
+   "t0": 72.4,
+   "t1": 73.571,
+   "texto": "Quando não encontra"
+  },
+  {
+   "t0": 73.571,
+   "t1": 75.183,
+   "texto": "uma apresentação clara,"
+  },
+  {
+   "t0": 74.853,
+   "t1": 76.046,
+   "texto": "precisa juntar"
+  },
+  {
+   "t0": 76.046,
+   "t1": 77.401,
+   "texto": "informações *espalhadas*"
+  },
+  {
+   "t0": 77.401,
+   "t1": 78.695,
+   "texto": "ou começar a conversa"
+  },
+  {
+   "t0": 78.695,
+   "t1": 79.927,
+   "texto": "com dúvidas básicas."
+  },
+  {
+   "t0": 80.4,
+   "t1": 81.845,
+   "texto": "Um site bem estruturado"
+  },
+  {
+   "t0": 81.845,
+   "t1": 83.755,
+   "texto": "pode *facilitar* esse percurso:"
+  },
+  {
+   "t0": 83.978,
+   "t1": 85.42,
+   "texto": "reunir as informações"
+  },
+  {
+   "t0": 85.42,
+   "t1": 86.174,
+   "texto": "importantes,"
+  },
+  {
+   "t0": 86.174,
+   "t1": 87.682,
+   "texto": "apresentar seus serviços"
+  },
+  {
+   "t0": 87.682,
+   "t1": 89.567,
+   "texto": "e indicar como falar com você."
+  },
+  {
+   "t0": 90.1,
+   "t1": 91.153,
+   "texto": "Para quem procura,"
+  },
+  {
+   "t0": 91.298,
+   "t1": 92.893,
+   "texto": "mais *clareza* para avaliar."
+  },
+  {
+   "t0": 92.85,
+   "t1": 94.447,
+   "texto": "Para sua empresa,"
+  },
+  {
+   "t0": 94.447,
+   "t1": 95.809,
+   "texto": "uma forma de apresentar"
+  },
+  {
+   "t0": 95.809,
+   "t1": 97.38,
+   "texto": "seu trabalho antes mesmo"
+  },
+  {
+   "t0": 97.38,
+   "t1": 98.623,
+   "texto": "da primeira conversa."
+  },
+  {
+   "t0": 99.2,
+   "t1": 100.389,
+   "texto": "E o site também pode"
+  },
+  {
+   "t0": 100.389,
+   "t1": 101.876,
+   "texto": "acompanhar aquele contato"
+  },
+  {
+   "t0": 101.876,
+   "t1": 103.422,
+   "texto": "que começou pelo WhatsApp,"
+  },
+  {
+   "t0": 103.422,
+   "t1": 104.552,
+   "texto": "pelas redes sociais"
+  },
+  {
+   "t0": 104.552,
+   "t1": 105.801,
+   "texto": "ou por uma indicação."
+  },
+  {
+   "t0": 107.2,
+   "t1": 109.346,
+   "texto": "Seja para criar seu primeiro site"
+  },
+  {
+   "t0": 109.346,
+   "t1": 111.096,
+   "texto": "ou renovar o que você já tem,"
+  },
+  {
+   "t0": 111.277,
+   "t1": 112.583,
+   "texto": "o ponto de partida"
+  },
+  {
+   "t0": 112.583,
+   "t1": 114.104,
+   "texto": "é o seu *negócio*."
+  },
+  {
+   "t0": 114.061,
+   "t1": 115.95,
+   "texto": "Na HZK, queremos entender"
+  },
+  {
+   "t0": 115.95,
+   "t1": 117.144,
+   "texto": "o que você oferece,"
+  },
+  {
+   "t0": 117.392,
+   "t1": 119.059,
+   "texto": "como deseja se apresentar"
+  },
+  {
+   "t0": 119.059,
+   "t1": 120.685,
+   "texto": "e o que precisa facilitar"
+  },
+  {
+   "t0": 120.685,
+   "t1": 121.92,
+   "texto": "para seus clientes."
+  },
+  {
+   "t0": 122.3,
+   "t1": 123.323,
+   "texto": "Por que *não*"
+  },
+  {
+   "t0": 123.538,
+   "t1": 125.225,
+   "texto": "dar esse próximo passo?"
+  },
+  {
+   "t0": 125.8,
+   "t1": 127.421,
+   "texto": "Responda à nossa mensagem"
+  },
+  {
+   "t0": 127.579,
+   "t1": 129.148,
+   "texto": "e conte o que você precisa"
+  },
+  {
+   "t0": 129.148,
+   "t1": 130.955,
+   "texto": "para o seu site."
+  },
+  {
+   "t0": 130.03,
+   "t1": 130.955,
+   "texto": "HZK."
+  },
+  {
+   "t0": 130.718,
+   "t1": 132.157,
+   "texto": "O digital a favor"
+  },
+  {
+   "t0": 132.309,
+   "t1": 134.031,
+   "texto": "do que importa para você."
+  }
+ ]
+}

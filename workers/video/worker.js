@@ -65,7 +65,8 @@ async function executar(browser, job, lease) {
     if (pontos) {
       analise.escolhidos = pontos.map((p, i) => {
         const area = analise.ancoras[i];
-        return { kind: p.kind || 'analise', text: p.text, short: p.short, impacto: p.impacto, print: area ? 'pagina.png' : 'home.png', foco: foco(area), evidencia: p.anchor || '' };
+        const print = area ? 'pagina.png' : p.kind === 'celular' ? 'mobile.png' : 'home.png';
+        return { kind: p.kind || 'analise', text: p.text, short: p.short, impacto: p.impacto, print, foco: foco(area), evidencia: p.anchor || '' };
       });
       if (extra.diferencial) analise.diferencial = extra.diferencial;
     }
@@ -79,19 +80,9 @@ async function executar(browser, job, lease) {
     const ficha = montarFicha({ ...lead, segment: extra.segmento || lead.segment, city: extra.cidade || lead.city }, analise);
     if (extra.especialidade) ficha.especialidade = extra.especialidade;
     await tool('report_progress', { ...ids, message: `achados: ${analise.escolhidos.map((a) => a.short).join(', ')} — renderizando`, percent: 20 });
-    let ultimo = 0;
-    const progresso = (de, ate, msg) => async (p) => {
-      const pct = Math.round(de + p * (ate - de));
-      if (pct - ultimo >= 10) { ultimo = pct; await tool('report_progress', { ...ids, message: msg, percent: pct }).catch(() => {}); }
-    };
-    // 1º vídeo (diagnóstico) e 2º vídeo (visão/transformação), com a mesma análise do site real
-    const v1 = await renderizar(browser, dir, ficha, { modelo: 1, onProgress: progresso(20, 55, 'renderizando o vídeo 1 (diagnóstico)') });
-    let v2 = null;
-    try {
-      v2 = await renderizar(browser, dir, ficha, { modelo: 2, onProgress: progresso(55, 90, 'renderizando o vídeo 2 (visão)') });
-    } catch (e) {
-      console.warn('  vídeo 2 falhou (segue só com o 1):', e.message);
-    }
+    // vídeo de diagnóstico (modelo DX-001 em dx/); o funil não tem mais o 2º vídeo (visão)
+    await tool('report_progress', { ...ids, message: 'renderizando o vídeo de diagnóstico (cerca de 4 min)', percent: 25 });
+    const v1 = await renderizar(dir, ficha);
 
     const up = await tool('create_upload_urls', ids);
     const subir = async (url, arquivo) => {
@@ -99,19 +90,16 @@ async function executar(browser, job, lease) {
       if (!res.ok) throw new Error(`upload falhou: ${res.status} ${await res.text().catch(() => '')}`);
     };
     await subir(up.signed_url, v1.arquivo);
-    if (v2) await subir(up.video2.signed_url, v2.arquivo);
 
     await tool('complete_job', {
       ...ids,
       result: {
         video_path: up.path,
-        ...(v2 ? { video2_path: up.video2.path } : {}),
         duration_sec: Math.round(v1.duracao),
         findings: analise.escolhidos.map(({ kind, text, short }) => ({ kind, text, short })),
       },
     });
-    const duracao = v1.duracao;
-    console.log(`  ✓ pronto (${Math.round(duracao)} s${v2 ? ` + vídeo 2 de ${Math.round(v2.duracao)} s` : ''}) — aguardando aprovação no sistema`);
+    console.log(`  ✓ pronto (${Math.round(v1.duracao)} s) — aguardando aprovação no sistema`);
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {
     console.error('  ✗', e.message);

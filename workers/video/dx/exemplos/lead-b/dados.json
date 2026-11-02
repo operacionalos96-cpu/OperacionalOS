@@ -1,0 +1,37 @@
+{
+  "teste": true,
+  "empresa": "Grupo Horizonte Serviços Integrados de Engenharia e Manutenção Predial (fictício)",
+  "segmento": "engenharia",
+  "url": "grupo-horizonte-servicos-integrados-exemplo.test",
+  "pontos": [
+    {
+      "kind": "visual",
+      "text": "não há uma chamada principal na página: a lista de serviços começa logo abaixo do nome, com todos os itens no mesmo tamanho e no mesmo peso visual ao longo de toda a rolagem, do início ao fim da página demonstrativa",
+      "short": "Tudo com o mesmo peso visual na página inteira",
+      "impacto": "Sem um destaque, a pessoa não sabe por onde começar a ler, e o serviço principal fica no mesmo nível dos demais em toda a extensão da página.",
+      "print": "pagina.png",
+      "foco": null
+    },
+    {
+      "kind": "mobile",
+      "text": "no celular, o menu e o contato não aparecem na primeira tela",
+      "short": "Sem contato na primeira tela do celular",
+      "impacto": "Quem abre pelo telefone não vê de imediato como falar com vocês.",
+      "print": "mobile.png",
+      "foco": null
+    },
+    {
+      "kind": "contato",
+      "text": "nenhum botão de contato aparece no topo da página",
+      "short": "Sem chamada para contato",
+      "impacto": "Falta indicar o próximo passo para quem se interessou.",
+      "print": "home.png",
+      "foco": [
+        0,
+        0,
+        1440,
+        240
+      ]
+    }
+  ]
+}
