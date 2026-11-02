@@ -186,13 +186,13 @@ function PageGate({ pathname, children }: { pathname: string; children: React.Re
 
 const PIN_KEY = "hzk-os-sidebar-fixa"
 /** Tempo com o mouse parado em cima da barra até ela abrir (evita abrir só de passar por cima). */
-const HOVER_OPEN_MS = 1000
+const HOVER_OPEN_MS = 550
 
 /**
  * Barra lateral (Briefing UI/UX, ADR 0013): a pílula escura de sempre, agora em grupos
  * (Dia a dia · Vendas · Criação · Gestão; Sistema no rodapé fixo). Ao passar o mouse (ou focar
  * pelo teclado) ela se expande sobre o conteúdo, sem empurrá-lo, mostrando rótulos e nomes dos
- * grupos (o mouse precisa ficar 1 s em cima); "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
+ * grupos (o mouse precisa ficar 0,55 s em cima); "fixar" a mantém aberta. O indicador laranja desliza até o item ativo.
  */
 function Sidebar() {
   const pathname = usePathname()
