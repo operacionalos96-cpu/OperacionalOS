@@ -17,6 +17,57 @@ O cadastro de novos usuários agora passa pela rota de servidor `POST /api/equip
 3. Informe `Rafael Freitas`, `freitassrafa2006@gmail.com` e selecione **Gestão Executiva / admin**.
 4. Envie o convite. Rafael receberá um e-mail para confirmar o acesso e definir a própria senha em `/redefinir-senha`.
 
+## Convidar Iole (CEO e CFO)
+
+O perfil dela já está pronto no sistema: só falta o e-mail.
+
+1. Entre com uma conta `owner` e abra **Equipe → Adicionar membro**.
+2. Preencha:
+   - **E-mail:** o dela;
+   - **Nome:** `Iole`;
+   - **Nível:** **Gestão Executiva** (`admin`);
+   - **Cargos:** marque **CEO** primeiro (vira o principal) e depois **CFO**.
+3. Envie. Ela recebe o e-mail, define a senha em `/redefinir-senha` e entra.
+4. Em **Equipe → Cargos e funções**, tire o cargo **CFO** do Gabriel: a partir daqui só a Iole tem.
+
+Com o cargo CEO, ela vira dona sozinha das áreas da CEO (Financeiro, Contratos e jurídico, Estratégia
+e metas, Pessoas). Ninguém precisa reatribuir nada: o que hoje cai na caixa de entrada por falta de
+CEO passa a ir para ela.
+
+### O que ela vê no menu
+
+Regra em `src/lib/domain/access-pages.ts` (ADR 0012). Para mudar só para ela, use **Configurações →
+O que cada um vê**.
+
+| Aba | Para que ela usa |
+| --- | --- |
+| Início | Plano do dia, check-in e o próximo passo de cada setor |
+| Agenda | Reuniões e prazos do time |
+| Caixa de entrada | O que foi capturado e ainda não tem destino |
+| Tarefas & Notas | As tarefas dela e as notas da equipe |
+| Decisões | Decide o que é dela: dinheiro acima do limite, contratos, contratação e estratégia |
+| Equipe | Acompanha o que cada um tem e o que fez |
+| Financeiro | Entradas, saídas, contas a pagar e a receber, meta do mês |
+| Pipeline | O dinheiro que ainda vai entrar (negócios em andamento) |
+| Clientes | Quem já pagou e quanto |
+| Metas | As metas da empresa e o progresso delas |
+| Mapas | Planejamento e estratégia em lousa ou mapa |
+| Configurações | Dono de cada área e o limite de gasto que vai para ela |
+
+Ela **não** vê Prospecção, Produtos, Conteúdos, AI Office e Cofre (o Cofre é só para `owner`).
+
+### Roteiro do onboarding (30 min)
+
+1. **Entrar:** abrir o e-mail do convite, definir a senha, entrar.
+2. **Início:** fazer o primeiro check-in pela bolinha do guia e montar o plano do dia.
+3. **Configurações:** conferir as áreas dela e definir o **limite de gasto** que precisa da CEO.
+4. **Decisões:** abrir uma decisão de exemplo e escolher uma opção direto no card.
+5. **Financeiro:** registrar uma entrada, uma conta a pagar e dar baixa.
+6. **Pipeline e Clientes:** ver o que está para entrar e quem já comprou.
+7. **Equipe:** ver as responsabilidades de cada um e responder o foco da semana.
+
+Cada página tem o botão **Como usar** com os passos dela.
+
 O sistema não define nem armazena uma senha temporária. Se o e-mail já estiver em `public.members` ou já existir no Supabase Auth, a API retorna um erro e não cria uma segunda associação automaticamente; verifique o usuário existente antes de tentar novamente.
 
 ## Segurança

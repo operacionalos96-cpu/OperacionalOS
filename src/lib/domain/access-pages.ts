@@ -18,7 +18,8 @@ export const AREA_PAGES: Record<string, string[]> = {
   conteudo: ["/conteudos", "/mapas"],
   roteiros: ["/conteudos", "/mapas"],
   trafego: ["/conteudos", "/ai-office"],
-  financeiro: ["/financeiro"],
+  // Quem cuida do caixa acompanha o que vai entrar (Pipeline) e quem já pagou (Clientes).
+  financeiro: ["/financeiro", "/pipeline", "/clientes"],
   estrategia: ["/metas", "/mapas"],
   contratos: ["/decisoes"],
   pessoas: ["/equipe"],
