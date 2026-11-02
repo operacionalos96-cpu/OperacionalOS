@@ -3,8 +3,8 @@
 import { MessageCircleIcon } from "lucide-react"
 import { TEMPERATURES, isOpenStage } from "@/lib/domain/constants"
 import type { Lead } from "@/lib/domain/types"
-import { daysSince, delayTone, leadDelayDays, leadUrgency } from "@/lib/domain/rules"
-import { followupDue } from "@/lib/domain/funnel"
+import { delayTone } from "@/lib/domain/rules"
+import { followupDays, followupDue } from "@/lib/domain/funnel"
 import { useFunnel } from "@/lib/funnel-store"
 import { dueLabel, moneyCompact } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -16,33 +16,15 @@ export function TemperatureDot({ lead, className }: { lead: Lead; className?: st
   return <span className={cn("inline-block size-2 shrink-0 rounded-full", t.dot, className)} title={`Temperatura: ${t.label}`} />
 }
 
-/** Atraso como chip pequeno (âmbar 7–29 dias, vermelho 30+), nunca a borda do card inteira. */
-export function DelayChip({ lead, now }: { lead: Lead; now: Date }) {
-  const days = leadDelayDays(lead, now)
-  if (!days) return null
-  const tone = delayTone(days)
-  return (
-    <span
-      className={cn(
-        "tabular shrink-0 rounded-md px-1.5 py-px text-[11px] font-semibold",
-        tone === "danger" ? "bg-danger-soft text-danger" : tone === "warning" ? "bg-warning-soft text-warning" : "bg-muted text-muted-foreground",
-      )}
-      title={leadUrgency(lead, now) === "parado" ? "Dias sem atividade" : "Dias com a próxima ação vencida"}
-    >
-      {days}d
-    </span>
-  )
-}
-
 /**
  * No quadro, o único alerta é o follow-up do funil que venceu (hoje ou atrasado). Próxima ação
- * vencida e lead parado não marcam o card: continuam na aba "Precisa de ação".
+ * vencida e lead parado não marcam o card, e a aba "Precisa de ação" também é só de follow-ups.
  */
 export function FollowUpChip({ lead, now }: { lead: Lead; now: Date }) {
   const steps = useFunnel((s) => s.steps)
   const due = followupDue(lead, steps, now)
   if (!due) return null
-  const days = Math.max(0, daysSince(due.dueAt.toISOString(), now))
+  const days = followupDays(due.dueAt, now)
   const tone = delayTone(days)
   return (
     <span

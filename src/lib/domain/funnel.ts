@@ -3,8 +3,9 @@
  * follow-ups com intervalo em dias. Regras puras, testadas em funnel.test.ts.
  * O envio é SEMPRE humano (o sistema/extensão só escreve a mensagem e registra).
  */
+import { differenceInCalendarDays } from "date-fns"
 import { rawSegment, regionOf, segmentPhrase } from "./lead-context"
-import { wasContacted } from "./prospecting"
+import { isDiscarded, wasContacted } from "./prospecting"
 import type { Lead } from "./types"
 
 export interface FunnelStep {
@@ -218,12 +219,15 @@ export function sentPatch(lead: Pick<Lead, "funnel" | "firstContactAt">, index: 
 
 /** Follow-up deste lead que vence hoje (ou está atrasado): já contatado e ainda no funil. null = nada a fazer. */
 export function followupDue(l: Lead, steps: FunnelStep[], now: Date) {
-  if (!wasContacted(l)) return null
+  if (!wasContacted(l) || isDiscarded(l)) return null
   const endOfDay = new Date(now)
   endOfDay.setHours(23, 59, 59, 999)
   const n = nextStep(l, steps, now)
   return n && n.index > 0 && n.dueAt && n.dueAt.getTime() <= endOfDay.getTime() ? { ...n, dueAt: n.dueAt } : null
 }
+
+/** Dias de atraso de um follow-up (0 = vence hoje). */
+export const followupDays = (dueAt: Date, now: Date) => Math.max(0, differenceInCalendarDays(now, dueAt))
 
 /** Follow-ups que vencem hoje (ou atrasados), do responsável — já contatados e ainda no funil. */
 export function followupsDue<L extends Lead>(leads: L[], steps: FunnelStep[], now: Date, ownerId?: string) {

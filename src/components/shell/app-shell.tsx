@@ -25,7 +25,9 @@ import {
   PinOffIcon,
 } from "lucide-react"
 import { getUser } from "@/config/team"
-import { isOverdue, isTaskFor, leadsNeedingAction } from "@/lib/domain/rules"
+import { isOverdue, isTaskFor } from "@/lib/domain/rules"
+import { followupsDue } from "@/lib/domain/funnel"
+import { useFunnel } from "@/lib/funnel-store"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
 import { openCapture, openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
@@ -152,14 +154,18 @@ function useBadges() {
   const tasks = useStore((s) => s.tasks)
   const items = useStore((s) => s.items)
   const meId = useStore((s) => s.meId)
+  // Pipeline: só follow-ups do funil vencidos (mesma regra do selo e da aba "Precisa de ação").
+  const steps = useFunnel((s) => s.steps)
+  const loadFunnel = useFunnel((s) => s.load)
+  useEffect(() => void loadFunnel(), [loadFunnel])
   return useMemo(() => {
     const now = new Date()
     return {
       "/caixa-de-entrada": [...items, ...tasks].filter((t) => inInbox(t) && (t.ownerId === meId || t.createdById === meId || !t.ownerId)).length,
-      "/pipeline": leadsNeedingAction(leads.filter((l) => l.ownerId === meId), now).length,
+      "/pipeline": followupsDue(leads, steps, now, meId).length,
       "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length,
     } as Record<string, number>
-  }, [leads, tasks, items, meId])
+  }, [leads, tasks, items, meId, steps])
 }
 
 /** Menu em seções, só com as abas que esta pessoa vê (ADR 0012); seção vazia some. */
