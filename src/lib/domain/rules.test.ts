@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { FinanceSettings, Lead, Task, Transaction } from "./types"
 import {
   balance,
+  boardOrder,
   balanceSeries,
   cashflowSeries,
   checklistProgress,
@@ -270,5 +271,14 @@ describe("faixa da semana", () => {
     expect(w).toHaveLength(7)
     expect(w[0]).toMatchObject({ date: "2025-10-13", done: 1, total: 2, pct: 0.5 })
     expect(w[2]).toMatchObject({ date: "2025-10-15", pct: 1, today: true })
+  })
+})
+
+describe("boardOrder (Pipeline)", () => {
+  it("o lead mexido ou criado por último fica em cima, mesmo com prazo vencido há mais tempo", () => {
+    const antigo = lead({ id: "a", createdAt: "2026-09-01T10:00:00Z", lastActivityAt: "2026-09-02T10:00:00Z" })
+    const movidoHoje = lead({ id: "b", createdAt: "2026-08-01T10:00:00Z", lastActivityAt: "2026-11-02T09:00:00Z" })
+    const novo = lead({ id: "c", createdAt: "2026-11-01T10:00:00Z", lastActivityAt: "2026-11-01T10:00:00Z" })
+    expect(boardOrder([antigo, novo, movidoHoje]).map((l) => l.id)).toEqual(["b", "c", "a"])
   })
 })

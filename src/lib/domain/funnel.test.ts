@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_FUNNEL, findLeadByName, findLeadByPhone, followupsDue, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "./funnel"
+import { DEFAULT_FUNNEL, findLeadByName, findLeadByPhone, followupDue, followupsDue, mergeFunnel, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "./funnel"
 import type { Lead } from "./types"
 
 const lead = (p: Partial<Lead>): Lead => ({
@@ -156,5 +156,15 @@ describe("achar lead pelo nome da conversa", () => {
   it("só palavras genéricas ou nada em comum: não chuta", () => {
     expect(findLeadByName(leads, "Contabilidade")).toBeUndefined()
     expect(findLeadByName(leads, "João Silva")).toBeUndefined()
+  })
+})
+
+describe("selo de follow-up no Pipeline", () => {
+  it("só marca o card quando o follow-up venceu; prazo antigo da próxima ação não conta", () => {
+    const sent = (day: string) => ({ step: 1, lastSentAt: `2026-10-${day}T10:00:00Z`, history: [{ step: 0, at: `2026-10-${day}T10:00:00Z` }] })
+    const now = new Date(2026, 9, 6, 9)
+    expect(followupDue(lead({ contactStatus: "contacted", funnel: sent("01") }), BY_DAYS, now)).toMatchObject({ index: 1 })
+    expect(followupDue(lead({ contactStatus: "contacted", funnel: sent("05") }), BY_DAYS, now)).toBeNull()
+    expect(followupDue(lead({ stage: "novo", nextAction: { text: "", dueDate: "2026-09-01" } }), BY_DAYS, now)).toBeNull()
   })
 })

@@ -216,15 +216,22 @@ export function sentPatch(lead: Pick<Lead, "funnel" | "firstContactAt">, index: 
   return { ...f, step: Math.max(f.step, index + 1), lastSentAt: at, history: [...f.history, { step: index, at, by }].slice(-30) }
 }
 
-/** Follow-ups que vencem hoje (ou atrasados), do responsável — já contatados e ainda no funil. */
-export function followupsDue<L extends Lead>(leads: L[], steps: FunnelStep[], now: Date, ownerId?: string) {
+/** Follow-up deste lead que vence hoje (ou está atrasado): já contatado e ainda no funil. null = nada a fazer. */
+export function followupDue(l: Lead, steps: FunnelStep[], now: Date) {
+  if (!wasContacted(l)) return null
   const endOfDay = new Date(now)
   endOfDay.setHours(23, 59, 59, 999)
+  const n = nextStep(l, steps, now)
+  return n && n.index > 0 && n.dueAt && n.dueAt.getTime() <= endOfDay.getTime() ? { ...n, dueAt: n.dueAt } : null
+}
+
+/** Follow-ups que vencem hoje (ou atrasados), do responsável — já contatados e ainda no funil. */
+export function followupsDue<L extends Lead>(leads: L[], steps: FunnelStep[], now: Date, ownerId?: string) {
   return leads
-    .filter((l) => wasContacted(l) && (!ownerId || l.ownerId === ownerId))
+    .filter((l) => !ownerId || l.ownerId === ownerId)
     .flatMap((l) => {
-      const n = nextStep(l, steps, now)
-      return n && n.index > 0 && n.dueAt && n.dueAt.getTime() <= endOfDay.getTime() ? [{ lead: l, ...n, dueAt: n.dueAt }] : []
+      const n = followupDue(l, steps, now)
+      return n ? [{ lead: l, ...n }] : []
     })
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
 }

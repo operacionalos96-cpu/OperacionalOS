@@ -18,31 +18,22 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, FileTextIcon, HandshakeIcon, InboxIcon, MessageCircleIcon, PlusIcon, TrophyIcon, XCircleIcon } from "lucide-react"
 import { STAGES, stageColor } from "@/lib/domain/constants"
 import type { Lead, Stage } from "@/lib/domain/types"
-import { daysSince, leadUrgency, sum } from "@/lib/domain/rules"
+import { boardOrder, daysSince, sum } from "@/lib/domain/rules"
 import { moneyCompact } from "@/lib/format"
 import { openLeadForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
 import { LeadCard } from "./lead-card"
+import { useFunnel } from "@/lib/funnel-store"
 
 /** Fechados há mais que isso saem do quadro (continuam acessíveis pela busca). */
 const CLOSED_VISIBLE_DAYS = 30
 
-const URGENCY_RANK = { vencida: 0, hoje: 1, parado: 2 } as const
-
-/** Ordem automática: mais urgente em cima. Ninguém precisa ordenar cards à mão. */
-function sortLeads(leads: Lead[], now: Date) {
-  return [...leads].sort((a, b) => {
-    const ua = leadUrgency(a, now)
-    const ub = leadUrgency(b, now)
-    const ra = ua ? URGENCY_RANK[ua] : 3
-    const rb = ub ? URGENCY_RANK[ub] : 3
-    return ra - rb || a.nextAction.dueDate.localeCompare(b.nextAction.dueDate)
-  })
-}
-
 export function Kanban({ leads, showOwner = true, focusStage }: { leads: Lead[]; showOwner?: boolean; focusStage?: Stage | null }) {
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Passos do funil: base do selo de follow-up nos cards.
+  const loadFunnel = useFunnel((s) => s.load)
+  useEffect(() => void loadFunnel(), [loadFunnel])
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
@@ -84,7 +75,7 @@ export function Kanban({ leads, showOwner = true, focusStage }: { leads: Lead[];
             inStage = recent
           }
           return (
-            <Column key={stage.id} stage={stage.id} label={stage.label} open={stage.open} leads={sortLeads(inStage, now)} hidden={hidden} maxTotal={maxTotal} showOwner={showOwner} focused={focusStage === stage.id} />
+            <Column key={stage.id} stage={stage.id} label={stage.label} open={stage.open} leads={boardOrder(inStage)} hidden={hidden} maxTotal={maxTotal} showOwner={showOwner} focused={focusStage === stage.id} />
           )
         })}
       </div>

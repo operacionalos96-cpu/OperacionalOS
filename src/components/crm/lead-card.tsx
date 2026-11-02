@@ -3,7 +3,9 @@
 import { MessageCircleIcon } from "lucide-react"
 import { TEMPERATURES, isOpenStage } from "@/lib/domain/constants"
 import type { Lead } from "@/lib/domain/types"
-import { delayTone, leadDelayDays, leadUrgency } from "@/lib/domain/rules"
+import { daysSince, delayTone, leadDelayDays, leadUrgency } from "@/lib/domain/rules"
+import { followupDue } from "@/lib/domain/funnel"
+import { useFunnel } from "@/lib/funnel-store"
 import { dueLabel, moneyCompact } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/shared/user-avatar"
@@ -28,6 +30,29 @@ export function DelayChip({ lead, now }: { lead: Lead; now: Date }) {
       title={leadUrgency(lead, now) === "parado" ? "Dias sem atividade" : "Dias com a próxima ação vencida"}
     >
       {days}d
+    </span>
+  )
+}
+
+/**
+ * No quadro, o único alerta é o follow-up do funil que venceu (hoje ou atrasado). Próxima ação
+ * vencida e lead parado não marcam o card: continuam na aba "Precisa de ação".
+ */
+export function FollowUpChip({ lead, now }: { lead: Lead; now: Date }) {
+  const steps = useFunnel((s) => s.steps)
+  const due = followupDue(lead, steps, now)
+  if (!due) return null
+  const days = Math.max(0, daysSince(due.dueAt.toISOString(), now))
+  const tone = delayTone(days)
+  return (
+    <span
+      className={cn(
+        "tabular shrink-0 rounded-md px-1.5 py-px text-[11px] font-semibold",
+        tone === "danger" ? "bg-danger-soft text-danger" : tone === "warning" ? "bg-warning-soft text-warning" : "bg-highlight-soft text-highlight",
+      )}
+      title={`Follow-up ${due.index + 1}/${due.total} (${due.step.label}) ${days ? `atrasado há ${days} dia${days > 1 ? "s" : ""}` : "para hoje"}`}
+    >
+      Follow-up {days ? `· ${days}d` : "hoje"}
     </span>
   )
 }
@@ -65,7 +90,7 @@ export function LeadCard({ lead, dragging = false, showOwner = true }: { lead: L
           <span className="min-w-0 flex-1 truncate">
             {lead.nextAction.text} · {dueLabel(lead.nextAction.dueDate, now)}
           </span>
-          <DelayChip lead={lead} now={now} />
+          <FollowUpChip lead={lead} now={now} />
           {showOwner && <UserAvatar userId={lead.ownerId} />}
         </p>
       ) : (
