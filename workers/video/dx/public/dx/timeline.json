@@ -1,0 +1,370 @@
+{
+ "fps": 30,
+ "duracao": 114.0,
+ "quadros": 3420,
+ "falas": [
+  {
+   "id": "v1",
+   "ini": 0.6,
+   "fim": 7.08,
+   "arquivo": "v1.mp3"
+  },
+  {
+   "id": "v2",
+   "ini": 7.4,
+   "fim": 11.16,
+   "arquivo": "v2.mp3"
+  },
+  {
+   "id": "v3",
+   "ini": 12.6,
+   "fim": 21.24,
+   "arquivo": "v3.mp3"
+  },
+  {
+   "id": "v4",
+   "ini": 23.2,
+   "fim": 31.84,
+   "arquivo": "v4.mp3"
+  },
+  {
+   "id": "v5",
+   "ini": 33.0,
+   "fim": 40.52,
+   "arquivo": "v5.mp3"
+  },
+  {
+   "id": "p1",
+   "ini": 41.0,
+   "fim": 49.16,
+   "arquivo": "p1.mp3"
+  },
+  {
+   "id": "p2",
+   "ini": 55.0,
+   "fim": 62.92,
+   "arquivo": "p2.mp3"
+  },
+  {
+   "id": "p3",
+   "ini": 69.0,
+   "fim": 75.64,
+   "arquivo": "p3.mp3"
+  },
+  {
+   "id": "d1",
+   "ini": 82.9,
+   "fim": 90.1,
+   "arquivo": "d1.mp3"
+  },
+  {
+   "id": "d2",
+   "ini": 90.5,
+   "fim": 100.02,
+   "arquivo": "d2.mp3"
+  },
+  {
+   "id": "d3",
+   "ini": 100.4,
+   "fim": 103.52,
+   "arquivo": "d3.mp3"
+  },
+  {
+   "id": "d4",
+   "ini": 103.9,
+   "fim": 112.3,
+   "arquivo": "d4.mp3"
+  }
+ ],
+ "legendas": [
+  {
+   "t0": 0.6,
+   "t1": 2.262,
+   "texto": "Seu negócio tem *valor*."
+  },
+  {
+   "t0": 2.638,
+   "t1": 4.033,
+   "texto": "E, para muita gente,"
+  },
+  {
+   "t0": 4.033,
+   "t1": 5.879,
+   "texto": "o site é o primeiro contato"
+  },
+  {
+   "t0": 5.879,
+   "t1": 6.904,
+   "texto": "com esse valor."
+  },
+  {
+   "t0": 7.4,
+   "t1": 8.855,
+   "texto": "Será que ele ainda mostra"
+  },
+  {
+   "t0": 9.094,
+   "t1": 10.286,
+   "texto": "tudo o que a sua empresa"
+  },
+  {
+   "t0": 10.286,
+   "t1": 10.989,
+   "texto": "entrega hoje?"
+  },
+  {
+   "t0": 12.6,
+   "t1": 13.702,
+   "texto": "Foi o que fomos olhar."
+  },
+  {
+   "t0": 14.063,
+   "t1": 16.077,
+   "texto": "Analisamos o seu site com calma,"
+  },
+  {
+   "t0": 16.243,
+   "t1": 17.809,
+   "texto": "no computador e no celular,"
+  },
+  {
+   "t0": 17.962,
+   "t1": 19.537,
+   "texto": "com os olhos de quem acabou"
+  },
+  {
+   "t0": 19.537,
+   "t1": 21.041,
+   "texto": "de conhecer o seu trabalho."
+  },
+  {
+   "t0": 23.2,
+   "t1": 24.746,
+   "texto": "Pense em alguém que recebeu"
+  },
+  {
+   "t0": 24.746,
+   "t1": 26.829,
+   "texto": "uma *indicação* da sua empresa."
+  },
+  {
+   "t0": 26.589,
+   "t1": 28.485,
+   "texto": "O interesse já existe."
+  },
+  {
+   "t0": 28.304,
+   "t1": 30.349,
+   "texto": "O próximo passo, quase sempre,"
+  },
+  {
+   "t0": 30.503,
+   "t1": 31.627,
+   "texto": "é abrir o seu *site*."
+  },
+  {
+   "t0": 33.0,
+   "t1": 33.984,
+   "texto": "Por que *não*"
+  },
+  {
+   "t0": 33.692,
+   "t1": 35.527,
+   "texto": "ver esse caminho do jeito"
+  },
+  {
+   "t0": 35.527,
+   "t1": 36.733,
+   "texto": "que essa pessoa vê?"
+  },
+  {
+   "t0": 36.723,
+   "t1": 38.624,
+   "texto": "Separamos três pontos"
+  },
+  {
+   "t0": 38.624,
+   "t1": 40.324,
+   "texto": "que observamos no seu site."
+  },
+  {
+   "t0": 41.0,
+   "t1": 41.843,
+   "texto": "Primeiro ponto."
+  },
+  {
+   "t0": 42.12,
+   "t1": 44.121,
+   "texto": "Repare no que aparece aqui."
+  },
+  {
+   "t0": 44.056,
+   "t1": 46.005,
+   "texto": "Para quem chega pela primeira vez,"
+  },
+  {
+   "t0": 46.005,
+   "t1": 47.764,
+   "texto": "detalhes assim pesam na forma"
+  },
+  {
+   "t0": 47.764,
+   "t1": 48.983,
+   "texto": "de entender a empresa."
+  },
+  {
+   "t0": 55.0,
+   "t1": 55.99,
+   "texto": "Segundo ponto."
+  },
+  {
+   "t0": 55.892,
+   "t1": 57.039,
+   "texto": "Aqui, vale olhar"
+  },
+  {
+   "t0": 57.252,
+   "t1": 59.398,
+   "texto": "como um visitante olharia:"
+  },
+  {
+   "t0": 59.181,
+   "t1": 60.872,
+   "texto": "o que ele entende,"
+  },
+  {
+   "t0": 61.12,
+   "t1": 62.92,
+   "texto": "e o que ainda fica em aberto."
+  },
+  {
+   "t0": 69.0,
+   "t1": 70.739,
+   "texto": "E o terceiro ponto."
+  },
+  {
+   "t0": 70.683,
+   "t1": 72.456,
+   "texto": "Este trecho também faz parte"
+  },
+  {
+   "t0": 72.456,
+   "t1": 74.172,
+   "texto": "do caminho entre o interesse"
+  },
+  {
+   "t0": 74.172,
+   "t1": 75.46,
+   "texto": "e o primeiro contato."
+  },
+  {
+   "t0": 82.9,
+   "t1": 84.184,
+   "texto": "Esses pontos não dizem"
+  },
+  {
+   "t0": 84.184,
+   "t1": 85.983,
+   "texto": "que o seu site está errado."
+  },
+  {
+   "t0": 86.299,
+   "t1": 87.534,
+   "texto": "Mostram onde ele pode"
+  },
+  {
+   "t0": 87.534,
+   "t1": 88.585,
+   "texto": "representar melhor"
+  },
+  {
+   "t0": 88.585,
+   "t1": 89.927,
+   "texto": "o nível da sua empresa."
+  },
+  {
+   "t0": 90.5,
+   "t1": 91.842,
+   "texto": "Renovar um site começa"
+  },
+  {
+   "t0": 91.842,
+   "t1": 93.561,
+   "texto": "por entender o seu *negócio*:"
+  },
+  {
+   "t0": 93.488,
+   "t1": 95.122,
+   "texto": "o que você oferece,"
+  },
+  {
+   "t0": 95.452,
+   "t1": 96.928,
+   "texto": "como deseja se apresentar"
+  },
+  {
+   "t0": 97.148,
+   "t1": 98.678,
+   "texto": "e o que precisa facilitar"
+  },
+  {
+   "t0": 98.678,
+   "t1": 100.02,
+   "texto": "para os seus clientes."
+  },
+  {
+   "t0": 100.4,
+   "t1": 101.423,
+   "texto": "Por que *não*"
+  },
+  {
+   "t0": 101.638,
+   "t1": 103.325,
+   "texto": "dar esse próximo passo?"
+  },
+  {
+   "t0": 103.9,
+   "t1": 105.521,
+   "texto": "Responda à nossa mensagem"
+  },
+  {
+   "t0": 105.679,
+   "t1": 107.248,
+   "texto": "e conte o que você precisa"
+  },
+  {
+   "t0": 107.248,
+   "t1": 109.055,
+   "texto": "para o seu site."
+  },
+  {
+   "t0": 108.13,
+   "t1": 109.055,
+   "texto": "HZK."
+  },
+  {
+   "t0": 108.818,
+   "t1": 110.257,
+   "texto": "O digital a favor"
+  },
+  {
+   "t0": 110.409,
+   "t1": 112.131,
+   "texto": "do que importa para você."
+  }
+ ],
+ "pontos": [
+  {
+   "ini": 40.4,
+   "fim": 54.4
+  },
+  {
+   "ini": 54.4,
+   "fim": 68.4
+  },
+  {
+   "ini": 68.4,
+   "fim": 82.4
+  }
+ ]
+}

@@ -22,7 +22,8 @@ export interface FunnelStep {
   media?: FunnelMedia
   /**
    * Só vídeo: de onde vem o vídeo deste passo. "arquivo" = o arquivo acima (igual para todos);
-   * "diagnostico"/"visao" = o vídeo personalizado do lead (o arquivo vira reserva).
+   * "diagnostico" = o vídeo personalizado do lead (o arquivo vira reserva).
+   * "visao" foi o 2º vídeo personalizado, que deixou de ser gerado; fica no tipo só para funis e leads antigos.
    * Sem valor (funis antigos): 1º vídeo = diagnóstico, 2º = visão, demais = arquivo.
    */
   source?: VideoSource
@@ -32,7 +33,6 @@ export type VideoSource = "arquivo" | "diagnostico" | "visao"
 export const VIDEO_SOURCES: { id: VideoSource; label: string }[] = [
   { id: "arquivo", label: "Arquivo (igual para todos)" },
   { id: "diagnostico", label: "Personalizado: diagnóstico" },
-  { id: "visao", label: "Personalizado: visão" },
 ]
 
 /** Quando começar a gerar os vídeos personalizados do lead (editável no funil). */
@@ -100,15 +100,6 @@ export const DEFAULT_FUNNEL: FunnelStep[] = [
   {
     id: "m4",
     label: "Vídeo",
-    kind: "video",
-    trigger: "resposta",
-    delayDays: 0,
-    template: "",
-  },
-  {
-    // 2º vídeo personalizado (visão/transformação): vai quando ele responder ao 1º.
-    id: "m5",
-    label: "Vídeo 2 — visão",
     kind: "video",
     trigger: "resposta",
     delayDays: 0,

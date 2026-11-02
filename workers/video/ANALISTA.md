@@ -27,9 +27,11 @@ Se o site realmente não tiver 3 pontos fortes, **não force**: `node analista.j
 
 ## Como escrever cada ponto
 
-- `text`: completa a frase **"Um exemplo: …"**. Específico, com algo do próprio site. Ex.: *"a primeira tela só mostra "Conotec", sem dizer que vocês cuidam da contabilidade de clínicas em Campinas"*.
-- `short`: 2–4 palavras para o quadro do vídeo. Ex.: *"Topo sem proposta clara"*.
-- `impacto`: 1 frase, por que isso pesa para quem chega agora. Sem números inventados, sem prometer. Ex.: *"Quem chega precisa adivinhar o que vocês fazem."*
+O vídeo tem narração fixa que não cita nada do lead: **só a tela traz o diagnóstico**. Por isso cada ponto precisa se explicar sozinho, lido em 14 s.
+
+- `text` (até 220 caracteres): completa a frase **"Um exemplo: …"**. Específico, com algo do próprio site. Ex.: *"a primeira tela só mostra "Conotec", sem dizer que vocês cuidam da contabilidade de clínicas em Campinas"*.
+- `short` (até 48 caracteres): 2–4 palavras para o quadro do vídeo. Ex.: *"Topo sem proposta clara"*.
+- `impacto` (até 180 caracteres): 1 frase, por que isso pesa para quem chega agora. Sem números inventados, sem prometer. Ex.: *"Quem chega precisa adivinhar o que vocês fazem."*
 - `anchor`: um trecho **exato** (copiado) de texto visível na página onde o ponto aparece — o vídeo dá zoom nele. Se o ponto é uma ausência (ex.: não há depoimentos), deixe vazio.
 - `kind`: um rótulo curto (clareza, diferencial, confianca, contato, celular, servicos, busca).
 
