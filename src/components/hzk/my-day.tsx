@@ -69,7 +69,7 @@ export function DailyCard() {
   // Quem não participa da daily (Configurações › Reunião diária) não vê o cartão.
   if (!participants.includes(meId)) return null
   return (
-    <section aria-label="Reunião diária" className={cn("flex flex-wrap items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-card", state.phase === "todos" && "border-success/50")}>
+    <section aria-label="Reunião diária" className={cn("flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-5 py-4 shadow-card", state.phase === "todos" && "border-success/50")}>
       <VideoIcon className="size-5 text-highlight" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">
@@ -83,7 +83,7 @@ export function DailyCard() {
               : `${state.ready.length} de ${state.expected.length} prontos${meReady ? ` · esperando ${names(state.expected.filter((id) => !state.ready.includes(id)))}` : ""}.`}
         </p>
       </div>
-      <div className="flex items-center -space-x-1.5" aria-hidden>
+      <div className="flex items-center gap-1" aria-hidden>
         {state.expected.map((id) => (
           <span key={id} className={cn("rounded-full ring-2", state.ready.includes(id) ? "ring-success" : state.missingCheckIn.includes(id) ? "ring-transparent opacity-50" : "ring-highlight/60")}>
             <UserAvatar userId={id} />
@@ -478,7 +478,7 @@ export function SectorStepsPanel() {
 
 export function InboxCounter({ count }: { count: number }) {
   return (
-    <Link href="/caixa-de-entrada" className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-card hover:border-brand/50">
+    <Link href="/caixa-de-entrada" className="flex items-center gap-3 rounded-2xl border bg-card px-5 py-4 shadow-card hover:border-brand/50">
       <InboxIcon className="size-5 text-muted-foreground" />
       <span className="flex-1 text-sm">
         {count ? (
@@ -509,7 +509,7 @@ export function WeeklyNudge() {
   if (!kind) return null
   return (
     <section aria-label="Check-in da semana" className="overflow-hidden rounded-2xl border border-highlight/40 bg-card shadow-card">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 px-5 py-4">
         <CalendarCheckIcon className="size-5 text-highlight" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{kind === "segunda" ? "Qual o seu foco da semana?" : "Como foi a semana?"}</p>

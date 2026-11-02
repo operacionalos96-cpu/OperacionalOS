@@ -40,7 +40,7 @@ export default function HomePage() {
   const at = (i: number) => ({ "--i": i }) as React.CSSProperties
 
   return (
-    <div className="page-body flex flex-col gap-5 pt-6">
+    <div className="page-body flex flex-col gap-7 pt-8">
       <header className="guided flex flex-wrap items-end justify-between gap-3" style={at(0)}>
         <div className="flex min-w-0 items-center gap-4">
           {/* O orbe do guia: o humor mostra o dia (atraso = foco; tudo entregue = festa). Toque abre o guia. */}
@@ -77,7 +77,7 @@ export default function HomePage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!checkedIn ? (
-            <Button onClick={() => openGuide("dia")}>
+            <Button variant="brand" onClick={() => openGuide("dia")}>
               <SunriseIcon /> Planejar meu dia
             </Button>
           ) : (
@@ -92,7 +92,7 @@ export default function HomePage() {
       </header>
 
       {day.noteFromYesterday && (
-        <aside style={at(1)} className="guided flex gap-3 rounded-2xl border border-highlight/30 bg-highlight-soft px-4 py-3">
+        <aside style={at(1)} className="guided flex gap-3 rounded-2xl border border-highlight/30 bg-highlight-soft px-5 py-4">
           <StickyNoteIcon className="mt-0.5 size-5 shrink-0 text-highlight" />
           <div>
             <p className="text-sm font-semibold">Sua nota de ontem</p>
@@ -108,8 +108,8 @@ export default function HomePage() {
         <WeeklyNudge />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8">
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
           <div className="guided" style={at(3)}>
             <DayPlanPanel day={day} />
           </div>
@@ -117,7 +117,7 @@ export default function HomePage() {
             <WaitingForYou day={day} />
           </div>
         </div>
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
           <div className="guided" style={at(4)}>
             <AgendaToday day={day} />
           </div>

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CloseDay } from "./close-day"
 import { DoingButton } from "./doing-now"
+import { FeedbackButton } from "./feedback-dialog"
 import { GuideOrb } from "./guide-orb"
 import { WeeklyCheckinCard } from "./weekly-checkin"
 import { usePersonWork } from "./team-overview"
@@ -273,6 +274,7 @@ export function DayGuide() {
                 <GuideOrb mood={mood} className="size-8" />
               </span>
               <p className="flex-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Guia do dia</p>
+              <FeedbackButton />
               {idx > 0 && (
                 <button type="button" onClick={() => go(SCREENS[idx - 1], -1)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent">
                   <ChevronLeftIcon className="size-3.5" /> Voltar

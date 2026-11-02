@@ -3,6 +3,7 @@
 import { create } from "zustand"
 import { makeEvent, type BusinessEvent, type BusinessEventType, type EventInput } from "@/lib/domain/ai-office"
 import { publicId } from "@/lib/domain/jobs"
+import { FEEDBACK_PREFIX } from "@/lib/feedback"
 import { supabaseBrowser } from "@/lib/supabase/client"
 
 /**
@@ -63,7 +64,8 @@ export const useEventFeed = create<FeedState>((set, get) => ({
     const { data, error } = await supabaseBrowser().from("events").select("*").order("created_at", { ascending: false }).limit(limit)
     if (error) return set({ loaded: true })
     const known = new Set(get().events.map((e) => e.id))
-    const fresh = (data as BusinessEvent[]).filter((e) => !known.has(e.id))
+    // Relatos de bug/ideia (src/lib/feedback.ts) moram na mesma tabela, mas não são fatos do negócio.
+    const fresh = (data as BusinessEvent[]).filter((e) => !known.has(e.id) && !e.event_type.startsWith(FEEDBACK_PREFIX))
     set((s) => ({ loaded: true, events: [...s.events, ...fresh].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 500) }))
   },
   add(e) {
@@ -82,6 +84,7 @@ export function startEventFeed() {
     .channel("eventos-ai-office")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "events" }, (payload) => {
       const e = payload.new as BusinessEvent
+      if (e.event_type.startsWith(FEEDBACK_PREFIX)) return
       if (useEventFeed.getState().events.some((x) => x.id === e.id)) return // eu mesmo gravei
       useEventFeed.getState().add(e)
       notify(e)

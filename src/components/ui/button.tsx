@@ -8,8 +8,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "btn-depth",
-        /** Verde: só para ação positiva (entrada, concluir, ganho). */
+        /** Padrão: laranja suave (tom da marca), nunca preto — ação comum. */
+        default: "btn-tonal",
+        /** Laranja sólido: a ação principal da tela (uma por página). */
         brand: "btn-depth [--btn-bg:var(--brand)] [--btn-fg:var(--brand-foreground)]",
         outline:
           "btn-surface border-border text-foreground aria-expanded:bg-accent",
