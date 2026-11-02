@@ -10,7 +10,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { ArrowRightIcon, BellIcon, CalendarCheckIcon, CalendarPlusIcon, CheckIcon, CircleCheckBigIcon, GripVerticalIcon, InboxIcon, VideoIcon, XIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { EVENT_KINDS, timeRange, type CalendarEvent } from "@/lib/domain/calendar"
-import { TEAM_SETTINGS_ID, dailyState } from "@/lib/domain/daily"
+import { TEAM_SETTINGS_ID, dailyParticipants, dailyState } from "@/lib/domain/daily"
 import { PLAN_GROUP_LABEL, reorder, type Badge, type MyDay, type PlanGroup, type PlanItem } from "@/lib/domain/my-day"
 import { sectorSteps } from "@/lib/domain/sectors"
 import { relative } from "@/lib/format"
@@ -46,12 +46,11 @@ export function DailyCard() {
   const events = useCalendarEvents((s) => s.items)
   const settings = useTeamSettings((s) => s.items.find((x) => x.id === TEAM_SETTINGS_ID))
   const now = useMinute()
-  const state = dailyState(
+  const participants = dailyParticipants(
     team.map((u) => u.id),
-    plans,
-    events,
-    now,
+    settings,
   )
+  const state = dailyState(participants, plans, events, now)
   const meReady = state.ready.includes(meId)
   const meChecked = !state.missingCheckIn.includes(meId)
   const link = settings?.daily?.link
@@ -67,6 +66,8 @@ export function DailyCard() {
     } else toast.success("Você está pronto para a daily")
   }
 
+  // Quem não participa da daily (Configurações › Reunião diária) não vê o cartão.
+  if (!participants.includes(meId)) return null
   return (
     <section aria-label="Reunião diária" className={cn("flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-5 py-4 shadow-card", state.phase === "todos" && "border-success/50")}>
       <VideoIcon className="size-5 text-highlight" />

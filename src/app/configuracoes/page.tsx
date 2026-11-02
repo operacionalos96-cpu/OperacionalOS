@@ -179,6 +179,9 @@ function DailyMeetingPanel({ editable }: { editable: boolean }) {
   const save = useTeamSettings((s) => s.save)
   const [time, setTime] = useState(current?.daily?.time ?? DAILY_DEFAULT_TIME)
   const [link, setLink] = useState(current?.daily?.link ?? "")
+  const team = useTeam()
+  const [excluded, setExcluded] = useState<string[]>(current?.daily?.excludedIds ?? [])
+  const toggle = (id: string) => setExcluded((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]))
   function submit(e: React.FormEvent) {
     e.preventDefault()
     const url = link.trim()
@@ -186,7 +189,7 @@ function DailyMeetingPanel({ editable }: { editable: boolean }) {
       toast.error("O link precisa começar com https://")
       return
     }
-    save({ ...(current ?? { id: TEAM_SETTINGS_ID }), daily: { time, link: url || undefined } })
+    save({ ...(current ?? { id: TEAM_SETTINGS_ID }), daily: { time, link: url || undefined, excludedIds: excluded.length ? excluded : undefined } })
     toast.success("Reunião diária salva")
   }
   return (
@@ -201,6 +204,32 @@ function DailyMeetingPanel({ editable }: { editable: boolean }) {
         <Button type="submit" disabled={!editable}>
           Salvar
         </Button>
+        {/* Quem participa: clique para tirar ou pôr de volta; vale ao salvar. */}
+        <div className="grid gap-2 sm:col-span-3">
+          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Quem participa</span>
+          <div className="flex flex-wrap gap-2">
+            {team.map((u) => {
+              const on = !excluded.includes(u.id)
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  disabled={!editable}
+                  aria-pressed={on}
+                  onClick={() => toggle(u.id)}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-sm transition-colors disabled:opacity-60",
+                    on ? "border-highlight/60 bg-highlight-soft/40 font-medium" : "text-muted-foreground line-through",
+                  )}
+                >
+                  <span className="size-2 rounded-full" style={{ backgroundColor: u.color }} />
+                  {u.name}
+                </button>
+              )
+            })}
+          </div>
+          <p className="t-desc text-xs">Quem fica de fora não conta para liberar o “Pronto” e não vê o cartão da reunião.</p>
+        </div>
       </form>
     </Panel>
   )
