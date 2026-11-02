@@ -4,7 +4,7 @@ import { useState } from "react"
 import { format } from "date-fns"
 import { CalendarHeartIcon, CoffeeIcon, DumbbellIcon, MoreHorizontalIcon, PauseIcon, PlayIcon, StethoscopeIcon, UtensilsIcon } from "lucide-react"
 import type { Task } from "@/lib/domain/types"
-import { PAUSE_REASONS, PERIOD_LABEL, minutesText, pauseLabel, periodOfDay, type PauseReason } from "@/lib/domain/work-sessions"
+import { PAUSE_REASONS, PERIOD_LABEL, minutesText, pauseLabel, periodOfDay, type PauseReason, type Routine } from "@/lib/domain/work-sessions"
 import { planId } from "@/lib/domain/presence"
 import { useDailyPlans } from "@/lib/modules"
 import { useMinute } from "@/lib/presence"
@@ -128,6 +128,30 @@ export function DoingButton({ task, compact, className }: { task: Task; compact?
     </Button>
   )
   return active ? <PauseMenu>{trigger}</PauseMenu> : trigger
+}
+
+/**
+ * ▶ Começar / ⏸ Pausar uma rotina (Prospecção…): o time vê "Fazendo: Prospecção" no online, igual a
+ * uma tarefa, e a pausa abre os mesmos motivos. Começar também fecha uma pausa em aberto.
+ */
+export function RoutineButton({ routine }: { routine: Routine }) {
+  const { doing, startRoutine } = useDoing()
+  if (doing?.taskId !== routine.id) {
+    return (
+      <Button type="button" size="sm" variant="brand" onClick={() => startRoutine(routine)} title={`Começar: o time vê que você está fazendo ${routine.title} agora`}>
+        <PlayIcon /> Começar {routine.title.toLowerCase()}
+      </Button>
+    )
+  }
+  return (
+    <PauseMenu>
+      <Button type="button" size="sm" variant="outline" title="Pausar: escolha o motivo (almoço, academia…) ou só pause">
+        <span className="size-2 animate-pulse rounded-full bg-highlight" aria-hidden />
+        {routine.title} desde {format(new Date(doing.start), "HH:mm")}
+        <PauseIcon className="text-highlight" /> Pausar
+      </Button>
+    </PauseMenu>
+  )
 }
 
 /**
