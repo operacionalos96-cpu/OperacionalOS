@@ -28,7 +28,7 @@ node gerar_video.mjs "C:/caminho/da/pasta-do-lead" "C:/caminho/saida.mp4"
 - **Código de saída:** `0` gerou; `1` lead rejeitado, com a lista de erros, sem vídeo; `2` uso ou `dados.json` inválido.
 - Vários leads podem rodar ao mesmo tempo: cada render usa uma pasta temporária própria, apagada no fim.
 
-Requisitos do PC: Windows e Node. O 3D já vem renderizado, então não precisa de GPU. Neste PC, cada vídeo leva cerca de 2min30.
+Requisitos do PC: Windows e Node. O 3D já vem renderizado, então não precisa de GPU. Neste PC, cada vídeo leva cerca de 2 minutos.
 
 Para testar já: `node gerar_video.mjs exemplos/lead-a saida.mp4` (sites e dados fictícios, com faixa de teste).
 
@@ -72,8 +72,20 @@ Cada ponto:
 
 ## O que é fixo
 
-- **Tempos:** 114 s. Cada ponto tem 14 s, para caber o texto mais longo permitido.
-- **Narração:** não cita dados do lead e não afirma nenhum problema. Só a tela traz o diagnóstico, e por isso não existe áudio por lead.
+- **Tempos (v3.2):** 112,6 s.
+
+  | Trecho | Tempo |
+  |---|---|
+  | Abertura com a busca do site e os dados do lead | 0–12,6 s |
+  | Hub 3D com o site no computador e no celular | 12,6–21,6 s |
+  | Rua: alguém abre o site depois de uma indicação | 22,6–31,6 s |
+  | "Por que não?" com a lista dos pontos | 31,8–40,4 s |
+  | Pausa para a dica: o HZK pede para tirar print de cada ponto | 40,4–49 s |
+  | Três pontos de 11 s cada, dentro de uma tela 3D com o HZK apontando | 49–82 s |
+  | Fechamento e convite para responder no WhatsApp | 82–112,6 s |
+
+- **Som:** a música vem da ElevenLabs Music e abaixa sozinha quando a narração fala. Os efeitos são fixos e já vêm em `public/dx/sfx`.
+- **Narração:** não cita dados do lead e não afirma nenhum problema. Nos pontos, ela só conduz o olhar ("olha o que aparece para quem chega"); o diagnóstico fica na tela. Por isso não existe áudio por lead.
 - **Regra de conteúdo:** o modelo não confere se um ponto é verdadeiro. Isso continua com a análise e a revisão humana.
 
 ## Refazer as partes fixas
@@ -84,4 +96,7 @@ Só é preciso se o roteiro ou o 3D mudarem, e isso é feito no estúdio da HZK.
 python projects/dx001-diagnostico-sites/scripts/gerar_timeline.py
 ```
 
-No estúdio (não vem neste pacote), o 3D é renderizado por `projects/dx001-diagnostico-sites/scripts/render_placa.py` (trechos `hub` e `rua`). O Hub sai com alfa e vai para `public/dx/placa_hub.webm`; os cantos das telas vão para `public/dx/cantos.json`.
+No estúdio (não vem neste pacote), o 3D é renderizado por `projects/dx001-diagnostico-sites/scripts/render_placa.py`, nos trechos `hub`, `rua`, `dica` e `ponto`. Depois, `codificar_placas.py` gera estes arquivos em `public/dx/`:
+- `placa_hub.webm`, `placa_dica.webm` e `placa_ponto.webm`, com alfa;
+- `placa_rua.mp4`;
+- `cantos.json`, com as telas `home`, `mobile` e `analise`.

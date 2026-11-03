@@ -79,8 +79,18 @@ export const VistaPrint: React.FC<{ lead: Lead; ponto: Ponto; t0: number; t1: nu
     <>
       <Img src={src(lead, ponto.print)} style={{ position: "absolute", left: tx, top: ty, width: W * s, height: H * s, maxWidth: "none" }} />
       {marca && (
-        <div style={{ position: "absolute", left: marca.x - 7, top: marca.y - 7, width: marca.w + 14, height: marca.h + 14, borderRadius: 12, border: `4px solid ${C.orange}`,
-          boxShadow: `0 0 0 2px rgba(17,24,39,.75), 0 0 0 2200px rgba(17,24,39,${0.42 * m})`, opacity: m }} />
+        <>
+          {/* escurece o resto do print e o contorno laranja se desenha em volta do trecho; depois pulsa de leve (v2) */}
+          <div style={{ position: "absolute", left: marca.x - 9, top: marca.y - 9, width: marca.w + 18, height: marca.h + 18, borderRadius: 14,
+            boxShadow: `0 0 0 3000px rgba(17,24,39,${0.46 * m})` }} />
+          <svg width={vw} height={vh} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
+            <rect x={marca.x - 9} y={marca.y - 9} width={marca.w + 18} height={marca.h + 18} rx={14} fill="none" stroke={C.deep} strokeWidth={10}
+              pathLength={1} strokeDasharray={`${ent(t, t0 + 2.2, 1.1, VAIVEM)} 1`} opacity={0.75} />
+            <rect x={marca.x - 9} y={marca.y - 9} width={marca.w + 18} height={marca.h + 18} rx={14} fill="none" stroke={C.orange}
+              strokeWidth={5 + 1.5 * Math.max(0, Math.sin((t - t0 - 3.4) * 3)) * ent(t, t0 + 3.4, 0.3)}
+              pathLength={1} strokeDasharray={`${ent(t, t0 + 2.2, 1.1, VAIVEM)} 1`} strokeLinecap="round" />
+          </svg>
+        </>
       )}
     </>
   );
