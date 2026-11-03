@@ -6,7 +6,7 @@ import { findLeadByName, findLeadByPhone, followupsDue, funnelOf, mergeFunnel, m
 import { approvePatch, contactedPatch, reviewStatus } from "@/lib/domain/prospecting"
 import { stepMediaFor } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
-import { AGENT_ID, agentSentPatch } from "@/lib/domain/whatsapp-agent"
+import { AGENT_ID, agentOwned, agentSentPatch } from "@/lib/domain/whatsapp-agent"
 import { supabaseAdmin } from "./supabase-admin"
 
 /**
@@ -85,7 +85,7 @@ export async function view(l: Lead, steps: FunnelStep[], now: Date) {
   // Vídeo: o personalizado do lead (aprovado) tem prioridade sobre o arquivo padrão do funil.
   const m = n ? stepMediaFor(l, steps, n.index) : null
   return {
-    lead: { id: l.id, name: l.name, company: l.company ?? null, segment: l.segment ?? null, city: l.city ?? null, stage: l.stage, website: l.website ?? null, problems: l.analysis?.problems?.slice(0, 3) ?? [] },
+    lead: { id: l.id, name: l.name, company: l.company ?? null, segment: l.segment ?? null, city: l.city ?? null, stage: l.stage, website: l.website ?? null, problems: l.analysis?.problems?.slice(0, 3) ?? [], agent: agentOwned(l) },
     funnel: { step: f.step, total: steps.length, lastSentAt: f.lastSentAt ?? null, repliedAt: f.repliedAt ?? null, stopped: !!f.stopped },
     // Texto de cada passo já personalizado: a extensão compara com o que está na conversa.
     steps: steps.map((s, i) => ({ index: i, label: s.label, kind: s.kind, trigger: s.trigger, delayDays: s.delayDays, done: i < f.step, text: s.template ? renderTemplate(s.template, l, now) : "", sentAt: [...f.history].reverse().find((h) => h.step === i)?.at ?? null })),

@@ -44,8 +44,11 @@ const ON = { ...DEFAULT_AGENT, enabled: true }
 // Terça, 3/11/2026, 10:00 em Brasília (13:00 UTC).
 const TUE_10 = new Date("2026-11-03T13:00:00Z")
 
+/** Conversa que o AGENTE começou (abriu em 1/11). */
 const contacted = (p: Partial<Lead>, f: Partial<NonNullable<Lead["funnel"]>>) =>
-  lead({ stage: "contato", contactStatus: "contacted", firstContactAt: "2026-11-01T13:00:00Z", funnel: { step: 1, lastSentAt: "2026-11-01T13:00:00Z", history: [{ step: 0, at: "2026-11-01T13:00:00Z" }], ...f }, ...p })
+  lead({ stage: "contato", contactStatus: "contacted", firstContactAt: "2026-11-01T13:00:00Z", agent: { sends: [{ at: "2026-11-01T13:00:00Z", step: 0 }] }, funnel: { step: 1, lastSentAt: "2026-11-01T13:00:00Z", history: [{ step: 0, at: "2026-11-01T13:00:00Z" }], ...f }, ...p })
+/** Envio do agente há 1 h (para decidir a vez: abertura ou conversa). */
+const lastSend = (step: number) => lead({ stage: "contato", contactStatus: "contacted", agent: { sends: [{ at: new Date(TUE_10.getTime() - 3_600_000).toISOString(), step }] }, funnel: { step: 9, history: [], stopped: true } })
 
 describe("agente do WhatsApp", () => {
   it("configuração: desligado por padrão, valores fora da faixa voltam para o limite", () => {
@@ -75,15 +78,28 @@ describe("agente do WhatsApp", () => {
     expect(openingsToSend([ok, low, fixo, siteNaoLido, siteLido, outro, descartado, humano], ON, "u1").map((l) => l.id)).toEqual(["ok", "lido"])
   })
 
-  it("prioridade: quem respondeu → follow-up vencido → abertura", () => {
+  it("alterna: depois de uma abertura vem uma conversa (resposta → follow-up); depois, outra abertura", () => {
     const opening = lead({ id: "abre" })
     const followup = contacted({ id: "fup" }, { step: 2, lastSentAt: "2026-10-30T13:00:00Z" }) // Lembrete: 2 dias, vencido
     const replied = contacted({ id: "resp" }, { repliedAt: "2026-11-03T12:00:00Z" })
-    expect(agentPlan([opening, followup, replied], STEPS, ON, TUE_10).action).toEqual({ kind: "responder", leadId: "resp", step: 1 })
-    expect(agentPlan([opening, followup], STEPS, ON, TUE_10).action).toEqual({ kind: "followup", leadId: "fup", step: 2 })
-    expect(agentPlan([opening], STEPS, ON, TUE_10).action).toEqual({ kind: "abertura", leadId: "abre", step: 0 })
+    const all = [opening, followup, replied]
+    expect(agentPlan([...all, lastSend(0)], STEPS, ON, TUE_10).action).toEqual({ kind: "responder", leadId: "resp", step: 1 })
+    expect(agentPlan([opening, followup, lastSend(0)], STEPS, ON, TUE_10).action).toEqual({ kind: "followup", leadId: "fup", step: 2 })
+    expect(agentPlan([...all, lastSend(1)], STEPS, ON, TUE_10).action).toEqual({ kind: "abertura", leadId: "abre", step: 0 })
+    // Sem abertura disponível, segue com a conversa (e vice-versa).
+    expect(agentPlan([followup, replied, lastSend(1)], STEPS, ON, TUE_10).action?.kind).toBe("responder")
+    expect(agentPlan([opening, lastSend(0)], STEPS, ON, TUE_10).action?.kind).toBe("abertura")
     // Passo "depois da resposta" sem resposta: espera, não insiste.
     expect(agentPlan([contacted({}, {})], STEPS, ON, TUE_10).state).toBe("sem_tarefas")
+  })
+
+  it("conversas de antes do agente ficam com o humano: nem resposta nem follow-up", () => {
+    const manual = (p: Partial<Lead>, f: Partial<NonNullable<Lead["funnel"]>>) => ({ ...contacted(p, f), agent: undefined })
+    const replied = manual({ id: "resp" }, { repliedAt: "2026-11-03T12:00:00Z" })
+    const followup = manual({ id: "fup" }, { step: 2, lastSentAt: "2026-10-30T13:00:00Z" })
+    const done = manual({ id: "fim" }, { step: 3, repliedAt: "2026-11-03T12:00:00Z" })
+    expect(agentPlan([replied, followup, done], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", counts: { replies: 0, followups: 0, forHuman: 0 } })
+    expect(agentPlan([replied, followup, lead({ id: "abre" })], STEPS, ON, TUE_10).action).toEqual({ kind: "abertura", leadId: "abre", step: 0 })
   })
 
   it("desligado, fora do horário e limite do dia não agem", () => {
@@ -100,7 +116,7 @@ describe("agente do WhatsApp", () => {
     const opened = Array.from({ length: 2 }, () => contacted({ agent: { sends: [{ at: earlier, step: 0 }] } }, { step: 1, lastSentAt: earlier }))
     const s = { ...ON, maxNewPerDay: 2 }
     expect(agentPlan([lead({}), ...opened], STEPS, s, TUE_10)).toMatchObject({ state: "sem_tarefas", counts: { opened: 2, openings: 0 } })
-    const fup = contacted({ id: "fup" }, { step: 2, lastSentAt: "2026-10-30T13:00:00Z" })
+    const fup = contacted({ id: "fup" }, { step: 2, lastSentAt: "2026-10-30T13:00:00Z", history: [] })
     expect(agentPlan([lead({}), fup, ...opened], STEPS, s, TUE_10).action?.kind).toBe("followup")
   })
 
@@ -127,7 +143,7 @@ describe("agente do WhatsApp", () => {
     l = { ...l, agent: agentSentPatch(l, 0, "2026-11-03T12:00:00Z") }
     l = { ...l, agent: agentSentPatch(l, FREE_REPLY, "2026-11-03T12:30:00Z") }
     l = { ...l, agent: agentSentPatch(l, 1, "2026-11-02T12:00:00Z") } // ontem
-    expect(agentCounts([l], TUE_10)).toEqual({ sent: 2, opened: 1, lastAt: "2026-11-03T12:30:00Z" })
+    expect(agentCounts([l], TUE_10)).toEqual({ sent: 2, opened: 1, lastAt: "2026-11-03T12:30:00Z", lastStep: FREE_REPLY })
     l = { ...l, agent: needsHumanPatch(l, "pediu orçamento", "2026-11-03T12:40:00Z") }
     expect(l.agent?.needsHuman?.reason).toBe("pediu orçamento")
     expect(releasePatch(l).needsHuman).toBeUndefined()

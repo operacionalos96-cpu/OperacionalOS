@@ -115,14 +115,18 @@ export function agentCounts(leads: Pick<Lead, "agent">[], now: Date) {
   let sent = 0
   let opened = 0
   let lastAt: string | undefined
+  let lastStep: number | undefined
   for (const l of leads)
     for (const s of l.agent?.sends ?? []) {
-      if (!lastAt || s.at > lastAt) lastAt = s.at
+      if (!lastAt || s.at > lastAt) {
+        lastAt = s.at
+        lastStep = s.step
+      }
       if (brClock(new Date(s.at)).day !== today) continue
       sent++
       if (s.step === 0) opened++
     }
-  return { sent, opened, lastAt }
+  return { sent, opened, lastAt, lastStep }
 }
 
 /** Intervalo depois de um envio: sorteado entre gapMin e gapMax, mas estável para o mesmo envio (não muda a cada consulta). */
@@ -135,6 +139,12 @@ export function gapAfter(lastAt: string, s: AgentSettings) {
 /** Lead parou de falar com o funil e o agente não deve tocar nele. */
 const offLimits = (l: Lead) => isDiscarded(l) || !!l.agent?.needsHuman || funnelOf(l).stopped || ["ganho", "perdido"].includes(l.stage)
 
+/**
+ * Conversa que o agente começou ou já tocou. Ele só responde e faz follow-up nessas: as conversas
+ * de antes do agente foram feitas à mão e o registro delas pode não bater com o WhatsApp.
+ */
+export const agentOwned = (l: Pick<Lead, "agent">) => !!l.agent?.sends?.length
+
 /** Ele respondeu depois da nossa última mensagem: a vez é nossa. */
 export const awaitingUs = (l: Lead) => {
   const f = funnelOf(l)
@@ -143,16 +153,16 @@ export const awaitingUs = (l: Lead) => {
 
 /** Respostas que o agente trata (o lead ainda está no funil). */
 export const repliesToHandle = <L extends Lead>(leads: L[], steps: FunnelStep[], now: Date) =>
-  leads.filter((l) => !offLimits(l) && awaitingUs(l) && !!nextStep(l, steps, now)).sort((a, b) => funnelOf(a).repliedAt!.localeCompare(funnelOf(b).repliedAt!))
+  leads.filter((l) => agentOwned(l) && !offLimits(l) && awaitingUs(l) && !!nextStep(l, steps, now)).sort((a, b) => funnelOf(a).repliedAt!.localeCompare(funnelOf(b).repliedAt!))
 
 /** Respondeu depois que o funil acabou (ou já está em proposta/negociação): conversa de humano. */
 export const repliesForHuman = <L extends Lead>(leads: L[], steps: FunnelStep[], now: Date) =>
-  leads.filter((l) => !offLimits(l) && awaitingUs(l) && !nextStep(l, steps, now))
+  leads.filter((l) => agentOwned(l) && !offLimits(l) && awaitingUs(l) && !nextStep(l, steps, now))
 
 /** Follow-ups por dias que já venceram (passos "resposta" esperam a resposta, não entram aqui). */
 export const followupsToSend = <L extends Lead>(leads: L[], steps: FunnelStep[], now: Date) =>
   leads
-    .filter((l) => !offLimits(l) && wasContacted(l) && !awaitingUs(l))
+    .filter((l) => agentOwned(l) && !offLimits(l) && wasContacted(l) && !awaitingUs(l))
     .flatMap((l) => {
       const n = nextStep(l, steps, now)
       return n && n.index > 0 && n.due && n.step.trigger === "dias" ? [{ lead: l, index: n.index, dueAt: n.dueAt! }] : []
@@ -186,12 +196,13 @@ export type AgentPlan = {
 }
 
 /**
- * O que o agente faz agora. Prioridade: quem respondeu (está esperando a gente) → follow-ups vencidos →
- * aberturas. Limites do dia, horário e intervalo valem para tudo.
+ * O que o agente faz agora. Alterna: depois de uma abertura, a vez é de quem respondeu (ou de um follow-up
+ * vencido); depois disso, uma abertura nova. Sem um dos lados, segue com o outro.
+ * Limites do dia, horário e intervalo valem para tudo.
  */
 export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, now: Date, ownerId?: string): AgentPlan {
   const mine = leads.filter((l) => !ownerId || l.ownerId === ownerId)
-  const { sent, opened, lastAt } = agentCounts(mine, now)
+  const { sent, opened, lastAt, lastStep } = agentCounts(mine, now)
   const replies = repliesToHandle(mine, steps, now)
   const followups = followupsToSend(mine, steps, now)
   const openings = opened < s.maxNewPerDay ? openingsToSend(mine, s, ownerId) : []
@@ -199,13 +210,14 @@ export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, 
   if (!s.enabled) return { state: "desligado", retryAfterSec: 300, counts }
   if (!withinHours(now, s)) return { state: "fora_do_horario", retryAfterSec: 600, counts }
   if (sent >= s.maxSendsPerDay) return { state: "limite_do_dia", retryAfterSec: 1800, counts }
-  const action: AgentAction | undefined = replies[0]
+  const conversation: AgentAction | undefined = replies[0]
     ? { kind: "responder", leadId: replies[0].id, step: funnelOf(replies[0]).step }
     : followups[0]
       ? { kind: "followup", leadId: followups[0].lead.id, step: followups[0].index }
-      : openings[0]
-        ? { kind: "abertura", leadId: openings[0].id, step: 0 }
-        : undefined
+      : undefined
+  const opening: AgentAction | undefined = openings[0] ? { kind: "abertura", leadId: openings[0].id, step: 0 } : undefined
+  // Último envio foi abertura → agora uma conversa em andamento; senão, uma abertura.
+  const action = lastStep === 0 ? (conversation ?? opening) : (opening ?? conversation)
   if (!action) return { state: "sem_tarefas", retryAfterSec: 120, counts }
   const wait = lastAt ? new Date(lastAt).getTime() + gapAfter(lastAt, s) - now.getTime() : 0
   if (wait > 0) return { state: "aguardar", retryAfterSec: Math.ceil(wait / 1000), counts }
@@ -233,7 +245,8 @@ export interface ChatMessage {
   time?: string
 }
 
-export type ReplyAction = "proximo_passo" | "responder" | "parar" | "humano"
+/** "esperar" vem só do servidor: a última mensagem da conversa já é nossa (nada para responder). */
+export type ReplyAction = "proximo_passo" | "responder" | "parar" | "humano" | "esperar"
 export interface AgentReply {
   action: ReplyAction
   intent: string
@@ -267,6 +280,7 @@ Como decidir:
 - "responder": o lead perguntou ou disse algo que pede uma resposta curta antes de seguir (ex.: "quem é você?", "do que se trata?", "qual o preço?"). Escreva "mensagem" no tom do roteiro: português do Brasil, informal e educado, até 3 frases, sem emoji em excesso. Termine puxando de volta para o próximo passo quando fizer sentido.
 - "parar": não tem interesse, pediu para não receber, ficou irritado ou a empresa não existe mais.
 - "humano": pediu ligação, reunião, proposta ou orçamento; quer fechar; fez pergunta que a BASE DA OFERTA não responde; ou você não tem certeza. Na dúvida, "humano".
+- Se o passo PRÓXIMO já aparece na conversa como mensagem NOSSA (mesmo com outras palavras), não use "proximo_passo": responda a mensagem dele ou escolha "humano".
 
 Regras que não mudam:
 - Só afirme sobre a oferta o que está na BASE DA OFERTA. Nunca invente preço, prazo, garantia, cliente, número ou link.

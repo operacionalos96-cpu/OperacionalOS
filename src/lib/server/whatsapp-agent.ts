@@ -43,8 +43,8 @@ export async function agentReply(leadId: string, messages: ChatMessage[], actorI
   if (!s.enabled) throw new FunnelError("agente desligado", 409)
   if (l.agent?.needsHuman) throw new FunnelError("este lead está com um humano", 409)
   const pending = unanswered(messages)
-  // Consta que ele respondeu, mas a conversa não mostra: melhor um humano olhar do que o agente ficar tentando.
-  if (!pending.length) return { action: "humano", intent: "resposta não encontrada", reason: "não achei a resposta dele na conversa", view: await handOff(l, actorId, "não achei a resposta dele na conversa") }
+  // Consta que ele respondeu, mas a última mensagem da conversa já é nossa: anota e espera a próxima resposta.
+  if (!pending.length) return { action: "esperar", intent: "última mensagem é nossa", reason: "esperando ele responder", view: await waitForLead(l, actorId) }
   const now = new Date()
   if (pending.some((m) => isOptOut(m.text))) return { action: "parar", intent: "pediu para parar", reason: "pedido explícito", view: await stop(l, actorId, "pediu para parar") }
   // Áudio, foto ou vídeo do lead: a IA não ouve nem vê; um humano assume.
@@ -61,6 +61,14 @@ export async function agentReply(leadId: string, messages: ChatMessage[], actorI
   if (r.action === "parar") return { ...r, view: await stop(l, actorId, r.reason || r.intent) }
   if (r.action === "humano") return { ...r, view: await handOff(l, actorId, r.reason || r.intent) }
   return { ...r, view: await view(l, steps, now) }
+}
+
+async function waitForLead(l: Lead, actorId: string) {
+  const at = new Date().toISOString()
+  const next: Lead = { ...l, funnel: { ...funnelOf(l), lastSentAt: at } }
+  await saveLead(next)
+  await log(next, actorId, "Agente: a última mensagem da conversa já é nossa, esperando ele responder", null, { agent: true })
+  return view(next, await loadFunnel(), new Date())
 }
 
 async function stop(l: Lead, actorId: string, why: string) {

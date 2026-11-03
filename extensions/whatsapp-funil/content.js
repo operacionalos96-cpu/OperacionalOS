@@ -992,6 +992,7 @@
     const r = await agentApi("agent_reply", { leadId: lead.id, messages: extractMessages().slice(-30) })
     state.data = { found: true, ...r.view }
     render()
+    if (r.action === "esperar") return setAgentStatus(lead.name + ": a última mensagem já é nossa, esperando ele responder.")
     if (r.action === "parar") return toast(`${lead.name} saiu do funil: ${r.intent}.`)
     if (r.action === "humano") return toast(`Passei ${lead.name} para um humano: ${r.reason}`, true)
     if (r.action === "proximo_passo") return sendStep({ ...job, step: state.data.next?.index }, state.data.next, true)
@@ -1061,7 +1062,8 @@
       const phoneLike = /^[+\d\s()-]+$/.test(title) && d.length >= 10
       const r = await api("lookup", { phone: phoneLike ? d : "", name: phoneLike ? "" : title })
       const lead = r.ok && r.data?.found ? r.data.lead : null
-      if (!lead || (r.data.byName && norm(lead.name) !== norm(title))) continue
+      // Só conversa que o agente começou: as de antes dele continuam com você.
+      if (!lead || !lead.agent || (r.data.byName && norm(lead.name) !== norm(title))) continue
       await saveJob({ kind: "ler", leadId: lead.id, name: lead.name, phone: null, at: Date.now(), phase: "abrindo" })
       setAgentStatus(`${lead.name} mandou mensagem. Abrindo…`, "live")
       press(row.querySelector('[role="gridcell"]') || row)
