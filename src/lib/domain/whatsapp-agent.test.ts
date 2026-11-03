@@ -88,16 +88,17 @@ describe("agente do WhatsApp", () => {
     expect(agentPlan([lead({ contact: "" })], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", blockers: { sem_celular: 1 } })
   })
 
-  it("alterna: depois de uma abertura vem uma conversa (resposta → follow-up); depois, outra abertura", () => {
+  it("quem respondeu vem sempre primeiro; sem resposta, alterna abertura e follow-up", () => {
     const opening = lead({ id: "abre" })
     const followup = contacted({ id: "fup" }, { step: 2, lastSentAt: "2026-10-30T13:00:00Z" }) // Lembrete: 2 dias, vencido
     const replied = contacted({ id: "resp" }, { repliedAt: "2026-11-03T12:00:00Z" })
     const all = [opening, followup, replied]
     expect(agentPlan([...all, lastSend(0)], STEPS, ON, TUE_10).action).toEqual({ kind: "responder", leadId: "resp", step: 1 })
+    expect(agentPlan([...all, lastSend(1)], STEPS, ON, TUE_10).action).toEqual({ kind: "responder", leadId: "resp", step: 1 })
     expect(agentPlan([opening, followup, lastSend(0)], STEPS, ON, TUE_10).action).toEqual({ kind: "followup", leadId: "fup", step: 2 })
-    expect(agentPlan([...all, lastSend(1)], STEPS, ON, TUE_10).action).toEqual({ kind: "abertura", leadId: "abre", step: 0 })
-    // Sem abertura disponível, segue com a conversa (e vice-versa).
-    expect(agentPlan([followup, replied, lastSend(1)], STEPS, ON, TUE_10).action?.kind).toBe("responder")
+    expect(agentPlan([opening, followup, lastSend(1)], STEPS, ON, TUE_10).action).toEqual({ kind: "abertura", leadId: "abre", step: 0 })
+    // Sem um dos lados, segue com o outro.
+    expect(agentPlan([followup, lastSend(1)], STEPS, ON, TUE_10).action?.kind).toBe("followup")
     expect(agentPlan([opening, lastSend(0)], STEPS, ON, TUE_10).action?.kind).toBe("abertura")
     // Passo "depois da resposta" sem resposta: espera, não insiste.
     expect(agentPlan([contacted({}, {})], STEPS, ON, TUE_10).state).toBe("sem_tarefas")
@@ -132,15 +133,25 @@ describe("agente do WhatsApp", () => {
 
   it("intervalo entre envios: sorteado na faixa e estável para o mesmo envio", () => {
     const at = "2026-11-03T12:58:00Z"
-    const gap = gapAfter(at, ON)
+    const gap = gapAfter(at, ON.gapMin, ON.gapMax)
     expect(gap).toBeGreaterThanOrEqual(3 * 60_000)
     expect(gap).toBeLessThanOrEqual(8 * 60_000)
-    expect(gapAfter(at, ON)).toBe(gap)
+    expect(gapAfter(at, ON.gapMin, ON.gapMax)).toBe(gap)
     const l = lead({ agent: { sends: [{ at, step: 0 }] } })
     const plan = agentPlan([l, lead({})], STEPS, ON, TUE_10)
     expect(plan.state).toBe("aguardar")
     expect(plan.retryAfterSec).toBe(Math.ceil((new Date(at).getTime() + gap - TUE_10.getTime()) / 1000))
     expect(agentPlan([l, lead({})], STEPS, ON, new Date(TUE_10.getTime() + 8 * 60_000)).state).toBe("agir")
+  })
+
+  it("resposta tem intervalo próprio, mais curto que o das aberturas", () => {
+    const at = new Date(TUE_10.getTime() - 4 * 60_000).toISOString() // última ação há 4 min
+    const last = lead({ stage: "contato", contactStatus: "contacted", agent: { sends: [{ at, step: 0 }] }, funnel: { step: 9, history: [], stopped: true } })
+    const replied = contacted({ id: "resp" }, { repliedAt: "2026-11-03T12:00:00Z" })
+    const s = { ...ON, gapMin: 10, gapMax: 10, replyGapMin: 2, replyGapMax: 2 }
+    expect(agentPlan([last, replied], STEPS, s, TUE_10)).toMatchObject({ state: "agir", action: { kind: "responder" } }) // 4 min ≥ 2
+    expect(agentPlan([last, lead({ id: "abre" })], STEPS, s, TUE_10)).toMatchObject({ state: "aguardar", retryAfterSec: 360 }) // abertura: 10 min
+    expect(mergeAgentSettings({ replyGapMin: 5, replyGapMax: 1 })).toMatchObject({ replyGapMin: 5, replyGapMax: 5 })
   })
 
   it("passar para humano também segura o intervalo (tentativa que falhou não emenda na próxima)", () => {

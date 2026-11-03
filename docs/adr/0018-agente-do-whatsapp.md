@@ -14,13 +14,14 @@ API oficial da Meta e não disfarçar o agente de pessoa: um agente de IA opera 
 
 1. **Quem decide é o servidor; a extensão executa.** A extensão pergunta "o que faço agora?" (`agent_agenda`),
    faz no WhatsApp Web e registra. As regras ficam em `src/lib/domain/whatsapp-agent.ts`:
-   - **Ordem:** alterna uma abertura e uma conversa em andamento (quem respondeu → follow-up vencido).
+   - **Ordem:** quem respondeu vem sempre primeiro, com intervalo próprio e curto (padrão 1–3 min). Sem
+     resposta pendente, alterna abertura nova e follow-up vencido.
    - **Aberturas:** a mesma fila da Prospecção (`prospectQueue`), com celular válido. Sem corte de nota
      (a maioria dos leads ainda não tem nota). Site não lido não impede: o agente lê o site antes de enviar.
      O agente aprova o lead em nome dele (`approvedBy: "whatsapp-agent"`), sem misturar com as decisões
      humanas que servem de aprendizado.
    - **Só nas conversas dele:** respostas e follow-ups apenas em leads que o agente já tocou; as conversas
-     feitas à mão antes dele continuam com o humano. Alterna abertura e conversa em andamento.
+     feitas à mão antes dele continuam com o humano.
    - **Limites:** conversas novas por dia (padrão 10, para o piloto), envios por dia (60), janela em
      Brasília (seg–sex, 9h–18h) e intervalo sorteado entre 3 e 8 min. O intervalo é estável para o mesmo envio.
 2. **Respostas com IA (Gemini, `agent_reply`)**, sempre validadas por `parseAgentReply`:

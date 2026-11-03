@@ -23,6 +23,9 @@ export interface AgentSettings {
   /** Intervalo entre dois envios do agente, em minutos (sorteado entre os dois). */
   gapMin: number
   gapMax: number
+  /** Intervalo para RESPONDER quem respondeu (mais curto: é o lead mais quente), em minutos. */
+  replyGapMin: number
+  replyGapMax: number
   /** Base da oferta: a ÚNICA fonte do que a IA pode afirmar (serviço, preço, prazo, como funciona). */
   offer: string
 }
@@ -36,6 +39,8 @@ export const DEFAULT_AGENT: AgentSettings = {
   weekends: false,
   gapMin: 3,
   gapMax: 8,
+  replyGapMin: 1,
+  replyGapMax: 3,
   offer: "",
 }
 
@@ -58,6 +63,7 @@ export function mergeAgentSettings(raw: unknown): AgentSettings {
   const d = DEFAULT_AGENT
   const startHour = num(o.startHour, 0, 23, d.startHour)
   const gapMin = num(o.gapMin, 1, 120, d.gapMin)
+  const replyGapMin = num(o.replyGapMin, 0, 60, d.replyGapMin)
   return {
     enabled: o.enabled === true,
     maxNewPerDay: num(o.maxNewPerDay, 0, 200, d.maxNewPerDay),
@@ -67,6 +73,8 @@ export function mergeAgentSettings(raw: unknown): AgentSettings {
     weekends: o.weekends === true,
     gapMin,
     gapMax: Math.max(gapMin, num(o.gapMax, 1, 240, d.gapMax)),
+    replyGapMin,
+    replyGapMax: Math.max(replyGapMin, num(o.replyGapMax, 0, 120, d.replyGapMax)),
     offer: typeof o.offer === "string" ? o.offer.trim().slice(0, 6000) : "",
   }
 }
@@ -135,11 +143,11 @@ export function agentCounts(leads: Pick<Lead, "agent">[], now: Date) {
   return { sent, opened, lastAt, lastStep }
 }
 
-/** Intervalo depois de um envio: sorteado entre gapMin e gapMax, mas estável para o mesmo envio (não muda a cada consulta). */
-export function gapAfter(lastAt: string, s: AgentSettings) {
+/** Intervalo depois de uma ação: sorteado entre min e max (minutos), mas estável para a mesma ação (não muda a cada consulta). */
+export function gapAfter(lastAt: string, min: number, max: number) {
   let h = 0
   for (const ch of lastAt) h = (h * 31 + ch.charCodeAt(0)) >>> 0
-  return (s.gapMin + (h % (s.gapMax - s.gapMin + 1))) * 60_000
+  return (min + (h % (max - min + 1))) * 60_000
 }
 
 /** Lead parou de falar com o funil e o agente não deve tocar nele. */
@@ -232,9 +240,9 @@ export type AgentPlan = {
 }
 
 /**
- * O que o agente faz agora. Alterna: depois de uma abertura, a vez é de quem respondeu (ou de um follow-up
- * vencido); depois disso, uma abertura nova. Sem um dos lados, segue com o outro.
- * Limites do dia, horário e intervalo valem para tudo.
+ * O que o agente faz agora. Quem respondeu vem SEMPRE primeiro, com o intervalo de resposta (mais curto).
+ * Sem resposta pendente, alterna abertura nova e follow-up vencido, com o intervalo normal.
+ * Limites do dia e horário valem para tudo.
  */
 export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, now: Date, ownerId?: string): AgentPlan {
   const mine = leads.filter((l) => !ownerId || l.ownerId === ownerId)
@@ -246,16 +254,14 @@ export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, 
   if (!s.enabled) return { state: "desligado", retryAfterSec: 300, counts }
   if (!withinHours(now, s)) return { state: "fora_do_horario", retryAfterSec: 600, counts }
   if (sent >= s.maxSendsPerDay) return { state: "limite_do_dia", retryAfterSec: 1800, counts }
-  const conversation: AgentAction | undefined = replies[0]
-    ? { kind: "responder", leadId: replies[0].id, step: funnelOf(replies[0]).step }
-    : followups[0]
-      ? { kind: "followup", leadId: followups[0].lead.id, step: followups[0].index }
-      : undefined
+  const reply: AgentAction | undefined = replies[0] ? { kind: "responder", leadId: replies[0].id, step: funnelOf(replies[0]).step } : undefined
+  const followup: AgentAction | undefined = followups[0] ? { kind: "followup", leadId: followups[0].lead.id, step: followups[0].index } : undefined
   const opening: AgentAction | undefined = openings[0] ? { kind: "abertura", leadId: openings[0].id, step: 0 } : undefined
-  // Último envio foi abertura → agora uma conversa em andamento; senão, uma abertura.
-  const action = lastStep === 0 ? (conversation ?? opening) : (opening ?? conversation)
+  // Resposta primeiro; senão, último envio foi abertura → follow-up, e vice-versa.
+  const action = reply ?? (lastStep === 0 ? (followup ?? opening) : (opening ?? followup))
   if (!action) return { state: "sem_tarefas", retryAfterSec: 120, counts, blockers: openingBlockers(mine, ownerId) }
-  const wait = lastAt ? new Date(lastAt).getTime() + gapAfter(lastAt, s) - now.getTime() : 0
+  const gap = lastAt ? (reply ? gapAfter(lastAt, s.replyGapMin, s.replyGapMax) : gapAfter(lastAt, s.gapMin, s.gapMax)) : 0
+  const wait = lastAt ? new Date(lastAt).getTime() + gap - now.getTime() : 0
   if (wait > 0) return { state: "aguardar", retryAfterSec: Math.ceil(wait / 1000), counts }
   return { state: "agir", retryAfterSec: 0, action, counts }
 }

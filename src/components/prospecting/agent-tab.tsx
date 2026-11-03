@@ -63,7 +63,7 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
     .slice(0, 15)
   const dirty = !!saved && JSON.stringify(saved) !== JSON.stringify(form)
   const set = <K extends keyof AgentSettings>(k: K, v: AgentSettings[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const num = (k: "maxNewPerDay" | "maxSendsPerDay" | "startHour" | "endHour" | "gapMin" | "gapMax") => (e: React.ChangeEvent<HTMLInputElement>) => set(k, Number(e.target.value))
+  const num = (k: "maxNewPerDay" | "maxSendsPerDay" | "startHour" | "endHour" | "gapMin" | "gapMax" | "replyGapMin" | "replyGapMax") => (e: React.ChangeEvent<HTMLInputElement>) => set(k, Number(e.target.value))
 
   async function save(patch: Partial<AgentSettings> = {}) {
     setBusy(true)
@@ -152,9 +152,14 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
               das <Input type="number" min={0} max={23} value={form.startHour} onChange={num("startHour")} className="w-20" /> às <Input type="number" min={1} max={24} value={form.endHour} onChange={num("endHour")} className="w-20" /> h
             </span>
           </Field>
-          <Field label="Intervalo entre envios" hint="minutos, sorteado">
+          <Field label="Intervalo entre envios" hint="aberturas e follow-ups, minutos">
             <span className="flex items-center gap-2 text-sm">
               de <Input type="number" min={1} max={120} value={form.gapMin} onChange={num("gapMin")} className="w-20" /> a <Input type="number" min={1} max={240} value={form.gapMax} onChange={num("gapMax")} className="w-20" />
+            </span>
+          </Field>
+          <Field label="Tempo para responder" hint="quem respondeu vem primeiro, minutos">
+            <span className="flex items-center gap-2 text-sm">
+              de <Input type="number" min={0} max={60} value={form.replyGapMin} onChange={num("replyGapMin")} className="w-20" /> a <Input type="number" min={0} max={120} value={form.replyGapMax} onChange={num("replyGapMax")} className="w-20" />
             </span>
           </Field>
         </div>

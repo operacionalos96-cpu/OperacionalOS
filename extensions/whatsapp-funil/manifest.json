@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Funil HZK",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "description": "Funil do Operacional OS dentro do WhatsApp Web: mostra o lead e o próximo passo, escreve a mensagem e anexa o áudio ou vídeo. Com o agente ligado, envia e responde sozinho.",
   "icons": {
     "16": "icons/hzk-16.png",

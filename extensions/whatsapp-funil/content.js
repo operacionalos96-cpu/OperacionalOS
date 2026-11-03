@@ -1061,7 +1061,10 @@
     agent.sending = true
     try {
       if (job.kind === "ler") {
-        if (lastMessage()?.incoming) await act("replied", { auto: true }, `${job.name} respondeu.`)
+        if (lastMessage()?.incoming) {
+          await act("replied", { auto: true }, `${job.name} respondeu.`)
+          agent.nextAt = 0
+        }
       } else if (job.kind === "responder") await replyTo(job)
       else await sendStep(job, state.data.next)
     } catch (e) {
@@ -1113,11 +1116,13 @@
     agent.runningSince = Date.now()
     try {
       if (agent.job) return await runJob(agent.job)
-      if (Date.now() < agent.nextAt || state.loading) return
+      if (state.loading) return
       // Não atropela quem está mexendo nesta aba.
       if (pendingSend || voice) return setAgentStatus("Esperando você concluir o envio manual…")
       if (flat(composer()?.innerText)) return setAgentStatus("Esperando você terminar de digitar…")
+      // Resposta de lead não espera o intervalo das aberturas: olha as não lidas sempre (o servidor dá o ritmo da resposta).
       if (await openUnreadLead()) return
+      if (Date.now() < agent.nextAt) return
       const r = await api("agent_agenda", {})
       if (!r.ok) {
         agent.nextAt = Date.now() + 60_000
@@ -1175,7 +1180,10 @@
         // Enviou algo sem o botão (digitou, mandou áudio/vídeo) ou ele respondeu: a leitura da conversa acerta a etapa.
         await reconcile()
         // Com o agente ligado, toda resposta conta (ele decide o que fazer), não só a que libera um passo.
-        if (last.incoming && (state.data?.next?.waitingReply || agent.on)) await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
+        if (last.incoming && (state.data?.next?.waitingReply || agent.on)) {
+          await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
+          agent.nextAt = 0 // pergunta ao servidor já: a resposta tem intervalo próprio
+        }
       }
     } finally {
       busy = false
