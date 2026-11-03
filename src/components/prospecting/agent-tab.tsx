@@ -63,7 +63,7 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
     .slice(0, 15)
   const dirty = !!saved && JSON.stringify(saved) !== JSON.stringify(form)
   const set = <K extends keyof AgentSettings>(k: K, v: AgentSettings[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const num = (k: "minQualification" | "maxNewPerDay" | "maxSendsPerDay" | "startHour" | "endHour" | "gapMin" | "gapMax") => (e: React.ChangeEvent<HTMLInputElement>) => set(k, Number(e.target.value))
+  const num = (k: "maxNewPerDay" | "maxSendsPerDay" | "startHour" | "endHour" | "gapMin" | "gapMax") => (e: React.ChangeEvent<HTMLInputElement>) => set(k, Number(e.target.value))
 
   async function save(patch: Partial<AgentSettings> = {}) {
     setBusy(true)
@@ -124,16 +124,13 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
               Próximo: {ACTION_TEXT[plan.action.kind]} <Link href={`/pipeline/${next.id}`} className="font-medium text-foreground hover:underline">{next.name}</Link>
             </p>
           )}
-          {plan.blockers && !plan.counts.openings && <p className="text-xs text-warning">{blockersText(plan.blockers)} {plan.blockers.site_nao_lido ? "Use “Ler sites” no topo da Prospecção. " : ""}{plan.blockers.sem_nota ? "Para incluir quem não tem nota, use nota mínima 0." : ""}</p>}
+          {plan.blockers && !plan.counts.openings && <p className="text-xs text-warning">{blockersText(plan.blockers)} {plan.blockers.sem_celular ? "Cadastre o celular no lead para ele entrar." : ""}</p>}
           <p className="tabular text-xs text-muted-foreground">
             Hoje: {plan.counts.sent}/{saved.maxSendsPerDay} envios · {plan.counts.opened}/{saved.maxNewPerDay} conversas novas · na fila: {plan.counts.replies} respostas, {plan.counts.followups} follow-ups, {plan.counts.openings} aberturas
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Nota mínima" hint="0–10, para a abertura">
-            <Input type="number" min={0} max={10} value={form.minQualification} onChange={num("minQualification")} />
-          </Field>
           <Field label="Conversas novas por dia">
             <Input type="number" min={0} max={200} value={form.maxNewPerDay} onChange={num("maxNewPerDay")} />
           </Field>

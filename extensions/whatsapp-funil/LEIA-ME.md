@@ -26,7 +26,7 @@ a extensão só executa no WhatsApp Web deste computador.
 - **Ligar:** a chave **Agente** no topo do painel liga neste computador. Ele também precisa estar ligado no
   sistema (limites, horário e base da oferta). Desligar a chave para tudo na hora.
 - **O que ele faz, nesta ordem:** responde quem mandou mensagem → manda os follow-ups vencidos → manda
-  aberturas para os melhores leads da fila (celular, nota no corte e site lido), até o limite do dia.
+  aberturas para os leads da fila que têm celular (lê o site antes, se ainda não foi lido), até o limite do dia.
 - **Respostas:** a IA lê a conversa e segue o roteiro, responde curto (só com o que está na base da oferta),
   tira do funil quem não quer ou passa para um humano. Áudio, foto ou vídeo do lead sempre vão para um humano.
 - **Conversas:** para abrir a conversa de um lead, o WhatsApp Web recarrega no número. Conversas não lidas só são

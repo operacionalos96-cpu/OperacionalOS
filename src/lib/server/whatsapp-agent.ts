@@ -1,9 +1,10 @@
 import "server-only"
 import { funnelOf, nextStep } from "@/lib/domain/funnel"
 import type { Lead } from "@/lib/domain/types"
-import { FREE_REPLY, agentPlan, blockersText, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
+import { FREE_REPLY, agentPlan, blockersText, needsSiteInfo, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
 import { AiError, aiConfigured, generateJson } from "./ai"
 import { rateHit } from "./rate-limit"
+import { readSiteInfo } from "./site-info"
 import { FunnelError, allLeads, getLead, loadFunnel, log, saveLead, stopFunnel, view } from "./whatsapp-funnel"
 import { supabaseAdmin } from "./supabase-admin"
 
@@ -30,7 +31,16 @@ export async function agentAgenda(ownerId: string) {
   const now = new Date()
   const plan = agentPlan(leads, steps, s, now, ownerId)
   if (plan.state !== "agir" || !plan.action) return { ...plan, ...(plan.blockers ? { blockersText: blockersText(plan.blockers) } : {}) }
-  const l = leads.find((x) => x.id === plan.action!.leadId)!
+  let l = leads.find((x) => x.id === plan.action!.leadId)!
+  // Abertura de quem ainda não teve o site lido: lê agora (segmento e cidade certos na 1ª mensagem).
+  // Se o site não abrir, a mensagem sai com o segmento da planilha e a região pelo DDD.
+  if (plan.action.kind === "abertura" && needsSiteInfo(l)) {
+    const r = await readSiteInfo(l)
+    if ("siteInfo" in r) {
+      l = { ...l, siteInfo: r.siteInfo }
+      await saveLead(l)
+    }
+  }
   return { ...plan, lead: { id: l.id, name: l.name, contact: l.contact ?? null }, view: await view(l, steps, now) }
 }
 

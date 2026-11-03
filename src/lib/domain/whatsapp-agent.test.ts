@@ -55,8 +55,8 @@ const lastSend = (step: number) => lead({ stage: "contato", contactStatus: "cont
 describe("agente do WhatsApp", () => {
   it("configuração: desligado por padrão, valores fora da faixa voltam para o limite", () => {
     expect(mergeAgentSettings(null)).toEqual(DEFAULT_AGENT)
-    const s = mergeAgentSettings({ enabled: true, minQualification: 15, maxNewPerDay: -3, startHour: 20, endHour: 8, gapMin: 10, gapMax: 2, offer: "  Site em 7 dias  " })
-    expect(s).toMatchObject({ enabled: true, minQualification: 10, maxNewPerDay: 0, startHour: 20, endHour: 21, gapMin: 10, gapMax: 10, offer: "Site em 7 dias" })
+    const s = mergeAgentSettings({ enabled: true, maxNewPerDay: -3, startHour: 20, endHour: 8, gapMin: 10, gapMax: 2, offer: "  Site em 7 dias  " })
+    expect(s).toMatchObject({ enabled: true, maxNewPerDay: 0, startHour: 20, endHour: 21, gapMin: 10, gapMax: 10, offer: "Site em 7 dias" })
   })
 
   it("horário de Brasília: dia útil dentro da janela; fim de semana só se ligado", () => {
@@ -68,7 +68,7 @@ describe("agente do WhatsApp", () => {
     expect(withinHours(sat, { ...ON, weekends: true })).toBe(true)
   })
 
-  it("aberturas: mesma fila da Prospecção, só com celular, nota no corte e site lido", () => {
+  it("aberturas: mesma fila da Prospecção, só com celular (nota e site não lido não impedem)", () => {
     const ok = lead({ id: "ok", analysis: { qualificationScore: 9 } })
     const low = lead({ id: "low", analysis: { qualificationScore: 4 } })
     const fixo = lead({ id: "fixo", contact: "(11) 3333-4444" })
@@ -77,16 +77,15 @@ describe("agente do WhatsApp", () => {
     const outro = lead({ id: "outro", ownerId: "u2" })
     const descartado = lead({ id: "desc", review: { status: "rejected" } })
     const humano = lead({ id: "hum", agent: { sends: [], needsHuman: { at: "x", reason: "y" } } })
-    expect(openingsToSend([ok, low, fixo, siteNaoLido, siteLido, outro, descartado, humano], ON, "u1").map((l) => l.id)).toEqual(["ok", "lido"])
+    expect(openingsToSend([ok, low, fixo, siteNaoLido, siteLido, outro, descartado, humano], "u1").map((l) => l.id)).toEqual(["ok", "site", "lido", "low"])
   })
 
-  it("diz por que a Fila não vira abertura; nota mínima 0 aceita lead sem nota", () => {
-    const leads = [lead({ id: "ok" }), lead({ analysis: {} }), lead({ analysis: { qualificationScore: 3 } }), lead({ contact: "(11) 3333-4444" }), lead({ website: "https://x.com.br" })]
-    const b = openingBlockers(leads, ON, "u1")
-    expect(b).toMatchObject({ fila: 5, prontas: 1, sem_nota: 1, nota_baixa: 1, sem_celular: 1, site_nao_lido: 1 })
-    expect(blockersText(b)).toBe("Das 5 da Fila: 1 sem nota de qualificação, 1 com nota abaixo do mínimo, 1 com site ainda não lido, 1 sem celular.")
-    expect(openingsToSend(leads, { ...ON, minQualification: 0 }, "u1")).toHaveLength(3) // ok, sem nota e nota 3
-    expect(agentPlan([lead({ analysis: {} })], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", blockers: { sem_nota: 1 } })
+  it("diz por que a Fila não vira abertura (só falta de celular ou lead com humano)", () => {
+    const leads = [lead({ id: "ok" }), lead({ analysis: {} }), lead({ contact: "(11) 3333-4444" }), lead({ contact: "" }), lead({ website: "https://x.com.br" })]
+    const b = openingBlockers(leads, "u1")
+    expect(b).toMatchObject({ fila: 5, prontas: 3, sem_celular: 2, com_humano: 0 })
+    expect(blockersText(b)).toBe("Das 5 da Fila: 2 sem celular.")
+    expect(agentPlan([lead({ contact: "" })], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", blockers: { sem_celular: 1 } })
   })
 
   it("alterna: depois de uma abertura vem uma conversa (resposta → follow-up); depois, outra abertura", () => {

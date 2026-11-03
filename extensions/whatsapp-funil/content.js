@@ -17,7 +17,7 @@
   const withTimeout = (p, ms, fallback) => Promise.race([p, sleep(ms).then(() => fallback)])
   async function api(action, body) {
     try {
-      const r = await withTimeout(chrome.runtime.sendMessage({ type: "api", action, body }), 20000, { ok: false, data: { erro: "O Operacional OS não respondeu. Tente de novo." } })
+      const r = await withTimeout(chrome.runtime.sendMessage({ type: "api", action, body }), action === "agent_agenda" ? 50000 : 20000, { ok: false, data: { erro: "O Operacional OS não respondeu. Tente de novo." } })
       return r || { ok: false, data: { erro: RELOAD } }
     } catch {
       return { ok: false, data: { erro: RELOAD } }

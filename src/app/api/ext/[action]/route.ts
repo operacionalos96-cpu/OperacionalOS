@@ -10,6 +10,8 @@ import type { ChatMessage } from "@/lib/domain/whatsapp-agent"
  * Ações agent_* exigem também o escopo whatsapp:agent.
  */
 const noStore = { "Cache-Control": "no-store" }
+/** agent_agenda pode ler o site do lead antes da abertura. */
+export const maxDuration = 45
 
 const KINDS = new Set(["texto", "audio", "video", "outro"])
 /** Mensagens que a extensão leu na conversa (conteúdo do lead: dado não confiável, só texto curto). */

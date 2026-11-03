@@ -12,8 +12,6 @@ import type { Lead } from "./types"
 
 export interface AgentSettings {
   enabled: boolean
-  /** Corte da qualificação (0–10) para o agente mandar a abertura sozinho. */
-  minQualification: number
   /** Conversas novas (aberturas) por dia. Começar baixo no piloto. */
   maxNewPerDay: number
   /** Total de envios do agente por dia (aberturas + follow-ups + respostas). */
@@ -31,7 +29,6 @@ export interface AgentSettings {
 
 export const DEFAULT_AGENT: AgentSettings = {
   enabled: false,
-  minQualification: 6,
   maxNewPerDay: 10,
   maxSendsPerDay: 60,
   startHour: 9,
@@ -63,7 +60,6 @@ export function mergeAgentSettings(raw: unknown): AgentSettings {
   const gapMin = num(o.gapMin, 1, 120, d.gapMin)
   return {
     enabled: o.enabled === true,
-    minQualification: num(o.minQualification, 0, 10, d.minQualification),
     maxNewPerDay: num(o.maxNewPerDay, 0, 200, d.maxNewPerDay),
     maxSendsPerDay: num(o.maxSendsPerDay, 0, 500, d.maxSendsPerDay),
     startHour,
@@ -169,31 +165,27 @@ export const followupsToSend = <L extends Lead>(leads: L[], steps: FunnelStep[],
     })
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
 
-/** Por que um lead da Fila não recebe a abertura do agente (null = pode receber). Nota mínima 0 aceita quem não tem nota. */
-export type OpeningBlocker = "com_humano" | "sem_celular" | "sem_nota" | "nota_baixa" | "site_nao_lido"
-export function openingBlocker(l: Lead, s: AgentSettings): OpeningBlocker | null {
+/** Por que um lead da Fila não recebe a abertura do agente (null = pode receber). Site não lido não impede: o agente lê antes de enviar. */
+export type OpeningBlocker = "com_humano" | "sem_celular"
+export function openingBlocker(l: Lead): OpeningBlocker | null {
   const n = whatsappNumber(l.contact)
-  const score = l.analysis?.qualificationScore
   if (offLimits(l)) return "com_humano"
   if (!n || !isLikelyMobile(n)) return "sem_celular"
-  if (score === undefined && s.minQualification > 0) return "sem_nota"
-  if (score !== undefined && score < s.minQualification) return "nota_baixa"
-  if (needsSiteInfo(l)) return "site_nao_lido"
   return null
 }
 
-/**
- * Aberturas que o agente manda sozinho: a fila da Prospecção (mesma ordem), com qualificação no corte,
- * celular válido e o site já lido (para a 1ª mensagem sair com o segmento e a cidade certos).
- */
-export const openingsToSend = <L extends Lead>(leads: L[], s: AgentSettings, ownerId?: string) => prospectQueue(leads, ownerId).filter((l) => !openingBlocker(l, s))
+/** Aberturas que o agente manda sozinho: a fila da Prospecção (mesma ordem), só quem tem celular. */
+export const openingsToSend = <L extends Lead>(leads: L[], ownerId?: string) => prospectQueue(leads, ownerId).filter((l) => !openingBlocker(l))
+
+/** O agente lê o site antes da abertura (para a 1ª mensagem sair com o segmento e a cidade certos). */
+export { needsSiteInfo }
 
 /** Quantos leads da Fila param em cada filtro da abertura (para a tela dizer por que não há o que enviar). */
-export function openingBlockers(leads: Lead[], s: AgentSettings, ownerId?: string) {
-  const out: Record<OpeningBlocker, number> & { fila: number; prontas: number } = { fila: 0, prontas: 0, com_humano: 0, sem_celular: 0, sem_nota: 0, nota_baixa: 0, site_nao_lido: 0 }
+export function openingBlockers(leads: Lead[], ownerId?: string) {
+  const out: Record<OpeningBlocker, number> & { fila: number; prontas: number } = { fila: 0, prontas: 0, com_humano: 0, sem_celular: 0 }
   for (const l of prospectQueue(leads, ownerId)) {
     out.fila++
-    const b = openingBlocker(l, s)
+    const b = openingBlocker(l)
     if (b) out[b]++
     else out.prontas++
   }
@@ -201,14 +193,11 @@ export function openingBlockers(leads: Lead[], s: AgentSettings, ownerId?: strin
 }
 
 export const BLOCKER_TEXT: Record<OpeningBlocker, string> = {
-  sem_nota: "sem nota de qualificação",
-  nota_baixa: "com nota abaixo do mínimo",
-  site_nao_lido: "com site ainda não lido",
   sem_celular: "sem celular",
   com_humano: "com um humano",
 }
 
-/** "Das 124 da Fila: 80 sem nota de qualificação, 30 com site ainda não lido." */
+/** "Das 124 da Fila: 36 sem celular." */
 export function blockersText(b: ReturnType<typeof openingBlockers>) {
   const parts = (Object.keys(BLOCKER_TEXT) as OpeningBlocker[]).filter((k) => b[k]).map((k) => `${b[k]} ${BLOCKER_TEXT[k]}`)
   return b.fila ? `Das ${b.fila} da Fila: ${parts.join(", ") || "todas prontas"}.` : "A Fila está vazia."
@@ -242,7 +231,7 @@ export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, 
   const { sent, opened, lastAt, lastStep } = agentCounts(mine, now)
   const replies = repliesToHandle(mine, steps, now)
   const followups = followupsToSend(mine, steps, now)
-  const openings = opened < s.maxNewPerDay ? openingsToSend(mine, s, ownerId) : []
+  const openings = opened < s.maxNewPerDay ? openingsToSend(mine, ownerId) : []
   const counts = { sent, opened, replies: replies.length, followups: followups.length, openings: openings.length, forHuman: mine.filter((l) => !!l.agent?.needsHuman).length + repliesForHuman(mine, steps, now).length }
   if (!s.enabled) return { state: "desligado", retryAfterSec: 300, counts }
   if (!withinHours(now, s)) return { state: "fora_do_horario", retryAfterSec: 600, counts }
@@ -255,7 +244,7 @@ export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, 
   const opening: AgentAction | undefined = openings[0] ? { kind: "abertura", leadId: openings[0].id, step: 0 } : undefined
   // Último envio foi abertura → agora uma conversa em andamento; senão, uma abertura.
   const action = lastStep === 0 ? (conversation ?? opening) : (opening ?? conversation)
-  if (!action) return { state: "sem_tarefas", retryAfterSec: 120, counts, blockers: openingBlockers(mine, s, ownerId) }
+  if (!action) return { state: "sem_tarefas", retryAfterSec: 120, counts, blockers: openingBlockers(mine, ownerId) }
   const wait = lastAt ? new Date(lastAt).getTime() + gapAfter(lastAt, s) - now.getTime() : 0
   if (wait > 0) return { state: "aguardar", retryAfterSec: Math.ceil(wait / 1000), counts }
   return { state: "agir", retryAfterSec: 0, action, counts }
