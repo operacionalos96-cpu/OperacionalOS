@@ -1,6 +1,7 @@
 // Funil Operacional OS dentro do WhatsApp Web.
-// Regra de ouro: a extensão NUNCA envia mensagem. Ela escreve na caixa de texto e
-// a pessoa confere e aperta Enter. Só registra no sistema o que a pessoa fez.
+// Modo manual: a extensão escreve na caixa de texto e a pessoa confere e aperta Enter.
+// Modo agente (ADR 0018, ligado neste computador E no sistema): envia sozinha o que o servidor mandar,
+// no ritmo e nos limites decididos por ele. Nos dois modos, só registra o que foi enviado de fato.
 ;(() => {
   "use strict"
   if (window.__oosFunil) return
@@ -308,6 +309,17 @@
       .seg button { border: 0; background: none; padding: 4px 11px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text-2); transition: background .2s, color .2s; }
       .seg button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
 
+      .agent { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--card); border-bottom: 1px solid var(--sep); }
+      .agent .grow { flex: 1; min-width: 0; }
+      .agent .at { font-size: 12.5px; font-weight: 600; }
+      .agent .as { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .agent .as.warn { color: var(--warn); }
+      .agent .as.live { color: var(--accent); }
+      .sw { flex: none; position: relative; width: 36px; height: 22px; border-radius: 99px; background: var(--fill-2); cursor: pointer; transition: background .2s; }
+      .sw span { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s cubic-bezier(.32, .72, 0, 1); }
+      .sw.on { background: var(--accent); }
+      .sw.on span { transform: translateX(14px); }
+
       .body { flex: 1; overflow-y: auto; padding: 14px 12px 18px; scrollbar-width: thin; }
       .enter { animation: enter .26s cubic-bezier(.32, .72, 0, 1); }
       @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -401,6 +413,7 @@
         <span class="logo">${SIMBOLO}</span><span class="title">Funil</span>
         <span class="seg" role="tablist"><button data-tab="chat" class="on" role="tab">Conversa</button><button data-tab="hoje" role="tab">Hoje</button></span>
       </header>
+      <div class="agent"></div>
       <div class="body"></div>
       <div class="toast" role="status"></div>
     </div>
@@ -836,6 +849,252 @@
     )
   }
 
+  // ---------- agente (ADR 0018): envia sozinho o que o servidor mandar ----------
+  // Quem decide quem recebe, o quê e quando (limites, horário, intervalo) é o servidor; aqui só se executa.
+  // Precisa estar ligado neste computador (chave do painel) e no sistema. A tarefa em andamento fica
+  // guardada (agentJob) porque abrir outra conversa recarrega o WhatsApp Web.
+  const agentEl = root.querySelector(".agent")
+  const agent = { on: false, running: false, sending: false, nextAt: 0, job: null, status: "", kind: "" }
+  /** Tempo máximo para abrir a conversa de uma tarefa (inclui recarregar a página). */
+  const OPEN_TIMEOUT = 90_000
+  const norm = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
+  const hhmm = (ms) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+
+  function setAgentStatus(text, kind = "") {
+    agent.status = text
+    agent.kind = kind
+    agentEl.innerHTML = `<span class="sw ${agent.on ? "on" : ""}" role="switch" aria-checked="${agent.on}" aria-label="Ligar o agente neste computador" tabindex="0"><span></span></span>
+      <div class="grow"><div class="at">Agente ${agent.on ? "ligado" : "desligado"}</div><div class="as ${kind}" title="${esc(text)}">${esc(text)}</div></div>`
+  }
+  const saveJob = (job) => {
+    agent.job = job
+    return chrome.storage.local.set({ agentJob: job })
+  }
+  async function toggleAgent() {
+    agent.on = !agent.on
+    agent.nextAt = 0
+    await chrome.storage.local.set({ agentOn: agent.on })
+    if (!agent.on) await saveJob(null)
+    setAgentStatus(agent.on ? "Começando…" : "Desligado neste computador. Nada é enviado sozinho.")
+  }
+  agentEl.addEventListener("click", (e) => e.target.closest(".sw") && toggleAgent())
+  agentEl.addEventListener("keydown", (e) => {
+    if ((e.key === " " || e.key === "Enter") && e.target.closest(".sw")) {
+      e.preventDefault()
+      toggleAgent()
+    }
+  })
+  setAgentStatus("Carregando…")
+  chrome.storage.local.get(["agentOn", "agentJob"]).then(({ agentOn, agentJob }) => {
+    agent.on = !!agentOn
+    // Tarefa velha (o navegador fechou no meio): descarta; se ainda valer, o servidor manda de novo.
+    agent.job = agentJob && Date.now() - agentJob.at < OPEN_TIMEOUT ? agentJob : null
+    setAgentStatus(agent.on ? "Começando…" : "Desligado neste computador. Nada é enviado sozinho.")
+  })
+
+  const agentApi = async (action, extra) => {
+    const r = await api(action, extra)
+    if (!r.ok) throw new Error(r.data?.erro || "O Operacional OS não respondeu.")
+    return r.data
+  }
+  /** Passa o lead para um humano (o agente não mexe mais nele até alguém devolver). */
+  async function handOff(leadId, reason) {
+    await api("agent_human", { leadId, reason })
+    toast(`Passei para um humano: ${reason}`, true)
+  }
+
+  /** Botão de enviar: o da barra da conversa ou o da prévia do anexo. */
+  const sendButton = (inPreview) =>
+    [...document.querySelectorAll('[data-icon="send"], [data-icon="wds-ic-send-filled"], [aria-label="Enviar"], [aria-label="Send"]')].filter(visible).find((el) => (inPreview ? !el.closest("footer") : !!el.closest("footer")))
+  /** Espera aparecer uma mensagem NOSSA nova na conversa (o envio foi de verdade). */
+  async function confirmOut(before, ms) {
+    for (let t = 0; t < ms; t += 500) {
+      const last = lastMessage()
+      if (last && last.id !== before && !last.incoming) return true
+      await sleep(500)
+    }
+    return false
+  }
+  async function sendText(text) {
+    if (!(await writeInComposer(text))) return false
+    await sleep(500)
+    const btn = sendButton(false)
+    if (btn) press(btn)
+    else composer()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }))
+    return true
+  }
+  async function sendFile(caption) {
+    const file = await mediaFile()
+    if (!(await attachFile(file))) return false
+    if (caption && !(await writeCaption(caption))) return false
+    await sleep(700)
+    const btn = sendButton(true)
+    if (!btn) return false
+    press(btn)
+    return true
+  }
+  /** Descarta uma gravação que não deu certo (nada é enviado). */
+  function cancelRecording() {
+    const el = findButton(/excluir|delete|lixeira|descartar|cancel/)
+    if (el) press(el)
+  }
+  /** Áudio como mensagem de voz (mesmo caminho do botão "Enviar como áudio gravado"). Falhou → false, e vai como arquivo. */
+  async function sendVoice() {
+    const giveUp = () => {
+      cancelRecording()
+      disarmVoice()
+      return false
+    }
+    try {
+      const buffer = await (await mediaFile()).arrayBuffer()
+      voice = { phase: "armed", micClicked: false }
+      window.postMessage({ __oos: "ping" }, location.origin)
+      window.postMessage({ __oos: "arm", buffer }, location.origin, [buffer])
+      await sleep(300)
+      if (!voice?.armedOk) return giveUp()
+      voice.micClicked = clickMic()
+      if (!voice.micClicked) return giveUp()
+      // Sem tocar em poucos segundos (ex.: o Chrome segura o som numa página recém-aberta): desiste e manda como arquivo.
+      for (let i = 0; i < 32 && voice && voice.phase !== "playing"; i++) await sleep(250)
+      if (voice?.phase !== "playing") return giveUp()
+      const limit = Date.now() + ((voice.seconds || 120) + 20) * 1000
+      while (voice && !voice.pauseTried && Date.now() < limit) await sleep(500)
+      const btn = voice?.pauseTried ? sendButton(false) || findButton(/send|enviar/, /cancel|delete|excluir|lixeira/) : null
+      if (!btn) return giveUp()
+      press(btn)
+      voice = null
+      return true
+    } catch {
+      return giveUp()
+    }
+  }
+
+  /** Envia o passo do funil que está na tela e registra. `afterReply`: a IA mandou seguir porque ele respondeu (não espera os dias). */
+  async function sendStep(job, next, afterReply = false) {
+    const lead = state.data.lead
+    if (!next || next.index !== job.step || (!next.due && !afterReply)) return setAgentStatus("O passo mudou. Pedindo a próxima tarefa…")
+    if (next.kind !== "texto" && !next.media) return handOff(lead.id, next.mediaNote || `falta o arquivo do passo "${next.label}"`)
+    setAgentStatus(`Enviando “${next.label}” para ${lead.name}…`, "live")
+    const before = lastMessage()?.id ?? null
+    const ok = next.kind === "texto" ? await sendText(next.text) : next.kind === "video" ? await sendFile(next.text) : (await sendVoice()) || (await sendFile(""))
+    if (!ok || !(await confirmOut(before, next.kind === "texto" ? 15_000 : 120_000))) return handOff(lead.id, `não consegui enviar "${next.label}" pelo WhatsApp Web`)
+    await act("agent_sent", { step: next.index, text: next.text || "" }, `Agente enviou “${next.label}” para ${lead.name}.`)
+  }
+
+  /** Ele respondeu: a IA lê a conversa e decide (seguir o roteiro, responder, parar ou chamar um humano). */
+  async function replyTo(job) {
+    const lead = state.data.lead
+    setAgentStatus(`Lendo a resposta de ${lead.name}…`, "live")
+    const r = await agentApi("agent_reply", { leadId: lead.id, messages: extractMessages().slice(-30) })
+    state.data = { found: true, ...r.view }
+    render()
+    if (r.action === "parar") return toast(`${lead.name} saiu do funil: ${r.intent}.`)
+    if (r.action === "humano") return toast(`Passei ${lead.name} para um humano: ${r.reason}`, true)
+    if (r.action === "proximo_passo") return sendStep({ ...job, step: state.data.next?.index }, state.data.next, true)
+    setAgentStatus(`Respondendo ${lead.name}…`, "live")
+    const before = lastMessage()?.id ?? null
+    if (!(await sendText(r.message)) || !(await confirmOut(before, 15_000))) return handOff(lead.id, "não consegui enviar a resposta pelo WhatsApp Web")
+    state.data = { found: true, ...(await agentApi("agent_free_sent", { leadId: lead.id, text: r.message })) }
+    toast(`Agente respondeu ${lead.name} (${r.intent}).`)
+    render()
+  }
+
+  /** Abre a conversa da tarefa (recarrega o WhatsApp Web no número) ou continua esperando ela abrir. */
+  async function runJob(job) {
+    const ready = state.data?.lead?.id === job.leadId && !state.loading && !!state.title
+    if (!ready) {
+      if (Date.now() - job.at > OPEN_TIMEOUT) {
+        await saveJob(null)
+        if (job.kind !== "ler") await handOff(job.leadId, "a conversa não abriu (o número tem WhatsApp?)")
+        return
+      }
+      if (job.phase !== "abrindo" && job.phone) {
+        await saveJob({ ...job, phase: "abrindo" })
+        location.href = `https://web.whatsapp.com/send?phone=${job.phone}`
+      }
+      return setAgentStatus(`Abrindo a conversa de ${job.name}…`, "live")
+    }
+    // A partir daqui a tarefa não volta (recarregar no meio não envia duas vezes).
+    await saveJob(null)
+    agent.sending = true
+    try {
+      if (job.kind === "ler") {
+        if (lastMessage()?.incoming) await act("replied", { auto: true }, `${job.name} respondeu.`)
+      } else if (job.kind === "responder") await replyTo(job)
+      else await sendStep(job, state.data.next)
+    } catch (e) {
+      toast(e.message || String(e), true)
+    } finally {
+      agent.sending = false
+      baselineLast = lastMessage()?.id ?? null
+      agent.nextAt = Date.now() + 10_000
+    }
+  }
+
+  /** Conversas não lidas que são de leads: abre a primeira (clicando nela) para o agente responder. */
+  const looked = new Map()
+  async function openUnreadLead() {
+    const side = document.querySelector("#pane-side")
+    if (!side) return false
+    for (const row of side.querySelectorAll('[role="listitem"], [role="row"]')) {
+      if (![...row.querySelectorAll("[aria-label]")].some((el) => /n[ãa]o lida|unread/i.test(el.getAttribute("aria-label")))) continue
+      const title = row.querySelector("span[title]")?.getAttribute("title")?.trim()
+      if (!title || title === state.title || (looked.get(title) ?? 0) > Date.now()) continue
+      looked.set(title, Date.now() + 10 * 60_000)
+      // Só conversa de lead: número igual ao de um lead, ou nome IGUAL ao do lead. Conversas pessoais nunca são abertas.
+      const d = digits(title)
+      const phoneLike = /^[+\d\s()-]+$/.test(title) && d.length >= 10
+      const r = await api("lookup", { phone: phoneLike ? d : "", name: phoneLike ? "" : title })
+      const lead = r.ok && r.data?.found ? r.data.lead : null
+      if (!lead || (r.data.byName && norm(lead.name) !== norm(title))) continue
+      await saveJob({ kind: "ler", leadId: lead.id, name: lead.name, phone: null, at: Date.now(), phase: "abrindo" })
+      setAgentStatus(`${lead.name} mandou mensagem. Abrindo…`, "live")
+      press(row.querySelector('[role="gridcell"]') || row)
+      return true
+    }
+    return false
+  }
+
+  const PLAN_TEXT = {
+    desligado: "Desligado no sistema (Prospecção › Agente).",
+    fora_do_horario: "Fora do horário de envio.",
+    limite_do_dia: "Limite de envios do dia atingido.",
+    sem_tarefas: "Nada para enviar agora.",
+  }
+  async function agentTick() {
+    if (!agent.on || agent.running || !document.querySelector("#pane-side")) return
+    agent.running = true
+    try {
+      if (agent.job) return await runJob(agent.job)
+      if (Date.now() < agent.nextAt || state.loading) return
+      // Não atropela quem está mexendo nesta aba.
+      if (pendingSend || voice) return setAgentStatus("Esperando você concluir o envio manual…")
+      if (flat(composer()?.innerText)) return setAgentStatus("Esperando você terminar de digitar…")
+      if (await openUnreadLead()) return
+      const r = await api("agent_agenda", {})
+      if (!r.ok) {
+        agent.nextAt = Date.now() + 60_000
+        return setAgentStatus(r.data?.erro || "O Operacional OS não respondeu.", "warn")
+      }
+      const p = r.data
+      const c = p.counts || {}
+      const tail = ` · ${c.sent ?? 0} hoje${c.forHuman ? ` · ${c.forHuman} com humano` : ""}`
+      if (p.state !== "agir" || !p.action) {
+        agent.nextAt = Date.now() + Math.max(15, p.retryAfterSec || 60) * 1000
+        return setAgentStatus((p.state === "aguardar" ? `Próximo envio às ${hhmm(agent.nextAt)}.` : PLAN_TEXT[p.state] || p.state) + tail, p.state === "desligado" ? "warn" : "")
+      }
+      const d = digits(p.lead?.contact)
+      await saveJob({ kind: p.action.kind, leadId: p.action.leadId, step: p.action.step, name: p.lead?.name || "lead", phone: d.length <= 11 ? `55${d}` : d, at: Date.now(), phase: "nova" })
+      await runJob(agent.job)
+    } catch (e) {
+      agent.nextAt = Date.now() + 60_000
+      setAgentStatus(e.message || String(e), "warn")
+    } finally {
+      agent.running = false
+    }
+  }
+  setInterval(agentTick, 3000)
+
   // ---------- acompanha a conversa aberta e as mensagens novas ----------
   let busy = false
   let ticks = 0
@@ -855,6 +1114,8 @@
       if (lead && ++ticks % 4 === 0) await reconcile()
       if (!lead || !last || last.id === baselineLast) return
       baselineLast = last.id
+      // O agente está enviando: quem registra é ele (não registrar duas vezes).
+      if (agent.sending) return
       if (!last.incoming && pendingSend && pendingSend.leadId === lead.id && pendingSend.title === title) {
         // A pessoa apertou Enter: registra o passo.
         const p = pendingSend
@@ -864,7 +1125,8 @@
       } else {
         // Enviou algo sem o botão (digitou, mandou áudio/vídeo) ou ele respondeu: a leitura da conversa acerta a etapa.
         await reconcile()
-        if (last.incoming && state.data?.next?.waitingReply) await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
+        // Com o agente ligado, toda resposta conta (ele decide o que fazer), não só a que libera um passo.
+        if (last.incoming && (state.data?.next?.waitingReply || agent.on)) await act("replied", { auto: true }, "Ele respondeu — próximo passo liberado.")
       }
     } finally {
       busy = false

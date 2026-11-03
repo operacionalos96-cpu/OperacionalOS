@@ -39,7 +39,7 @@ async function media(url) {
   }
 }
 
-const ACTIONS = new Set(["ping", "funnel", "lookup", "sent", "replied", "stop", "today", "sync"])
+const ACTIONS = new Set(["ping", "funnel", "lookup", "sent", "replied", "stop", "today", "sync", "agent_agenda", "agent_sent", "agent_reply", "agent_free_sent", "agent_human"])
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Só aceita pedidos do próprio popup ou do WhatsApp Web.

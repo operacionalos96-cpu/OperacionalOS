@@ -16,6 +16,7 @@ export const SCOPES = {
   "context:read": "Ler o contexto do job (dados do lead etc.)",
   "knowledge:read": "Ler aprendizados e hipóteses",
   "whatsapp:funnel": "Extensão do WhatsApp: achar lead pelo número, ver o passo do funil e registrar envio/resposta",
+  "whatsapp:agent": "Agente do WhatsApp: pegar a próxima ação, pedir a resposta da IA e registrar o que enviou sozinho",
 } as const
 export type Scope = keyof typeof SCOPES
 

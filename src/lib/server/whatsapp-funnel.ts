@@ -3,15 +3,16 @@ import { randomUUID } from "node:crypto"
 import { publicId } from "@/lib/domain/jobs"
 import { makeEvent, type BusinessEventType } from "@/lib/domain/ai-office"
 import { findLeadByName, findLeadByPhone, followupsDue, funnelOf, mergeFunnel, mergeVideoPlan, nextStep, renderTemplate, repliedPatch, sentPatch, type FunnelStep } from "@/lib/domain/funnel"
-import { contactedPatch } from "@/lib/domain/prospecting"
+import { approvePatch, contactedPatch, reviewStatus } from "@/lib/domain/prospecting"
 import { stepMediaFor } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
+import { AGENT_ID, agentSentPatch } from "@/lib/domain/whatsapp-agent"
 import { supabaseAdmin } from "./supabase-admin"
 
 /**
- * Funil de WhatsApp no servidor (usado pela extensão do Chrome). A extensão NUNCA envia
- * sozinha: ela escreve a mensagem na caixa do WhatsApp Web e a pessoa aperta Enter.
- * Aqui só se consulta o lead/passo e se registra o que o humano fez.
+ * Funil de WhatsApp no servidor (usado pela extensão do Chrome). No modo manual a extensão
+ * escreve a mensagem e a pessoa aperta Enter; com o agente ligado (ADR 0018) ela envia sozinha.
+ * Aqui só se consulta o lead/passo e se registra o que foi enviado.
  */
 export class FunnelError extends Error {
   constructor(
@@ -35,7 +36,7 @@ export async function saveFunnel(raw: unknown, by: string, rawPlan?: unknown) {
   return { steps, video }
 }
 
-async function allLeads(): Promise<Lead[]> {
+export async function allLeads(): Promise<Lead[]> {
   const out: Lead[] = []
   for (let from = 0; from < 20_000; from += 1000) {
     const { data, error } = await supabaseAdmin().from("leads").select("data").order("id").range(from, from + 999)
@@ -46,23 +47,25 @@ async function allLeads(): Promise<Lead[]> {
   return out
 }
 
-async function getLead(id: string): Promise<Lead> {
+export async function getLead(id: string): Promise<Lead> {
   if (!id || id.length > 64) throw new FunnelError("lead inválido")
   const { data } = await supabaseAdmin().from("leads").select("data").eq("id", id).maybeSingle()
   if (!data) throw new FunnelError("lead não encontrado", 404)
   return data.data as Lead
 }
 
-async function saveLead(l: Lead) {
+export async function saveLead(l: Lead) {
   const { error } = await supabaseAdmin().from("leads").update({ data: l, updated_at: new Date().toISOString() }).eq("id", l.id)
   if (error) throw error
 }
 
-async function log(l: Lead, actorId: string, text: string, type: BusinessEventType, metadata: Record<string, unknown>) {
+/** Histórico do lead + evento do negócio (sem tipo: só o histórico). */
+export async function log(l: Lead, actorId: string, text: string, type: BusinessEventType | null, metadata: Record<string, unknown>) {
   const at = new Date().toISOString()
   const db = supabaseAdmin()
   const activity = { id: randomUUID(), leadId: l.id, kind: "mensagem", text: text.slice(0, 4000), authorId: actorId, createdAt: at }
   await db.from("activities").insert({ id: activity.id, data: activity })
+  if (!type) return
   const e = makeEvent({ type, entity: { type: "lead", id: l.id }, actor: { type: "human", id: actorId }, metadata: { name: l.name, via: "extensao_whatsapp", ...metadata } }, publicId("evt"), at)
   const { error } = await db.from("events").insert(e)
   if (error) console.warn("[funil] evento não gravou", error.message)
@@ -76,7 +79,7 @@ async function mediaLink(media: FunnelStep["media"] | null) {
 }
 
 /** O que a extensão mostra para o lead da conversa aberta. */
-async function view(l: Lead, steps: FunnelStep[], now: Date) {
+export async function view(l: Lead, steps: FunnelStep[], now: Date) {
   const f = funnelOf(l)
   const n = nextStep(l, steps, now)
   // Vídeo: o personalizado do lead (aprovado) tem prioridade sobre o arquivo padrão do funil.
@@ -115,7 +118,8 @@ export async function lookupByPhone(phone: string, name = "") {
   return l ? { found: true as const, byName: !byPhone, ...(await view(l, steps, new Date())) } : { found: false as const }
 }
 
-export async function markSent(leadId: string, index: number, text: string, actorId: string) {
+/** Registra o envio do passo `index`. `agent`: quem enviou foi o agente (conta nos limites dele; abertura aprova o lead em nome dele). */
+export async function markSent(leadId: string, index: number, text: string, actorId: string, opts: { agent?: boolean } = {}) {
   const [steps, l] = await Promise.all([loadFunnel(), getLead(leadId)])
   if (!Number.isInteger(index) || index < 0 || index >= steps.length) throw new FunnelError("passo inválido")
   const at = new Date().toISOString()
@@ -126,9 +130,10 @@ export async function markSent(leadId: string, index: number, text: string, acto
     ...(index === 0 && l.contactStatus !== "contacted" ? contactedPatch(l, body, at, "whatsapp") : {}),
     funnel: sentPatch(l, index, at, actorId),
     lastActivityAt: at,
+    ...(opts.agent ? { agent: agentSentPatch(l, index, at), ...(index === 0 && reviewStatus(l) === "pending" ? approvePatch(l, AGENT_ID, at) : {}) } : {}),
   }
   await saveLead(next)
-  await log(next, actorId, `Funil · ${step.label} (WhatsApp): ${body}`, index === 0 ? "lead.contacted" : "lead.followup_sent", { step: index, kind: step.kind, label: step.label, channel: "whatsapp" })
+  await log(next, actorId, `Funil · ${step.label} (WhatsApp${opts.agent ? ", pelo agente" : ""}): ${body}`, index === 0 ? "lead.contacted" : "lead.followup_sent", { step: index, kind: step.kind, label: step.label, channel: "whatsapp", ...(opts.agent ? { agent: true } : {}) })
   return view(next, steps, new Date())
 }
 

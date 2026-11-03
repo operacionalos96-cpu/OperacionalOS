@@ -4,6 +4,7 @@ import { requireMember } from "@/lib/server/auth"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { createWebhook, rotateWebhookSecret } from "@/lib/server/webhooks"
 import { saveFunnel } from "@/lib/server/whatsapp-funnel"
+import { loadAgentSettings, releaseToAgent, saveAgentSettings } from "@/lib/server/whatsapp-agent"
 import { createWorker, rotateWorkerToken, type Scope } from "@/lib/server/workers"
 import type { LeadVideo } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
@@ -89,10 +90,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
       case "funnel.update":
         return NextResponse.json({ ok: true, ...(await saveFunnel(b.steps, member.teamId, b.video)) }, { headers: noStore })
       case "ext.connect": {
-        // Token da extensão do WhatsApp: só o escopo do funil; aparece UMA vez.
-        const r = await createWorker({ name: `Extensão WhatsApp (${member.email.split("@")[0] || member.teamId})`, engine: "chrome-extension", capabilities: [], scopes: ["whatsapp:funnel"], createdBy: member.teamId })
+        // Token da extensão do WhatsApp: funil + agente (o agente só envia se estiver ligado em agent.update); aparece UMA vez.
+        const r = await createWorker({ name: `Extensão WhatsApp (${member.email.split("@")[0] || member.teamId})`, engine: "chrome-extension", capabilities: [], scopes: ["whatsapp:funnel", "whatsapp:agent"], createdBy: member.teamId })
         return NextResponse.json(r, { headers: noStore })
       }
+      // ---------- agente do WhatsApp (ADR 0018) ----------
+      case "agent.get":
+        return NextResponse.json({ ok: true, data: await loadAgentSettings() }, { headers: noStore })
+      case "agent.update":
+        return NextResponse.json({ ok: true, data: await saveAgentSettings(b.data, member.teamId) }, { headers: noStore })
+      case "agent.release":
+        if (!id) return bad("lead inválido")
+        return NextResponse.json({ ok: true, lead: await releaseToAgent(id, member.teamId) }, { headers: noStore })
       // ---------- vídeo de análise do lead (revisão humana) ----------
       case "video.url":
       case "video.approve":
