@@ -910,11 +910,24 @@
   /** Botão de enviar: o da barra da conversa ou o da prévia do anexo. */
   const sendButton = (inPreview) =>
     [...document.querySelectorAll('[data-icon="send"], [data-icon="wds-ic-send-filled"], [aria-label="Enviar"], [aria-label="Send"]')].filter(visible).find((el) => (inPreview ? !el.closest("footer") : !!el.closest("footer")))
-  /** Espera aparecer uma mensagem NOSSA nova na conversa (o envio foi de verdade). */
-  async function confirmOut(before, ms) {
+  /** Texto das mensagens da conversa (sem a caixa de digitar). */
+  const chatText = () => {
+    const m = main()
+    if (!m) return ""
+    const footer = m.querySelector("footer")?.innerText || ""
+    return flat(m.innerText.replace(footer, ""))
+  }
+  /**
+   * Espera o envio aparecer na conversa. Vale qualquer um: uma mensagem NOSSA nova (pelo id do WhatsApp) ou,
+   * com texto, a caixa vazia e o texto na conversa (conversa nova às vezes monta as mensagens sem o id de sempre).
+   */
+  async function confirmOut(before, ms, text = "") {
+    const want = flat(text).slice(0, 60)
+    const hadText = !!want && chatText().includes(want)
     for (let t = 0; t < ms; t += 500) {
       const last = lastMessage()
       if (last && last.id !== before && !last.incoming) return true
+      if (want && !hadText && !flat(composer()?.innerText) && chatText().includes(want)) return true
       await sleep(500)
     }
     return false
@@ -981,7 +994,7 @@
     setAgentStatus(`Enviando “${next.label}” para ${lead.name}…`, "live")
     const before = lastMessage()?.id ?? null
     const ok = next.kind === "texto" ? await sendText(next.text) : next.kind === "video" ? await sendFile(next.text) : (await sendVoice()) || (await sendFile(""))
-    if (!ok || !(await confirmOut(before, next.kind === "texto" ? 15_000 : 120_000))) return handOff(lead.id, `não consegui enviar "${next.label}" pelo WhatsApp Web`)
+    if (!ok || !(await confirmOut(before, next.kind === "texto" ? 15_000 : 120_000, next.text || ""))) return handOff(lead.id, `não consegui enviar "${next.label}" pelo WhatsApp Web`)
     await act("agent_sent", { step: next.index, text: next.text || "" }, `Agente enviou “${next.label}” para ${lead.name}.`)
   }
 
@@ -998,7 +1011,7 @@
     if (r.action === "proximo_passo") return sendStep({ ...job, step: state.data.next?.index }, state.data.next, true)
     setAgentStatus(`Respondendo ${lead.name}…`, "live")
     const before = lastMessage()?.id ?? null
-    if (!(await sendText(r.message)) || !(await confirmOut(before, 15_000))) return handOff(lead.id, "não consegui enviar a resposta pelo WhatsApp Web")
+    if (!(await sendText(r.message)) || !(await confirmOut(before, 15_000, r.message))) return handOff(lead.id, "não consegui enviar a resposta pelo WhatsApp Web")
     state.data = { found: true, ...(await agentApi("agent_free_sent", { leadId: lead.id, text: r.message })) }
     toast(`Agente respondeu ${lead.name} (${r.intent}).`)
     render()
