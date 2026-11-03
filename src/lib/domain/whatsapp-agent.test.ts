@@ -143,6 +143,15 @@ describe("agente do WhatsApp", () => {
     expect(agentPlan([l, lead({})], STEPS, ON, new Date(TUE_10.getTime() + 8 * 60_000)).state).toBe("agir")
   })
 
+  it("passar para humano também segura o intervalo (tentativa que falhou não emenda na próxima)", () => {
+    const at = "2026-11-03T12:58:00Z"
+    const handed = lead({ id: "h", agent: { sends: [], needsHuman: { at, reason: "não consegui enviar" } } })
+    const plan = agentPlan([handed, lead({ id: "abre" })], STEPS, ON, TUE_10)
+    expect(plan.state).toBe("aguardar")
+    expect(plan.counts.sent).toBe(0)
+    expect(agentPlan([handed, lead({ id: "abre" })], STEPS, ON, new Date(TUE_10.getTime() + 8 * 60_000)).action?.leadId).toBe("abre")
+  })
+
   it("respondeu depois do fim do funil vai para humano, não para o agente", () => {
     const done = contacted({}, { step: 3, repliedAt: "2026-11-03T12:00:00Z" })
     expect(agentPlan([done], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", counts: { forHuman: 1 } })

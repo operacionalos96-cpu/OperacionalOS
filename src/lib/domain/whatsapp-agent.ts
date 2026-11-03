@@ -105,14 +105,17 @@ export function releasePatch(l: Pick<Lead, "agent">): LeadAgent {
   return a
 }
 
-/** Envios do agente hoje (Brasília). */
+/**
+ * Envios do agente hoje (Brasília). `lastAt` é a última AÇÃO dele (envio ou passar para humano): o intervalo
+ * conta a partir dela, para uma tentativa que falhou não emendar na próxima empresa sem espera.
+ */
 export function agentCounts(leads: Pick<Lead, "agent">[], now: Date) {
   const today = brClock(now).day
   let sent = 0
   let opened = 0
   let lastAt: string | undefined
   let lastStep: number | undefined
-  for (const l of leads)
+  for (const l of leads) {
     for (const s of l.agent?.sends ?? []) {
       if (!lastAt || s.at > lastAt) {
         lastAt = s.at
@@ -122,6 +125,13 @@ export function agentCounts(leads: Pick<Lead, "agent">[], now: Date) {
       sent++
       if (s.step === 0) opened++
     }
+    const h = l.agent?.needsHuman?.at
+    // Passou para humano depois do último envio: conta como ação (intervalo), sem contar como envio.
+    if (h && /^\d{4}-/.test(h) && (!lastAt || h > lastAt)) {
+      lastAt = h
+      lastStep = undefined
+    }
+  }
   return { sent, opened, lastAt, lastStep }
 }
 
