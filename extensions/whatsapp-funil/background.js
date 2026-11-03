@@ -45,6 +45,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Só aceita pedidos do próprio popup ou do WhatsApp Web.
   const from = sender.url || ""
   if (!msg || sender.id !== chrome.runtime.id || !(from.startsWith("https://web.whatsapp.com/") || from.startsWith(`chrome-extension://${chrome.runtime.id}/`))) return false
+  // Agente: abre a conversa do número NA MESMA aba, pelo Chrome (a página do WhatsApp não consegue trocar o próprio endereço).
+  if (msg.type === "open" && typeof msg.phone === "string" && /^\d{10,15}$/.test(msg.phone) && sender.tab?.id) {
+    chrome.tabs.update(sender.tab.id, { url: `https://web.whatsapp.com/send?phone=${msg.phone}` }).then(
+      () => reply({ ok: true }),
+      (e) => reply({ ok: false, erro: String(e?.message || e) }),
+    )
+    return true
+  }
   if (msg.type === "media" && typeof msg.url === "string") {
     media(msg.url).then(reply)
     return true

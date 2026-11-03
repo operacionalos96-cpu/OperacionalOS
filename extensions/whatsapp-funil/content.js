@@ -857,6 +857,8 @@
   const agent = { on: false, running: false, sending: false, nextAt: 0, job: null, status: "", kind: "" }
   /** Tempo máximo para abrir a conversa de uma tarefa (inclui recarregar a página). */
   const OPEN_TIMEOUT = 90_000
+  /** Sem a conversa aberta depois disso, pede para abrir de novo (uma vez). */
+  const OPEN_RETRY = 30_000
   const norm = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
   const hhmm = (ms) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 
@@ -999,20 +1001,28 @@
     render()
   }
 
+  /** Pede ao Chrome para abrir a conversa do número nesta aba (recarrega o WhatsApp Web). */
+  async function openNumber(phone) {
+    const r = await chrome.runtime.sendMessage({ type: "open", phone }).catch(() => null)
+    if (!r?.ok) location.href = `https://web.whatsapp.com/send?phone=${phone}` // plano B
+  }
+
   /** Abre a conversa da tarefa (recarrega o WhatsApp Web no número) ou continua esperando ela abrir. */
   async function runJob(job) {
     const ready = state.data?.lead?.id === job.leadId && !state.loading && !!state.title
     if (!ready) {
-      if (Date.now() - job.at > OPEN_TIMEOUT) {
+      const waited = Date.now() - job.at
+      if (waited > OPEN_TIMEOUT) {
         await saveJob(null)
         if (job.kind !== "ler") await handOff(job.leadId, "a conversa não abriu (o número tem WhatsApp?)")
         return
       }
-      if (job.phase !== "abrindo" && job.phone) {
-        await saveJob({ ...job, phase: "abrindo" })
-        location.href = `https://web.whatsapp.com/send?phone=${job.phone}`
+      const retry = job.phase === "abrindo" && !job.retried && job.phone && Date.now() - (job.openedAt || job.at) > OPEN_RETRY
+      if ((job.phase !== "abrindo" || retry) && job.phone) {
+        await saveJob({ ...job, phase: "abrindo", openedAt: Date.now(), retried: job.phase === "abrindo" })
+        await openNumber(job.phone)
       }
-      return setAgentStatus(`Abrindo a conversa de ${job.name}…`, "live")
+      return setAgentStatus(`Abrindo a conversa de ${job.name}… (${Math.round(waited / 1000)} s)`, "live")
     }
     // A partir daqui a tarefa não volta (recarregar no meio não envia duas vezes).
     await saveJob(null)
