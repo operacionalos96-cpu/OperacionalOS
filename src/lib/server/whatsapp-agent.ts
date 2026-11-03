@@ -1,7 +1,7 @@
 import "server-only"
 import { funnelOf, nextStep } from "@/lib/domain/funnel"
 import type { Lead } from "@/lib/domain/types"
-import { FREE_REPLY, agentPlan, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
+import { FREE_REPLY, agentPlan, blockersText, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
 import { AiError, aiConfigured, generateJson } from "./ai"
 import { rateHit } from "./rate-limit"
 import { FunnelError, allLeads, getLead, loadFunnel, log, saveLead, stopFunnel, view } from "./whatsapp-funnel"
@@ -29,7 +29,7 @@ export async function agentAgenda(ownerId: string) {
   const [s, steps, leads] = await Promise.all([loadAgentSettings(), loadFunnel(), allLeads()])
   const now = new Date()
   const plan = agentPlan(leads, steps, s, now, ownerId)
-  if (plan.state !== "agir" || !plan.action) return plan
+  if (plan.state !== "agir" || !plan.action) return { ...plan, ...(plan.blockers ? { blockersText: blockersText(plan.blockers) } : {}) }
   const l = leads.find((x) => x.id === plan.action!.leadId)!
   return { ...plan, lead: { id: l.id, name: l.name, contact: l.contact ?? null }, view: await view(l, steps, now) }
 }

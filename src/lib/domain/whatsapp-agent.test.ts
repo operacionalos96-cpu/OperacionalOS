@@ -7,6 +7,8 @@ import {
   agentCounts,
   agentPlan,
   agentSentPatch,
+  blockersText,
+  openingBlockers,
   brClock,
   buildReplyPrompt,
   gapAfter,
@@ -76,6 +78,15 @@ describe("agente do WhatsApp", () => {
     const descartado = lead({ id: "desc", review: { status: "rejected" } })
     const humano = lead({ id: "hum", agent: { sends: [], needsHuman: { at: "x", reason: "y" } } })
     expect(openingsToSend([ok, low, fixo, siteNaoLido, siteLido, outro, descartado, humano], ON, "u1").map((l) => l.id)).toEqual(["ok", "lido"])
+  })
+
+  it("diz por que a Fila não vira abertura; nota mínima 0 aceita lead sem nota", () => {
+    const leads = [lead({ id: "ok" }), lead({ analysis: {} }), lead({ analysis: { qualificationScore: 3 } }), lead({ contact: "(11) 3333-4444" }), lead({ website: "https://x.com.br" })]
+    const b = openingBlockers(leads, ON, "u1")
+    expect(b).toMatchObject({ fila: 5, prontas: 1, sem_nota: 1, nota_baixa: 1, sem_celular: 1, site_nao_lido: 1 })
+    expect(blockersText(b)).toBe("Das 5 da Fila: 1 sem nota de qualificação, 1 com nota abaixo do mínimo, 1 com site ainda não lido, 1 sem celular.")
+    expect(openingsToSend(leads, { ...ON, minQualification: 0 }, "u1")).toHaveLength(3) // ok, sem nota e nota 3
+    expect(agentPlan([lead({ analysis: {} })], STEPS, ON, TUE_10)).toMatchObject({ state: "sem_tarefas", blockers: { sem_nota: 1 } })
   })
 
   it("alterna: depois de uma abertura vem uma conversa (resposta → follow-up); depois, outra abertura", () => {

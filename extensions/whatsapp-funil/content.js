@@ -1102,7 +1102,8 @@
       const tail = ` · ${c.sent ?? 0} hoje${c.forHuman ? ` · ${c.forHuman} com humano` : ""}`
       if (p.state !== "agir" || !p.action) {
         agent.nextAt = Date.now() + Math.max(15, p.retryAfterSec || 60) * 1000
-        return setAgentStatus((p.state === "aguardar" ? `Próximo envio às ${hhmm(agent.nextAt)}.` : PLAN_TEXT[p.state] || p.state) + tail, p.state === "desligado" ? "warn" : "")
+        const why = p.state === "sem_tarefas" && p.blockersText ? ` ${p.blockersText}` : ""
+        return setAgentStatus((p.state === "aguardar" ? `Próximo envio às ${hhmm(agent.nextAt)}.` : PLAN_TEXT[p.state] || p.state) + why + tail, p.state === "desligado" || why ? "warn" : "")
       }
       const d = digits(p.lead?.contact)
       await saveJob({ kind: p.action.kind, leadId: p.action.leadId, step: p.action.step, name: p.lead?.name || "lead", phone: d.length <= 11 ? `55${d}` : d, at: Date.now(), phase: "nova" })

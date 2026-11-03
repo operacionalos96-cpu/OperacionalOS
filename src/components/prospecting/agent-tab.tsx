@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { BotIcon, CheckIcon, LoaderIcon, TriangleAlertIcon, Undo2Icon, UserRoundIcon } from "lucide-react"
-import { DEFAULT_AGENT, FREE_REPLY, agentPlan, repliesForHuman, type AgentPlan, type AgentSettings } from "@/lib/domain/whatsapp-agent"
+import { DEFAULT_AGENT, FREE_REPLY, agentPlan, blockersText, repliesForHuman, type AgentPlan, type AgentSettings } from "@/lib/domain/whatsapp-agent"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { agentSettings } from "@/lib/agent-store"
@@ -124,6 +124,7 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
               Próximo: {ACTION_TEXT[plan.action.kind]} <Link href={`/pipeline/${next.id}`} className="font-medium text-foreground hover:underline">{next.name}</Link>
             </p>
           )}
+          {plan.blockers && !plan.counts.openings && <p className="text-xs text-warning">{blockersText(plan.blockers)} {plan.blockers.site_nao_lido ? "Use “Ler sites” no topo da Prospecção. " : ""}{plan.blockers.sem_nota ? "Para incluir quem não tem nota, use nota mínima 0." : ""}</p>}
           <p className="tabular text-xs text-muted-foreground">
             Hoje: {plan.counts.sent}/{saved.maxSendsPerDay} envios · {plan.counts.opened}/{saved.maxNewPerDay} conversas novas · na fila: {plan.counts.replies} respostas, {plan.counts.followups} follow-ups, {plan.counts.openings} aberturas
           </p>
