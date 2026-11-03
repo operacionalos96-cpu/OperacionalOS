@@ -4,7 +4,8 @@ import { requireMember } from "@/lib/server/auth"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { createWebhook, rotateWebhookSecret } from "@/lib/server/webhooks"
 import { saveFunnel } from "@/lib/server/whatsapp-funnel"
-import { loadAgentSettings, releaseToAgent, saveAgentSettings } from "@/lib/server/whatsapp-agent"
+import { callNow, loadAgentSettings, releaseToAgent, saveAgentSettings } from "@/lib/server/whatsapp-agent"
+import { FunnelError } from "@/lib/server/whatsapp-funnel"
 import { createWorker, rotateWorkerToken, type Scope } from "@/lib/server/workers"
 import type { LeadVideo } from "@/lib/domain/prospect-video"
 import type { Lead } from "@/lib/domain/types"
@@ -99,6 +100,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
         return NextResponse.json({ ok: true, data: await loadAgentSettings() }, { headers: noStore })
       case "agent.update":
         return NextResponse.json({ ok: true, data: await saveAgentSettings(b.data, member.teamId) }, { headers: noStore })
+      case "agent.callNow":
+        if (!id) return bad("lead inválido")
+        try {
+          return NextResponse.json({ ok: true, lead: await callNow(id, member.teamId) }, { headers: noStore })
+        } catch (e) {
+          if (e instanceof FunnelError) return bad(e.message, e.status)
+          throw e
+        }
       case "agent.release":
         if (!id) return bad("lead inválido")
         return NextResponse.json({ ok: true, lead: await releaseToAgent(id, member.teamId) }, { headers: noStore })

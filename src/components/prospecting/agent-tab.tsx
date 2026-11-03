@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { BotIcon, CheckIcon, LoaderIcon, TriangleAlertIcon, Undo2Icon, UserRoundIcon } from "lucide-react"
+import { BotIcon, SendIcon, CheckIcon, LoaderIcon, TriangleAlertIcon, Undo2Icon, UserRoundIcon } from "lucide-react"
 import { DEFAULT_AGENT, FREE_REPLY, agentPlan, blockersText, repliesForHuman, type AgentPlan, type AgentSettings } from "@/lib/domain/whatsapp-agent"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
 import { agentSettings } from "@/lib/agent-store"
 import { useFunnel } from "@/lib/funnel-store"
-import { Field, Segmented } from "@/components/shared/fields"
+import { Field, LeadSelect, Segmented } from "@/components/shared/fields"
 import { Led } from "@/components/shared/layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -76,6 +76,18 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
       toast.error(e instanceof Error ? e.message : "Não salvou")
     } finally {
       setBusy(false)
+    }
+  }
+
+  const [callId, setCallId] = useState<string>()
+  async function callNow() {
+    if (!callId) return
+    try {
+      await agentSettings.callNow(callId)
+      toast.success("Pedido feito: o agente chama este lead na próxima rodada (até ~1 min)")
+      setCallId(undefined)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu para pedir")
     }
   }
 
@@ -193,6 +205,21 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
       </section>
 
       <div className="grid gap-4">
+        <section className="grid gap-2">
+          <h3 className="t-label">Chamar agora</h3>
+          <div className="grid gap-2 rounded-xl border bg-card p-3">
+            <p className="text-xs text-muted-foreground">O agente manda a abertura para este lead na próxima rodada, fora da ordem da Fila e sem esperar o intervalo (mesmo que a conversa já tenha mensagens). Só para lead em Novo.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-48 flex-1">
+                <LeadSelect value={callId} onChange={setCallId} placeholder="Escolha o lead" />
+              </div>
+              <Button size="sm" onClick={() => void callNow()} disabled={!callId || !saved.enabled} title={saved.enabled ? "" : "Ligue o agente primeiro"}>
+                <SendIcon /> Chamar agora
+              </Button>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-2">
           <h3 className="t-label">Precisa de humano ({handedOff.length + afterFunnel.length})</h3>
           {handedOff.length + afterFunnel.length ? (

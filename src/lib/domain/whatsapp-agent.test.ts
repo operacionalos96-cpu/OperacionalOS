@@ -7,6 +7,8 @@ import {
   agentCounts,
   agentPlan,
   agentSentPatch,
+  callNowPatch,
+  forceOpening,
   isTestLead,
   blockersText,
   openingBlockers,
@@ -162,6 +164,21 @@ describe("agente do WhatsApp", () => {
     expect(plan.state).toBe("aguardar")
     expect(plan.counts.sent).toBe(0)
     expect(agentPlan([handed, lead({ id: "abre" })], STEPS, ON, new Date(TUE_10.getTime() + 8 * 60_000)).action?.leadId).toBe("abre")
+  })
+
+  it("chamar agora: vai na próxima rodada, fora da ordem, sem intervalo e mesmo no limite do dia", () => {
+    const at = "2026-11-03T12:58:00Z" // última ação há 2 min (intervalo de 3–8 ainda não passou)
+    const last = lead({ stage: "contato", contactStatus: "contacted", agent: { sends: [{ at, step: 0 }] }, funnel: { step: 9, history: [], stopped: true } })
+    const first = lead({ id: "primeiro", analysis: { qualificationScore: 10 } })
+    let gabriel = lead({ id: "gabriel", agent: { sends: [], needsHuman: { at, reason: "x" } } })
+    gabriel = { ...gabriel, agent: callNowPatch(gabriel, "2026-11-03T12:59:00Z") }
+    expect(gabriel.agent?.needsHuman).toBeUndefined()
+    expect(forceOpening(gabriel)).toBe(true)
+    expect(agentPlan([last, first, gabriel], STEPS, { ...ON, maxNewPerDay: 1 }, TUE_10)).toMatchObject({ state: "agir", action: { kind: "abertura", leadId: "gabriel" } })
+    // Depois da abertura, o pedido some.
+    expect(agentSentPatch(gabriel, 0, TUE_10.toISOString()).callNowAt).toBeUndefined()
+    // Desligado ou fora do horário continua valendo.
+    expect(agentPlan([gabriel], STEPS, DEFAULT_AGENT, TUE_10).state).toBe("desligado")
   })
 
   it("lead de teste é o que tem Origem teste", () => {

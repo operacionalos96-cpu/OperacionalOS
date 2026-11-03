@@ -50,6 +50,8 @@ export interface LeadAgent {
   sends: { at: string; step: number }[]
   /** O agente não soube seguir: um humano assume e o agente não mexe mais no lead até alguém liberar. */
   needsHuman?: { at: string; reason: string }
+  /** Um humano pediu "chamar agora": a abertura vai na próxima rodada, fora da ordem e sem esperar o intervalo. */
+  callNowAt?: string
 }
 
 export const FREE_REPLY = -1
@@ -98,8 +100,16 @@ const agentOf = (l: Pick<Lead, "agent">): LeadAgent => l.agent ?? { sends: [] }
 
 /** Envio do agente: entra no histórico do agente (para os limites do dia e o intervalo). */
 export function agentSentPatch(l: Pick<Lead, "agent">, step: number, at: string): LeadAgent {
-  const a = agentOf(l)
-  return { ...a, sends: [...a.sends, { at, step }].slice(-30) }
+  const a = { ...agentOf(l), sends: [...agentOf(l).sends, { at, step }].slice(-30) }
+  if (step === 0) delete a.callNowAt // a abertura saiu: o pedido foi atendido
+  return a
+}
+
+/** "Chamar agora": marca o lead (e tira de "Precisa de humano", se estava lá). */
+export function callNowPatch(l: Pick<Lead, "agent">, at: string): LeadAgent {
+  const a = { ...agentOf(l), callNowAt: at }
+  delete a.needsHuman
+  return a
 }
 
 export function needsHumanPatch(l: Pick<Lead, "agent">, reason: string, at: string): LeadAgent {
@@ -161,6 +171,9 @@ export const agentOwned = (l: Pick<Lead, "agent">) => !!l.agent?.sends?.length
 
 /** Lead de teste (Origem "teste"): o agente manda a abertura mesmo numa conversa que já tem mensagens. */
 export const isTestLead = (l: Pick<Lead, "source">) => /^teste?$/i.test((l.source ?? "").trim())
+
+/** A abertura deste lead pode ir mesmo com conversa existente: lead de teste ou pedido de "chamar agora". */
+export const forceOpening = (l: Pick<Lead, "source" | "agent">) => isTestLead(l) || !!l.agent?.callNowAt
 
 /** Ele respondeu depois da nossa última mensagem: a vez é nossa. */
 export const awaitingUs = (l: Lead) => {
@@ -253,10 +266,16 @@ export function agentPlan(leads: Lead[], steps: FunnelStep[], s: AgentSettings, 
   const replies = repliesToHandle(mine, steps, now)
   const followups = followupsToSend(mine, steps, now)
   const openings = opened < s.maxNewPerDay ? openingsToSend(mine, ownerId) : []
+  // Pedido de "chamar agora" (o mais antigo primeiro): vale mesmo com o limite de aberturas do dia.
+  const callNow = openingsToSend(mine, ownerId)
+    .filter((l) => l.agent?.callNowAt)
+    .sort((a, b) => a.agent!.callNowAt!.localeCompare(b.agent!.callNowAt!))[0]
   const counts = { sent, opened, replies: replies.length, followups: followups.length, openings: openings.length, forHuman: mine.filter((l) => !!l.agent?.needsHuman).length + repliesForHuman(mine, steps, now).length }
   if (!s.enabled) return { state: "desligado", retryAfterSec: 300, counts }
   if (!withinHours(now, s)) return { state: "fora_do_horario", retryAfterSec: 600, counts }
   if (sent >= s.maxSendsPerDay) return { state: "limite_do_dia", retryAfterSec: 1800, counts }
+  // Pedido humano de "chamar agora": vai já, sem esperar o intervalo.
+  if (callNow) return { state: "agir", retryAfterSec: 0, action: { kind: "abertura", leadId: callNow.id, step: 0 }, counts }
   const reply: AgentAction | undefined = replies[0] ? { kind: "responder", leadId: replies[0].id, step: funnelOf(replies[0]).step } : undefined
   const followup: AgentAction | undefined = followups[0] ? { kind: "followup", leadId: followups[0].lead.id, step: followups[0].index } : undefined
   const opening: AgentAction | undefined = openings[0] ? { kind: "abertura", leadId: openings[0].id, step: 0 } : undefined

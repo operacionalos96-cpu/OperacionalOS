@@ -9,4 +9,6 @@ export const agentSettings = {
   save: async (data: AgentSettings) => (await opsAction<{ data: AgentSettings }>("agent.update", { data })).data,
   /** Um humano resolveu: o lead volta para o agente. */
   release: (leadId: string) => opsAction("agent.release", { id: leadId }),
+  /** O agente manda a abertura deste lead na próxima rodada. */
+  callNow: (leadId: string) => opsAction("agent.callNow", { id: leadId }),
 }

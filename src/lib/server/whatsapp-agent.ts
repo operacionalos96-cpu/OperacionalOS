@@ -1,7 +1,7 @@
 import "server-only"
 import { funnelOf, nextStep } from "@/lib/domain/funnel"
 import type { Lead } from "@/lib/domain/types"
-import { FREE_REPLY, agentPlan, blockersText, needsSiteInfo, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
+import { FREE_REPLY, agentPlan, blockersText, callNowPatch, needsSiteInfo, agentSentPatch, buildReplyPrompt, isOptOut, mergeAgentSettings, needsHumanPatch, parseAgentReply, releasePatch, unanswered, type AgentReply, type ChatMessage } from "@/lib/domain/whatsapp-agent"
 import { AiError, aiConfigured, generateJson } from "./ai"
 import { rateHit } from "./rate-limit"
 import { readSiteInfo } from "./site-info"
@@ -108,6 +108,16 @@ export async function agentFreeSent(leadId: string, text: string, actorId: strin
   await saveLead(next)
   await log(next, actorId, `Agente respondeu (WhatsApp): ${body}`, "lead.followup_sent", { agent: true, free: true, channel: "whatsapp" })
   return view(next, steps, new Date())
+}
+
+/** "Chamar agora": o agente manda a abertura deste lead na próxima rodada (só lead ainda não contatado). */
+export async function callNow(leadId: string, actorId: string) {
+  const l = await getLead(leadId)
+  if (l.stage !== "novo" || l.contactStatus === "contacted") throw new FunnelError("este lead já foi contatado: o agente só chama quem está em Novo", 409)
+  const next: Lead = { ...l, agent: callNowPatch(l, new Date().toISOString()) }
+  await saveLead(next)
+  await log(next, actorId, "Pediu ao agente do WhatsApp: chamar agora", null, {})
+  return next
 }
 
 /** Um humano assumiu e devolveu o lead para o agente. */

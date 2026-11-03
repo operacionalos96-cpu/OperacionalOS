@@ -1133,7 +1133,8 @@
       const c = p.counts || {}
       const tail = ` · ${c.sent ?? 0} hoje${c.forHuman ? ` · ${c.forHuman} com humano` : ""}`
       if (p.state !== "agir" || !p.action) {
-        agent.nextAt = Date.now() + Math.max(15, p.retryAfterSec || 60) * 1000
+        // Pergunta de novo em no máximo 1 min (um "chamar agora" ou uma resposta não espera o intervalo inteiro).
+        agent.nextAt = Date.now() + Math.min(60, Math.max(15, p.retryAfterSec || 60)) * 1000
         const why = p.state === "sem_tarefas" && p.blockersText ? ` ${p.blockersText}` : ""
         return setAgentStatus((p.state === "aguardar" ? `Próximo envio às ${hhmm(agent.nextAt)}.` : PLAN_TEXT[p.state] || p.state) + why + tail, p.state === "desligado" || why ? "warn" : "")
       }
