@@ -159,6 +159,9 @@ const offLimits = (l: Lead) => isDiscarded(l) || !!l.agent?.needsHuman || funnel
  */
 export const agentOwned = (l: Pick<Lead, "agent">) => !!l.agent?.sends?.length
 
+/** Lead de teste (Origem "teste"): o agente manda a abertura mesmo numa conversa que já tem mensagens. */
+export const isTestLead = (l: Pick<Lead, "source">) => /^teste?$/i.test((l.source ?? "").trim())
+
 /** Ele respondeu depois da nossa última mensagem: a vez é nossa. */
 export const awaitingUs = (l: Lead) => {
   const f = funnelOf(l)

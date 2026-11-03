@@ -993,7 +993,8 @@
     if (next.kind !== "texto" && !next.media) return handOff(lead.id, next.mediaNote || `falta o arquivo do passo "${next.label}"`)
     // Abertura numa conversa que já tem mensagem NOSSA: nunca manda de novo.
     // A própria abertura já está lá (envio que não foi registrado) → só registra. Outra conversa → humano.
-    if (next.index === 0) {
+    // Exceção: lead de teste (Origem "teste") recebe a abertura de novo, para testar o funil no próprio número.
+    if (next.index === 0 && !lead.test) {
       const ours = extractMessages().filter((m) => m.out)
       if (ours.length) {
         const want = flat(next.text).slice(0, 60)

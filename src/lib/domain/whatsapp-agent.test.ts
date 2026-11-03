@@ -7,6 +7,7 @@ import {
   agentCounts,
   agentPlan,
   agentSentPatch,
+  isTestLead,
   blockersText,
   openingBlockers,
   brClock,
@@ -161,6 +162,13 @@ describe("agente do WhatsApp", () => {
     expect(plan.state).toBe("aguardar")
     expect(plan.counts.sent).toBe(0)
     expect(agentPlan([handed, lead({ id: "abre" })], STEPS, ON, new Date(TUE_10.getTime() + 8 * 60_000)).action?.leadId).toBe("abre")
+  })
+
+  it("lead de teste é o que tem Origem teste", () => {
+    expect(isTestLead({ source: "teste" })).toBe(true)
+    expect(isTestLead({ source: " Teste " })).toBe(true)
+    expect(isTestLead({ source: "planilha" })).toBe(false)
+    expect(isTestLead({})).toBe(false)
   })
 
   it("respondeu depois do fim do funil vai para humano, não para o agente", () => {
