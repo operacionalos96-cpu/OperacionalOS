@@ -1107,7 +1107,8 @@
       await runJob(agent.job)
     } catch (e) {
       agent.nextAt = Date.now() + 60_000
-      setAgentStatus(e.message || String(e), "warn")
+      // Extensão recarregada com o WhatsApp aberto: este painel antigo não fala mais com ela.
+      setAgentStatus(/context invalidated/i.test(String(e?.message || e)) ? RELOAD : e.message || String(e), "warn")
     } finally {
       agent.running = false
     }
