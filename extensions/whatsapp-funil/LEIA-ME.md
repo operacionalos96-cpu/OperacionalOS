@@ -11,6 +11,7 @@ Com o **agente** ligado, envia o funil e responde os leads sozinha (veja abaixo)
 4. Abra/recarregue o WhatsApp Web.
 
 ## Como funciona
+- Clicou para abrir o WhatsApp no sistema (Prospecção, Pipeline) → a conversa abre na aba do WhatsApp Web que já está aberta, sem abrir outra.
 - Abriu uma conversa → acha o lead pelo número e mostra o passo do funil.
 - **Escrever no WhatsApp** → coloca o texto na caixa. Quando você aperta Enter, o envio é registrado sozinho.
 - Áudio como **mensagem de voz** (igual gravado na hora): clique em **Enviar como áudio gravado** e depois no microfone do WhatsApp. O áudio do funil entra no lugar da sua voz e é gravado em tempo real (1 min de áudio = 1 min). Quando terminar, clique em enviar. Seu microfone só é trocado nessa gravação.

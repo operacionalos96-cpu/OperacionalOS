@@ -32,13 +32,41 @@
     const span = h?.querySelector('span[dir="auto"]') || h?.querySelector("span[title]")
     return (span?.getAttribute("title") || span?.textContent || "").trim()
   }
-  const messages = () => Array.from(main()?.querySelectorAll("[data-id]") || []).filter((el) => /^(true|false)_/.test(el.getAttribute("data-id") || ""))
+  // O WhatsApp Web muda a marcação de tempos em tempos: cada leitura tenta mais de um sinal, do mais preciso ao mais genérico.
+  const idOf = (el) => el.getAttribute("data-id") || el.closest("[data-id]")?.getAttribute("data-id") || el.querySelector("[data-id]")?.getAttribute("data-id") || ""
+  const preOf = (el) => (el.matches("[data-pre-plain-text]") ? el : el.querySelector("[data-pre-plain-text]"))?.getAttribute("data-pre-plain-text") || ""
+  /** Linhas de mensagem da conversa aberta, em ordem. */
+  const messages = () => {
+    const m = main()
+    if (!m) return []
+    // 1) Formato clássico: data-id "true_…" (nossa) / "false_…" (dele).
+    const byId = [...m.querySelectorAll("[data-id]")].filter((el) => /^(true|false)_/.test(el.getAttribute("data-id") || ""))
+    if (byId.length) return byId
+    // 2) Balões de mensagem enviada/recebida.
+    const bubbles = [...m.querySelectorAll(".message-in, .message-out")]
+    if (bubbles.length) return bubbles
+    // 3) O texto copiável de cada mensagem ("[10:30, 03/11/2026] Nome: ").
+    const rows = [...m.querySelectorAll("[data-pre-plain-text]")].map((el) => el.closest('[role="row"]') || el)
+    return rows.filter((el, i) => rows.indexOf(el) === i)
+  }
+  /** Nossa (true) ou dele (false). */
+  const isOut = (el) => {
+    const id = idOf(el)
+    if (/^true_/.test(id)) return true
+    if (/^false_/.test(id)) return false
+    if (el.matches(".message-out") || el.closest(".message-out") || el.querySelector(".message-out")) return true
+    if (el.matches(".message-in") || el.closest(".message-in") || el.querySelector(".message-in")) return false
+    // O "enviado/entregue/lido" só aparece nas nossas mensagens.
+    return !!el.querySelector('[data-icon^="msg-check"], [data-icon^="msg-dblcheck"], [data-icon="msg-time"], [data-icon^="status-"], [aria-label*="Lida"], [aria-label*="Entregue"], [aria-label*="Enviada"], [aria-label*="Read"], [aria-label*="Delivered"], [aria-label*="Sent"]')
+  }
+  const textOf = (el) => ((el.querySelector("span.selectable-text") || el.querySelector(".copyable-text span[dir]") || el.querySelector("[data-pre-plain-text]"))?.innerText || "").trim()
+  /** Identidade estável da mensagem (o id do WhatsApp; sem ele, quem mandou + hora + começo do texto). */
+  const msgKey = (el) => idOf(el) || `${isOut(el) ? "o" : "i"}|${preOf(el)}|${textOf(el).slice(0, 80)}|${kindOf(el)}`
   const lastMessage = () => {
     const all = messages()
     const el = all[all.length - 1]
     if (!el) return null
-    const id = el.getAttribute("data-id")
-    return { id, incoming: id.startsWith("false_") || !!el.closest(".message-in") || !!el.querySelector(".message-in") }
+    return { id: msgKey(el), incoming: !isOut(el) }
   }
   /** Tipo da mensagem pelo que aparece nela (player de áudio, vídeo, texto). */
   const kindOf = (el) => {
@@ -49,17 +77,38 @@
   }
   /** Mensagens visíveis da conversa, em ordem: quem mandou, tipo, texto e hora. */
   function extractMessages() {
-    return messages().map((el) => {
-      const id = el.getAttribute("data-id") || ""
-      const pre = el.querySelector("[data-pre-plain-text]")?.getAttribute("data-pre-plain-text") || ""
-      return { out: id.startsWith("true_"), kind: kindOf(el), text: (el.querySelector("span.selectable-text")?.innerText || "").trim(), time: OOSAnalyze.timeFromPrePlain(pre) }
-    })
+    return messages().map((el) => ({ out: isOut(el), kind: kindOf(el), text: textOf(el), time: OOSAnalyze.timeFromPrePlain(preOf(el)) }))
+  }
+
+  /** O que a extensão está vendo na conversa aberta, SEM o conteúdo das mensagens (para achar o que mudou no WhatsApp). */
+  function readDiagnostics() {
+    const m = main()
+    const ids = [...(m?.querySelectorAll("[data-id]") || [])].map((el) => el.getAttribute("data-id") || "")
+    const msgs = extractMessages()
+    return {
+      versao: chrome.runtime.getManifest?.().version,
+      conversaAberta: !!m,
+      listaConversas: !!document.querySelector("#pane-side"),
+      dataId: ids.length,
+      dataIdComTrueFalse: ids.filter((x) => /^(true|false)_/.test(x)).length,
+      formatosDataId: [...new Set(ids.map((x) => x.replace(/[A-Za-z0-9]/g, (c) => (/\d/.test(c) ? "9" : "a")).slice(0, 18)))].slice(0, 6),
+      baloesIn: m?.querySelectorAll(".message-in").length ?? 0,
+      baloesOut: m?.querySelectorAll(".message-out").length ?? 0,
+      prePlain: m?.querySelectorAll("[data-pre-plain-text]").length ?? 0,
+      linhas: m?.querySelectorAll('[role="row"]').length ?? 0,
+      iconesEnvio: m?.querySelectorAll('[data-icon^="msg-"]').length ?? 0,
+      lidas: msgs.length,
+      nossas: msgs.filter((x) => x.out).length,
+      ultimaEhDele: lastMessage() ? lastMessage().incoming : null,
+      caixaDeTexto: !!composer(),
+      botaoEnviar: !!document.querySelector('[data-icon="send"], [data-icon="wds-ic-send-filled"], [aria-label="Enviar"], [aria-label="Send"]'),
+    }
   }
 
   /** Telefone da conversa: pelos ids das mensagens, pelo título, pelo link do sistema ou pelo que a pessoa informou. */
   async function chatPhone(title) {
     for (const el of messages()) {
-      const m = /_(\d{10,15})@c\.us/.exec(el.getAttribute("data-id") || "")
+      const m = /_(\d{10,15})@c\.us/.exec(idOf(el))
       if (m) return m[1]
     }
     const t = digits(title)
@@ -315,6 +364,7 @@
       .agent .as { font-size: 11.5px; line-height: 1.35; color: var(--text-2); overflow-wrap: anywhere; }
       .agent .as.warn { color: var(--warn); }
       .agent .as.live { color: var(--accent); }
+      .agent .diag { flex: none; border: 0; background: none; padding: 2px 4px; font-size: 11px; color: var(--text-3); cursor: pointer; text-decoration: underline; }
       .sw { flex: none; position: relative; width: 36px; height: 22px; border-radius: 99px; background: var(--fill-2); cursor: pointer; transition: background .2s; }
       .sw span { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s cubic-bezier(.32, .72, 0, 1); }
       .sw.on { background: var(--accent); }
@@ -866,7 +916,8 @@
     agent.status = text
     agent.kind = kind
     agentEl.innerHTML = `<span class="sw ${agent.on ? "on" : ""}" role="switch" aria-checked="${agent.on}" aria-label="Ligar o agente neste computador" tabindex="0"><span></span></span>
-      <div class="grow"><div class="at">Agente ${agent.on ? "ligado" : "desligado"}</div><div class="as ${kind}" title="${esc(text)}">${esc(text)}</div></div>`
+      <div class="grow"><div class="at">Agente ${agent.on ? "ligado" : "desligado"}</div><div class="as ${kind}" title="${esc(text)}">${esc(text)}</div></div>
+      <button class="diag" type="button" title="Copia o que a extensão está vendo nesta conversa (sem o texto das mensagens)">diagnóstico</button>`
   }
   const saveJob = (job) => {
     agent.job = job
@@ -879,7 +930,17 @@
     if (!agent.on) await saveJob(null)
     setAgentStatus(agent.on ? "Começando…" : "Desligado neste computador. Nada é enviado sozinho.")
   }
-  agentEl.addEventListener("click", (e) => e.target.closest(".sw") && toggleAgent())
+  agentEl.addEventListener("click", async (e) => {
+    if (e.target.closest(".sw")) return toggleAgent()
+    if (!e.target.closest(".diag")) return
+    const text = JSON.stringify(readDiagnostics(), null, 1)
+    try {
+      await navigator.clipboard.writeText(text)
+      toast("Diagnóstico copiado. Cole na conversa com o suporte.")
+    } catch {
+      toast("Diagnóstico: " + text, true)
+    }
+  })
   agentEl.addEventListener("keydown", (e) => {
     if ((e.key === " " || e.key === "Enter") && e.target.closest(".sw")) {
       e.preventDefault()

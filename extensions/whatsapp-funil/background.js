@@ -41,7 +41,26 @@ async function media(url) {
 
 const ACTIONS = new Set(["ping", "funnel", "lookup", "sent", "replied", "stop", "today", "sync", "agent_agenda", "agent_sent", "agent_reply", "agent_free_sent", "agent_human"])
 
+/** Abre a conversa na aba do WhatsApp Web que já existe (ou cria uma, se não houver) e traz ela para frente. */
+async function openWhats(url) {
+  const [tab] = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" })
+  if (!tab) {
+    await chrome.tabs.create({ url })
+    return { ok: true, nova: true }
+  }
+  await chrome.tabs.update(tab.id, { url, active: true })
+  await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {})
+  return { ok: true }
+}
+const SYSTEM = /^(https:\/\/operacional-os\.vercel\.app|http:\/\/localhost:3000)\//
+const WHATS_LINK = /^https:\/\/web\.whatsapp\.com\/send\?phone=\d{10,15}(&text=[^#]*)?$/
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  // Pedido do próprio Operacional OS (bridge.js): abrir a conversa na aba do WhatsApp já aberta.
+  if (msg?.type === "openWhats" && sender.id === chrome.runtime.id && SYSTEM.test(sender.url || "") && typeof msg.url === "string" && WHATS_LINK.test(msg.url)) {
+    openWhats(msg.url).then(reply, (e) => reply({ ok: false, erro: String(e?.message || e) }))
+    return true
+  }
   // Só aceita pedidos do próprio popup ou do WhatsApp Web.
   const from = sender.url || ""
   if (!msg || sender.id !== chrome.runtime.id || !(from.startsWith("https://web.whatsapp.com/") || from.startsWith(`chrome-extension://${chrome.runtime.id}/`))) return false
