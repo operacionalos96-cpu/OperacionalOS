@@ -991,6 +991,19 @@
     const lead = state.data.lead
     if (!next || next.index !== job.step || (!next.due && !afterReply)) return setAgentStatus("O passo mudou. Pedindo a próxima tarefa…")
     if (next.kind !== "texto" && !next.media) return handOff(lead.id, next.mediaNote || `falta o arquivo do passo "${next.label}"`)
+    // Abertura numa conversa que já tem mensagem NOSSA: nunca manda de novo.
+    // A própria abertura já está lá (envio que não foi registrado) → só registra. Outra conversa → humano.
+    if (next.index === 0) {
+      const ours = extractMessages().filter((m) => m.out)
+      if (ours.length) {
+        const want = flat(next.text).slice(0, 60)
+        if (want && (ours.some((m) => flat(m.text).includes(want)) || chatText().includes(want))) {
+          await act("agent_sent", { step: 0, text: next.text || "" }, `A abertura para ${lead.name} já estava na conversa: registrei sem enviar de novo.`)
+          return
+        }
+        return handOff(lead.id, "já existe conversa nossa com este número (não mandei a abertura)")
+      }
+    }
     setAgentStatus(`Enviando “${next.label}” para ${lead.name}…`, "live")
     const before = lastMessage()?.id ?? null
     const ok = next.kind === "texto" ? await sendText(next.text) : next.kind === "video" ? await sendFile(next.text) : (await sendVoice()) || (await sendFile(""))
