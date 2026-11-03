@@ -7,9 +7,11 @@ import { BotIcon, SendIcon, CheckIcon, LoaderIcon, TriangleAlertIcon, Undo2Icon,
 import { DEFAULT_AGENT, FREE_REPLY, agentPlan, blockersText, repliesForHuman, type AgentPlan, type AgentSettings } from "@/lib/domain/whatsapp-agent"
 import type { Lead } from "@/lib/domain/types"
 import { relative } from "@/lib/format"
+import { leadMatches } from "@/lib/domain/contact"
+import { wasContacted } from "@/lib/domain/prospecting"
 import { agentSettings } from "@/lib/agent-store"
 import { useFunnel } from "@/lib/funnel-store"
-import { Field, LeadSelect, Segmented } from "@/components/shared/fields"
+import { Field, Segmented } from "@/components/shared/fields"
 import { Led } from "@/components/shared/layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -79,17 +81,6 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
     }
   }
 
-  const [callId, setCallId] = useState<string>()
-  async function callNow() {
-    if (!callId) return
-    try {
-      await agentSettings.callNow(callId)
-      toast.success("Pedido feito: o agente chama este lead na próxima rodada (até ~1 min)")
-      setCallId(undefined)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não deu para pedir")
-    }
-  }
 
   async function release(id: string) {
     try {
@@ -209,14 +200,7 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
           <h3 className="t-label">Chamar agora</h3>
           <div className="grid gap-2 rounded-xl border bg-card p-3">
             <p className="text-xs text-muted-foreground">O agente manda a abertura para este lead na próxima rodada, fora da ordem da Fila e sem esperar o intervalo (mesmo que a conversa já tenha mensagens). Só para lead em Novo.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="min-w-48 flex-1">
-                <LeadSelect value={callId} onChange={setCallId} placeholder="Escolha o lead" />
-              </div>
-              <Button size="sm" onClick={() => void callNow()} disabled={!callId || !saved.enabled} title={saved.enabled ? "" : "Ligue o agente primeiro"}>
-                <SendIcon /> Chamar agora
-              </Button>
-            </div>
+            {saved.enabled ? <CallNowPicker leads={mine} /> : <p className="text-xs text-warning">Ligue o agente acima para usar.</p>}
           </div>
         </section>
 
@@ -278,6 +262,48 @@ export function AgentTab({ leads, ownerId }: { leads: Lead[]; ownerId?: string }
           )}
         </section>
       </div>
+    </div>
+  )
+}
+
+/** Busca um lead em Novo (nome, empresa, site ou número) e pede ao agente para chamar agora. */
+function CallNowPicker({ leads }: { leads: Lead[] }) {
+  const [q, setQ] = useState("")
+  const [busy, setBusy] = useState<string | null>(null)
+  const results = q.trim().length < 2 ? [] : leads.filter((l) => l.stage === "novo" && !wasContacted(l) && leadMatches(l, q)).slice(0, 8)
+  async function call(l: Lead) {
+    setBusy(l.id)
+    try {
+      await agentSettings.callNow(l.id)
+      toast.success(`Pedido feito: o agente chama ${l.name} na próxima rodada (até ~1 min)`)
+      setQ("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu para pedir")
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <div className="grid gap-2">
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Digite o nome ou o número do lead" aria-label="Buscar lead para chamar agora" />
+      {q.trim().length >= 2 &&
+        (results.length ? (
+          <ul className="divide-y rounded-lg border">
+            {results.map((l) => (
+              <li key={l.id} className="flex items-center gap-3 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{l.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{[l.contact, l.segment, l.city].filter(Boolean).join(" · ") || "sem contato"}</p>
+                </div>
+                <Button size="xs" onClick={() => void call(l)} disabled={!!busy}>
+                  {busy === l.id ? <LoaderIcon className="animate-spin" /> : <SendIcon />} Chamar agora
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">Nenhum lead em Novo com “{q.trim()}”.</p>
+        ))}
     </div>
   )
 }
