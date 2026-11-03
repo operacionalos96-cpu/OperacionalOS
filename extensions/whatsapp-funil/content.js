@@ -312,7 +312,7 @@
       .agent { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--card); border-bottom: 1px solid var(--sep); }
       .agent .grow { flex: 1; min-width: 0; }
       .agent .at { font-size: 12.5px; font-weight: 600; }
-      .agent .as { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .agent .as { font-size: 11.5px; line-height: 1.35; color: var(--text-2); overflow-wrap: anywhere; }
       .agent .as.warn { color: var(--warn); }
       .agent .as.live { color: var(--accent); }
       .sw { flex: none; position: relative; width: 36px; height: 22px; border-radius: 99px; background: var(--fill-2); cursor: pointer; transition: background .2s; }
@@ -891,6 +891,8 @@
     agent.on = !!agentOn
     // Tarefa velha (o navegador fechou no meio): descarta; se ainda valer, o servidor manda de novo.
     agent.job = agentJob && Date.now() - agentJob.at < OPEN_TIMEOUT ? agentJob : null
+    // Voltou de uma recarga pedida pelo agente: conta (diz no status se a página recarregou mesmo).
+    if (agent.job?.phase === "abrindo") void saveJob({ ...agent.job, reloads: (agent.job.reloads || 0) + 1 })
     setAgentStatus(agent.on ? "Começando…" : "Desligado neste computador. Nada é enviado sozinho.")
   })
 
@@ -1003,7 +1005,8 @@
 
   /** Pede ao Chrome para abrir a conversa do número nesta aba (recarrega o WhatsApp Web). */
   async function openNumber(phone) {
-    const r = await chrome.runtime.sendMessage({ type: "open", phone }).catch(() => null)
+    const r = await withTimeout(chrome.runtime.sendMessage({ type: "open", phone }).catch((e) => ({ ok: false, erro: String(e?.message || e) })), 5000, { ok: false, erro: "sem resposta da extensão" })
+    agent.openError = r?.ok ? "" : r?.erro || "falhou"
     if (!r?.ok) location.href = `https://web.whatsapp.com/send?phone=${phone}` // plano B
   }
 
@@ -1019,10 +1022,12 @@
       }
       const retry = job.phase === "abrindo" && !job.retried && job.phone && Date.now() - (job.openedAt || job.at) > OPEN_RETRY
       if ((job.phase !== "abrindo" || retry) && job.phone) {
-        await saveJob({ ...job, phase: "abrindo", openedAt: Date.now(), retried: job.phase === "abrindo" })
+        await saveJob({ ...job, phase: "abrindo", openedAt: Date.now(), retried: job.phase === "abrindo", navs: (job.navs || 0) + 1 })
         await openNumber(job.phone)
       }
-      return setAgentStatus(`Abrindo a conversa de ${job.name}… (${Math.round(waited / 1000)} s)`, "live")
+      const j = agent.job || job
+      const detail = [`${Math.round(waited / 1000)} s`, j.navs ? `pedi ${j.navs}x` : "", j.navs ? (j.reloads ? `recarregou ${j.reloads}x` : "a página não recarregou") : "", agent.openError ? `erro: ${agent.openError}` : ""].filter(Boolean).join(" · ")
+      return setAgentStatus(`Abrindo a conversa de ${job.name} (${detail})`, "live")
     }
     // A partir daqui a tarefa não volta (recarregar no meio não envia duas vezes).
     await saveJob(null)
@@ -1072,8 +1077,12 @@
     sem_tarefas: "Nada para enviar agora.",
   }
   async function agentTick() {
-    if (!agent.on || agent.running || !document.querySelector("#pane-side")) return
+    // Ciclo preso numa espera que não voltou (mais de 3 min): libera para não parar o agente.
+    if (agent.running && Date.now() - agent.runningSince > 180_000) agent.running = false
+    if (!agent.on || agent.running) return
+    if (!document.querySelector("#pane-side")) return setAgentStatus("Esperando o WhatsApp Web carregar a lista de conversas…")
     agent.running = true
+    agent.runningSince = Date.now()
     try {
       if (agent.job) return await runJob(agent.job)
       if (Date.now() < agent.nextAt || state.loading) return
