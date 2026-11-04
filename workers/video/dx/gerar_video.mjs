@@ -17,7 +17,7 @@ if (!pastaArg) {
 }
 // Windows limita caminhos a 260 caracteres: com o pacote fundo em pastas, o navegador do Remotion não abre (ENOENT)
 if (process.platform === "win32" && RAIZ.length > 90) {
-  console.error(`A pasta do modelo está num caminho longo demais (${RAIZ.length} caracteres; MAX_PATH do Windows). Mova para algo curto, como C:\hzk-video.`);
+  console.error(`A pasta do modelo está num caminho longo demais (${RAIZ.length} caracteres; MAX_PATH do Windows). Mova para algo curto, como C:\\hzk-video.`);
   process.exit(2);
 }
 const pasta = resolve(pastaArg);
