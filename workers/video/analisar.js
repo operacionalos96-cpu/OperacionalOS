@@ -33,6 +33,25 @@ async function carregarTudo(page) {
   await new Promise((r) => setTimeout(r, 800));
 }
 
+// Espera as fontes do site (webfonts) terminarem de carregar, no máximo 8 s.
+async function esperarFontes(page) {
+  await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 8000))])).catch(() => {});
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+// Repete `passos` se a página se recarregar no meio (o evaluate perde o contexto).
+async function mesmoSeRecarregar(page, passos, tentativas = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      return await passos();
+    } catch (e) {
+      if (i >= tentativas || !/Execution context was destroyed|navigat/i.test(e.message)) throw e;
+      await page.waitForNetworkIdle({ idleTime: 800, timeout: 20000 }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+}
+
 // Roda DENTRO da página: mede tudo e devolve candidatos com evidência e área.
 function medir(ctx, maxAltura) {
   const W = document.documentElement.clientWidth;
@@ -238,10 +257,15 @@ async function analisarSite(browser, url, dir, ctx = {}) {
   await page.waitForNetworkIdle({ idleTime: 800, timeout: 20000 }).catch(() => {});
   if (!resp || resp.status() >= 400) throw Object.assign(new Error(`site respondeu ${resp ? resp.status() : 'sem resposta'}`), { retryable: true });
   await new Promise((r) => setTimeout(r, 1500));
-  await limparSobreposicoes(page);
-  await carregarTudo(page);
-  await limparSobreposicoes(page);
-  const medida = await page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '', ancoras: ctx.ancoras || [] }, MAX_ALTURA);
+  // Alguns sites recarregam sozinhos depois do load (ex.: fatd.com.br) e o evaluate perde a página
+  // ("Execution context was destroyed"). Espera assentar e mede de novo (até 3 vezes).
+  const medida = await mesmoSeRecarregar(page, async () => {
+    await limparSobreposicoes(page);
+    await carregarTudo(page);
+    await limparSobreposicoes(page);
+    await esperarFontes(page);
+    return page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '', ancoras: ctx.ancoras || [] }, MAX_ALTURA);
+  });
   await page.screenshot({ path: path.join(dir, 'home.png') });
   await page.screenshot({ path: path.join(dir, 'pagina.png'), clip: { x: 0, y: 0, width: VIEW.width, height: medida.altura }, captureBeyondViewport: true });
   const urlFinal = page.url();
@@ -253,8 +277,12 @@ async function analisarSite(browser, url, dir, ctx = {}) {
   await mob.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1');
   await mob.goto(urlFinal, { waitUntil: 'networkidle2', timeout: 60000 }).catch(() => null);
   await new Promise((r) => setTimeout(r, 1200));
-  await limparSobreposicoes(mob);
-  const larguraMobile = await mob.evaluate(() => document.documentElement.scrollWidth);
+  // Sem esperar a fonte do site, o print usa a fonte reserva (mais larga) e o título parece cortado.
+  const larguraMobile = await mesmoSeRecarregar(mob, async () => {
+    await limparSobreposicoes(mob);
+    await esperarFontes(mob);
+    return mob.evaluate(() => document.documentElement.scrollWidth);
+  });
   await mob.screenshot({ path: path.join(dir, 'mobile.png') });
   await mob.close();
   if (larguraMobile > 420) medida.achados.push({ kind: 'nao_responsivo', prioridade: 88, area: null, larguraMobile, evidencia: `no celular (390 px) a página tem ${larguraMobile} px de largura` });
