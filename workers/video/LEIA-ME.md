@@ -60,7 +60,7 @@ Mostra o que foi medido e gera o vídeo em `.trabalho/teste-…/` (cerca de 4 mi
 
 ## O vídeo: modelo DX-001 (70% fixo, 30% do lead)
 
-O funil tem um vídeo só, o de diagnóstico. Ele é o modelo DX-001 em `dx/` (Remotion). Narração, 3D, sons e tempos (114 s) são fixos e iguais para todo lead;
+O funil tem um vídeo só, o de diagnóstico. Ele é o modelo DX-001 em `dx/` (Remotion). Narração, 3D, sons e tempos (112,6 s, v3.2) são fixos e iguais para todo lead;
 cada lead só troca os prints, o nome, o endereço e os 3 pontos na tela. O worker grava o `dados.json` na pasta de trabalho
 (ao lado de `home.png`, `pagina.png` e `mobile.png`) e chama `dx/gerar_video.mjs`. O contrato completo está em `dx/LEIA-ME.md`.
 
