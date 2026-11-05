@@ -30,17 +30,19 @@ const FIELD_HINTS: [ImportField, RegExp][] = [
   ["nome", /^(nome|contato nome|responsavel|lead|cliente|decisor)$/],
   ["contato", /(whatsapp|whats|telefone|celular|fone|phone)/],
   ["email", /(e ?mail)/],
-  ["site", /^(site|website|url|link)$/],
+  ["site", /^(site|website|url|link|site oficial|url do site|endereco do site)$/],
   ["segmento", /(segmento|nicho|setor|ramo|categoria)/],
-  ["cidade", /^(cidade|municipio|city|localidade)$/],
+  // "Cidade / SP" e "Cidade UF" também são a cidade.
+  ["cidade", /^(cidade|municipio|city|localidade)( (uf|estado|[a-z]{2}))?$/],
   ["origem", /^(origem|fonte|source|canal)$/],
-  ["nota_site", /^(nota( do)? site|nota|score( do)? site|site score|pontuacao( do)? site|avaliacao( do)? site)$/],
+  // "Nota_Final" é a nota do site na planilha do agente de prospecção (skill prospeccao-leads).
+  ["nota_site", /^(nota( do)? site|nota|nota final|score( do)? site|site score|pontuacao( do)? site|avaliacao( do)? site)$/],
   // "Nota oportunidade (0-10)" é NOTA (vem antes de "oportunidade", que é texto).
   ["qualificacao", /^(qualificacao|score|lead score|potencial|pontuacao)$|^nota (de )?(oportunidade|qualificacao|potencial)/],
   ["problemas", /(problema|falha|defeito)/],
   ["oportunidade", /(oportunidade|proposta de valor|o que oferecer)/],
   ["resumo", /^(resumo|analise|diagnostico|observacao da analise)$/],
-  ["prioridade", /^(prioridade|temperatura)$/],
+  ["prioridade", /^(prioridade|temperatura)( de revisao)?$/],
   ["valor", /^(valor|ticket|orcamento|valor estimado)$/],
 ]
 
@@ -67,6 +69,30 @@ export function detectColumns(headers: unknown[]): ImportField[] {
     return "ignorar"
   })
 }
+
+/** Colunas onde o telefone pode estar quando não há uma coluna "WhatsApp/Telefone" preenchida ("Contato público"…). */
+const CONTACT_LIKE = /(contato|whatsapp|whats|telefone|celular|fone|phone)/
+/** Colunas onde o endereço do site pode estar quando a coluna "Site" falta ou está vazia ("URL / página de evidência"…). */
+const URL_LIKE = /(url|site|pagina|link|endereco|fonte|origem)/
+/** Domínios que nunca são o site da empresa (comparados pelo domínio inteiro: "comex.com.br" não é "x.com"). */
+const NOT_A_SITE = ["google.com", "google.com.br", "goo.gl", "maps.app.goo.gl", "wa.me", "whatsapp.com", "instagram.com", "facebook.com", "linkedin.com", "tiktok.com", "youtube.com", "x.com", "twitter.com"]
+const isCompanySite = (url: string) => {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "")
+    return !NOT_A_SITE.some((d) => host === d || host.endsWith(`.${d}`))
+  } catch {
+    return false
+  }
+}
+
+/** Telefone brasileiro dentro de um texto ("adm@x.com.br | (11) 3255-8452" → "(11) 3255-8452"). */
+export function extractPhone(text: string): string | undefined {
+  const m = text.match(/(?<!\d)(?:\+?55[\s-]*)?\(?\d{2}\)?[\s-]*9?\d{4}[\s.-]?\d{4}(?!\d)/)
+  return m ? m[0].trim() : undefined
+}
+
+/** E-mail dentro de um texto. */
+export const extractEmail = (text: string) => text.match(/[\w.%+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0]
 
 export function temperatureFrom(value: unknown): Temperature | undefined {
   const n = normalizeHeader(value)
@@ -152,13 +178,32 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
     const whats = get("contato")
     // Contato = telefone de verdade (ou e-mail). "WhatsApp no site" não é número: fica na anotação.
     const hasPhone = whats.replace(/\D/g, "").length >= 8
-    const contact = hasPhone ? whats : get("email") || undefined
-    const website = safeHttpUrl(get("site"))
+    // Sem telefone na coluna principal, procura nas outras colunas de contato ("Contato público": "adm@x.com.br | (11) 3255-8452").
+    // Antes, esse lead entrava sem contato e acabava descartado como "Contato inadequado/inexistente".
+    const otherContacts = header
+      .map((h, c) => ({ h: normalizeHeader(h), v: values[c], f: fields[c] }))
+      .filter((x) => x.v && x.f !== "contato" && !["nome", "empresa", "site"].includes(x.f) && CONTACT_LIKE.test(x.h))
+      .map((x) => x.v)
+    const fallbackPhone = hasPhone ? undefined : otherContacts.map(extractPhone).find(Boolean)
+    const email = get("email") || otherContacts.map(extractEmail).find(Boolean)
+    const contact = hasPhone ? extractPhone(whats) ?? whats : fallbackPhone ?? (email || undefined)
+    // Site: coluna "Site"; sem ela, o 1º link de empresa numa coluna de URL ("URL / página de evidência", "Fonte"…).
+    const origem = get("origem")
+    const website =
+      safeHttpUrl(get("site")) ??
+      header
+        .map((h, c) => ({ h: normalizeHeader(h), v: values[c], f: fields[c] }))
+        .filter((x) => x.v && (x.f === "ignorar" || x.f === "origem") && URL_LIKE.test(x.h) && /^https?:\/\//i.test(x.v) && isCompanySite(x.v))
+        .map((x) => safeHttpUrl(x.v))
+        .find(Boolean)
 
     // O que já virou campo não se repete na anotação.
-    const asField = new Set<ImportField>(["nome", "empresa", "valor", "site", "segmento", "cidade", "origem", "nota_site", "qualificacao", "problemas", "oportunidade", "resumo", "prioridade"])
+    // Origem com um link ("Fonte: https://…") não é origem: o lead fica como "planilha" e o link vai para a anotação.
+    const originIsUrl = /^https?:\/\//i.test(origem)
+    const asField = new Set<ImportField>(["nome", "empresa", "valor", "site", "segmento", "cidade", "nota_site", "qualificacao", "problemas", "oportunidade", "resumo", "prioridade"])
+    if (!originIsUrl) asField.add("origem")
     if (hasPhone) asField.add("contato")
-    if (contact && !hasPhone) asField.add("email")
+    if (contact && contact === get("email")) asField.add("email")
     const noteLines = header
       .map((h, c) => ({ label: cell(h), value: values[c], field: fields[c] }))
       .filter((x) => x.value && !(asField.has(x.field) && (x.field !== "site" || website)))
@@ -170,7 +215,7 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
       company: nome && empresa ? empresa : undefined,
       segment: get("segmento") || undefined,
       city: get("cidade") || undefined,
-      source: get("origem") || "planilha",
+      source: (!originIsUrl && origem) || "planilha",
       analysis: analysisFrom(get),
       contact,
       website: website ?? undefined,
@@ -186,7 +231,8 @@ export function rowsToLeads(rows: unknown[][], opts: { defaultValueCents: number
 /** Nota 0–10 de um texto ("7", "7,5", "75%", "7/10", "70"). */
 function score(v: string): number | undefined {
   const t = v.replace(",", ".").trim()
-  if (!t) return undefined
+  // "Sem dados", "N/A": sem número não é nota 0 (antes virava 0 = "pior site" e ia para o topo da fila).
+  if (!/\d/.test(t)) return undefined
   const frac = t.match(/^([\d.]+)\s*\/\s*([\d.]+)$/)
   let n = frac ? (Number(frac[1]) / Number(frac[2])) * 10 : Number(t.replace(/[^\d.]/g, ""))
   if (!Number.isFinite(n)) return undefined
