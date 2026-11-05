@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckSquareIcon, InboxIcon, UserPlusIcon, WalletIcon } from "lucide-react"
+import { CheckSquareIcon, InboxIcon, SparklesIcon, UserPlusIcon, WalletIcon } from "lucide-react"
 import { ENTITY_ICON, openEntity, useEntitySnapshot } from "@/lib/entities/registry"
 import { ENTITY_LABEL, searchableEntities } from "@/lib/entities/summary"
 import { refKey, type EntityType } from "@/lib/entities/types"
@@ -69,6 +69,9 @@ export function CommandPalette() {
         <CommandGroup heading="Criar">
           <CommandItem onSelect={() => run(() => openCapture())}>
             <InboxIcon /> Captura rápida (tarefa, ideia, nota ou decisão)
+          </CommandItem>
+          <CommandItem value="estruturar tarefas com ia captura inteligente" onSelect={() => run(() => openCapture({ mode: "ia" }))}>
+            <SparklesIcon /> Estruturar tarefas com IA (várias de uma vez)
           </CommandItem>
           <CommandItem onSelect={() => run(() => openLeadForm())}>
             <UserPlusIcon /> Novo lead

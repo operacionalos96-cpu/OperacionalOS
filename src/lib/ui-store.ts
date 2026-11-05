@@ -10,8 +10,11 @@ import type { NewLeadInput, NewTaskInput, NewTransactionInput } from "@/lib/stor
  */
 interface UIState {
   paletteOpen: boolean
-  /** Captura rápida (HZK OS): aberta pelo "+" ou pelo Ctrl+K, com o tipo já escolhido. */
-  capture: { kind?: "task" | "idea" | "decision" | "note"; title?: string } | null
+  /**
+   * Captura rápida (HZK OS): aberta pelo "+" ou pelo Ctrl+K, com o tipo já escolhido.
+   * `mode: "ia"` abre direto em "Estruturar com IA" (captura inteligente, ADR 0019).
+   */
+  capture: { kind?: "task" | "idea" | "decision" | "note"; title?: string; mode?: "linha" | "ia" } | null
   leadForm: { prefill?: Partial<NewLeadInput>; onCreated?: (lead: Lead) => void } | null
   taskForm: { prefill?: Partial<NewTaskInput>; onCreated?: (task: Task) => void } | null
   txForm: { prefill?: Partial<NewTransactionInput>; onCreated?: (tx: Transaction) => void } | null
