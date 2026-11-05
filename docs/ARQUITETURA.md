@@ -137,8 +137,10 @@ No Pro dá para subir o limite e usar upload resumível; até lá, use o campo "
 
 - Botão **IA** no balão: sugerir filhos, achar lacunas, resumir ramo. Tudo chega como **rascunho**.
 - Regras puras em `src/lib/domain/ai-map.ts` (o que vai, limites, leitura da resposta); modelo no servidor em
-  `src/lib/server/ai.ts` (hoje Gemini: `GEMINI_API_KEY`, opcional `GEMINI_MODEL`); rota `POST /api/ia/mapa`
+  `src/lib/server/ai.ts` (hoje Gemini: `GEMINI_API_KEY`, opcional `GEMINI_MODEL`); rota `POST /api/ia/mapa`,
   só para membros, com limite de 10 pedidos/min por pessoa. Só vai o texto do mapa.
+- Captura inteligente de tarefas (ADR 0019): `POST /api/ia/captura`, saída estruturada por JSON Schema
+  (Claude com `ANTHROPIC_API_KEY`, senão Gemini); regras em `src/lib/domain/smart-capture.ts`.
 
 ## AI Office (prospecção + aprendizado, sem API de IA paga)
 

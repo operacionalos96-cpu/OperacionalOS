@@ -11,10 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { SubmitRow, submitOnModEnter } from "@/components/shared/fields"
 import { KIND_ICON } from "./item-bits"
+import { SmartCapture } from "./smart-capture"
+import { SparklesIcon, TextCursorInputIcon } from "lucide-react"
 
 /**
  * Captura rápida (HZK OS): tarefa, ideia, nota ou decisão em uma linha, de qualquer tela.
  * Vai para a caixa de entrada de quem capturou; a triagem decide área, dono e prazo depois.
+ * Modo "Estruturar com IA" (ADR 0019): texto livre → prévia de tarefas para revisar e criar.
  */
 export function QuickCapture() {
   const capture = useUI((s) => s.capture)
@@ -23,11 +26,13 @@ export function QuickCapture() {
   const createItem = useStore((s) => s.createItem)
   const [kind, setKind] = useState<ItemKind>("task")
   const [title, setTitle] = useState("")
+  const [mode, setMode] = useState<"linha" | "ia">("linha")
 
   useEffect(() => {
     if (!capture) return
     setKind(capture.kind ?? "task")
     setTitle(capture.title ?? "")
+    setMode(capture.mode ?? "linha")
   }, [capture])
 
   const close = () => setUI({ capture: null })
@@ -43,11 +48,39 @@ export function QuickCapture() {
 
   return (
     <Dialog open={capture !== null} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={cn("transition-[max-width] duration-300", mode === "ia" ? "sm:max-w-3xl" : "sm:max-w-lg")}>
         <DialogHeader>
           <DialogTitle>Captura rápida</DialogTitle>
-          <DialogDescription>Escreva em uma linha. Vai para a sua caixa de entrada.</DialogDescription>
+          <DialogDescription>
+            {mode === "ia" ? "Escreva do seu jeito, uma ou várias tarefas. Você revisa tudo antes de criar." : "Escreva em uma linha. Vai para a sua caixa de entrada."}
+          </DialogDescription>
         </DialogHeader>
+        <div className="grid grid-cols-2 gap-1 rounded-xl border bg-muted/40 p-1" role="tablist" aria-label="Modo da captura">
+          {(
+            [
+              { id: "linha", label: "Uma linha", Icon: TextCursorInputIcon },
+              { id: "ia", label: "Estruturar com IA", Icon: SparklesIcon },
+            ] as const
+          ).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mode === id}
+              onClick={() => setMode(id)}
+              className={cn(
+                "flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors",
+                mode === id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode === "ia" ? (
+          <SmartCapture onClose={close} />
+        ) : (
         <form onSubmit={submit} onKeyDown={submitOnModEnter} className="grid gap-4">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Tipo">
             {ITEM_KINDS.map((k) => {
@@ -82,6 +115,7 @@ export function QuickCapture() {
           />
           <SubmitRow onCancel={close} submitLabel="Guardar" disabled={!title.trim()} />
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )
