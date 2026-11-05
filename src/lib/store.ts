@@ -120,6 +120,11 @@ interface State {
   restoreLead(lead: Lead, activities: Activity[]): void
 
   createTask(input: NewTaskInput): Task
+  /**
+   * Cria e ESPERA gravar (erro = rejeita). `id` fixo: chamar de novo com o mesmo id não duplica.
+   * Usado na captura inteligente para mostrar resultado por tarefa.
+   */
+  createTaskConfirmed(input: NewTaskInput, id: string): Promise<Task>
   updateTask(id: string, patch: Partial<Omit<Task, "id">>): void
   /** Retorna a próxima ocorrência criada, se a tarefa for recorrente. */
   toggleTask(id: string): Task | undefined
@@ -184,6 +189,29 @@ export const useStore = create<State>((set, get) => {
     ...get().transactions.map((t) => t.projectName),
   ]
   const canon = (name: string | undefined | null) => canonicalProjectName(name, knownProjects())
+
+  /** Tarefa nova a partir do formulário (um só lugar: Nova tarefa, recorrência e captura inteligente). */
+  const newTask = (input: NewTaskInput, id: string): Task => ({
+    id,
+    title: input.title.trim(),
+    ownerId: input.ownerId,
+    dueDate: input.dueDate,
+    leadId: input.leadId,
+    done: false,
+    createdAt: nowIso(),
+    priority: input.priority,
+    labels: input.labels?.length ? input.labels : undefined,
+    description: input.description?.trim() || undefined,
+    checklist: input.checklist?.length ? input.checklist : undefined,
+    recurrence: input.recurrence,
+    seriesId: input.seriesId,
+    projectName: canon(input.projectName),
+    areaId: input.areaId,
+    estimateMin: input.estimateMin,
+    plannedFor: input.plannedFor,
+    createdById: input.createdById,
+    collaborators: input.collaborators?.filter((c) => c !== input.ownerId).length ? input.collaborators.filter((c) => c !== input.ownerId) : undefined,
+  })
 
   const saveTask = (task: Task) => {
     task = { ...task, projectName: canon(task.projectName) }
@@ -429,29 +457,25 @@ export const useStore = create<State>((set, get) => {
     // ---------- tarefas ----------
 
     createTask(input) {
-      const task: Task = {
-        id: uid(),
-        title: input.title.trim(),
-        ownerId: input.ownerId,
-        dueDate: input.dueDate,
-        leadId: input.leadId,
-        done: false,
-        createdAt: nowIso(),
-        priority: input.priority,
-        labels: input.labels?.length ? input.labels : undefined,
-        description: input.description?.trim() || undefined,
-        checklist: input.checklist?.length ? input.checklist : undefined,
-        recurrence: input.recurrence,
-        seriesId: input.seriesId,
-        projectName: canon(input.projectName),
-        areaId: input.areaId,
-        estimateMin: input.estimateMin,
-        plannedFor: input.plannedFor,
-        createdById: input.createdById,
-        collaborators: input.collaborators?.filter((id) => id !== input.ownerId).length ? input.collaborators.filter((id) => id !== input.ownerId) : undefined,
-      }
+      const task = newTask(input, uid())
       set((s) => ({ tasks: [...s.tasks, task] }))
       persist(repos().tasks.upsert(task))
+      return task
+    },
+
+    async createTaskConfirmed(input, id) {
+      // Mesmo id = mesma tarefa: repetir depois de um erro ou timeout regrava, não duplica.
+      // Se a pessoa corrigiu algo antes de tentar de novo, vale a versão nova.
+      const existing = get().tasks.find((t) => t.id === id)
+      const task = existing ? { ...newTask(input, id), createdAt: existing.createdAt } : newTask(input, id)
+      set((s) => ({ tasks: [...s.tasks.filter((t) => t.id !== id), task] }))
+      try {
+        await repos().tasks.upsert(task)
+      } catch (err) {
+        // Não gravou: sai da lista (a prévia guarda os dados para tentar de novo com o mesmo id).
+        set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+        throw err
+      }
       return task
     },
 

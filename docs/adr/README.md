@@ -35,3 +35,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0015](0015-pausa-e-avisos.md) | Online confiável, pausa com motivo e avisos para CEO e founders | Aceito |
 | [0016](0016-worker-do-tempo-real-na-csp.md) | Worker do tempo real liberado na CSP | Aceito |
 | [0017](0017-rotinas-no-fazendo-agora.md) | Rotinas no "fazendo agora": a Prospecção aparece no online | Aceito |
+| [0019](0019-captura-inteligente-de-tarefas.md) | Captura inteligente de tarefas: IA só propõe, servidor valida, pessoa confirma | Proposto |

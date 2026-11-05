@@ -16,6 +16,7 @@ import {
   PlusIcon,
   SearchIcon,
   ShieldAlertIcon,
+  SparklesIcon,
   SunIcon,
   UploadIcon,
   UserPlusIcon,
@@ -391,6 +392,9 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuItem onSelect={() => openCapture()}>
           <InboxIcon /> Captura rápida
           <DropdownMenuShortcut>Ctrl K</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openCapture({ mode: "ia" })}>
+          <SparklesIcon /> Estruturar tarefas com IA
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openLeadForm()}>
           <UserPlusIcon /> Lead
