@@ -119,7 +119,8 @@ export function ImportLeadsDialog({ open, onClose }: { open: boolean; onClose: (
       if (!lead.website && row.website) patch.website = row.website
       // Contato que era só o link do site (importação antiga) dá lugar ao telefone.
       const contactIsUrl = !!lead.contact && /^https?:\/\//.test(lead.contact)
-      if ((!lead.contact || contactIsUrl) && row.contact !== lead.contact) patch.contact = row.contact
+      // Só troca quando a planilha TEM contato: linha sem telefone não apaga o que o lead já tinha.
+      if ((!lead.contact || contactIsUrl) && row.contact && row.contact !== lead.contact) patch.contact = row.contact
       if (!lead.productId && productId) patch.productId = productId
       // Dados novos da planilha (segmento, cidade, origem, análise) entram onde ainda está vazio.
       if (!lead.segment && row.segment) patch.segment = row.segment
