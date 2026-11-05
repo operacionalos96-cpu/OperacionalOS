@@ -19,6 +19,13 @@ describe("abas por pessoa", () => {
     expect(defaultPages("u9", "operator", DEFAULT_AREAS, people).sort()).toEqual([...BASE_PAGES].sort())
   })
 
+  it("a CEO (admin) vê as abas das áreas dela e Configurações", () => {
+    const ceo = defaultPages("u3", "admin", DEFAULT_AREAS, { ...people, ceoId: "u3" })
+    expect(ceo.sort()).toEqual(
+      [...BASE_PAGES, "/financeiro", "/metas", "/mapas", "/configuracoes"].sort(),
+    )
+  })
+
   it("o ajuste do owner vale mais que o padrão; a Início sempre aparece; aba de nível só com nível", () => {
     const v = visiblePages("u1", "operator", { areas: DEFAULT_AREAS, people, overrides: { u1: ["/conteudos", "/cofre"] } })
     expect(canSee(v, "/conteudos")).toBe(true)
