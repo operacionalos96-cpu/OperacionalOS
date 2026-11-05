@@ -3,7 +3,8 @@
 //   node gerar_video.mjs <pasta_do_lead> [saida.mp4] [--escala=0.5]
 // Saída: H.264, 1080×1920, 30 fps, CRF 22, yuv420p, faststart. Código de saída ≠ 0 com a lista de erros, sem gerar vídeo.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, closeSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, closeSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -95,7 +96,21 @@ avisos.forEach((a) => console.warn("aviso:", a));
 
 // pasta própria por render: dois leads podem rodar ao mesmo tempo sem misturar prints
 const id = `${basename(pasta).replace(/[^\w-]/g, "_")}-${process.pid}`;
-const pub = join(RAIZ, "public", "dx_leads", id);
+// public/ copiado para fora do OneDrive a cada render: o OneDrive troca os arquivos por "sob demanda" (reparse point),
+// o Remotion os toma por atalho e tenta recriar o atalho no bundle (EPERM: symlink). A cópia lê o conteúdo e vira arquivo comum.
+const publico = join(tmpdir(), `hzk-dx-${id}`);
+const copiarPasta = (de, para) => {
+  mkdirSync(para, { recursive: true });
+  for (const nome of readdirSync(de)) {
+    if (nome === "dx_leads") continue;
+    const origem = join(de, nome);
+    if (statSync(origem).isDirectory()) copiarPasta(origem, join(para, nome));
+    else copyFileSync(origem, join(para, nome));
+  }
+};
+rmSync(publico, { recursive: true, force: true });
+copiarPasta(join(RAIZ, "public"), publico);
+const pub = join(publico, "dx_leads", id);
 mkdirSync(pub, { recursive: true });
 PRINTS.forEach((a) => copyFileSync(join(pasta, a), join(pub, a)));
 const props = join(pub, "props.json");
@@ -106,7 +121,7 @@ const inicio = Date.now();
 const correr = (cmd, a) => {
   const r = spawnSync(cmd, a, { cwd: RAIZ, stdio: "inherit", shell: process.platform === "win32" });
   if (r.status !== 0) {
-    rmSync(pub, { recursive: true, force: true });
+    rmSync(publico, { recursive: true, force: true });
     rmSync(bruto, { force: true });
     console.error(`falhou: ${cmd}`);
     process.exit(r.status ?? 1);
@@ -115,9 +130,9 @@ const correr = (cmd, a) => {
 // garante o navegador do Remotion antes do render: na primeira vez, sem isto, o render achou o download pela metade
 correr("npx", ["remotion", "browser", "ensure", "--log=error"]);
 correr("npx", ["remotion", "render", "Diagnostico", `"${bruto}"`, `--props="${props}"`, "--codec=h264", "--crf=14", "--pixel-format=yuv420p",
-  `--scale=${escala}`, "--log=error", `--concurrency=${concorrencia}`, "--timeout=120000"]);
+  `--scale=${escala}`, "--log=error", `--concurrency=${concorrencia}`, "--timeout=120000", `--public-dir="${publico}"`]);
 // ffmpeg que já vem com o Remotion: o PC não precisa de ffmpeg instalado
 correr("npx", ["remotion", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", `"${bruto}"`, "-vf", "scale=out_range=tv,format=yuv420p", "-c:v", "libx264", "-crf", "22", "-pix_fmt", "yuv420p", "-r", "30", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", `"${saida}"`]);
 rmSync(bruto, { force: true });
-rmSync(pub, { recursive: true, force: true });
+rmSync(publico, { recursive: true, force: true });
 console.log(`pronto: ${saida} (${(statSync(saida).size / 1048576).toFixed(1)} MB em ${Math.round((Date.now() - inicio) / 1000)} s)`);
