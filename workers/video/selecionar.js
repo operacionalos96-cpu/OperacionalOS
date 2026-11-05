@@ -7,110 +7,94 @@ const MINIMO = 3;
 // Pontos do mesmo assunto não aparecem juntos (o vídeo precisa de 3 argumentos diferentes).
 const FAMILIA = { contato_no_fim: 'contato', sem_whatsapp: 'contato', sem_cta_topo: 'contato', titulo_generico: 'busca', titulo_so_nome: 'busca', sem_descricao: 'busca' };
 
+// Cada ponto fala do CLIENTE do empresário (quem chega, confia, pede orçamento), não de peças do site.
+// Teste do dono: se a frase serviria para qualquer site, ou só um técnico vê valor nela, não entra no vídeo.
+// Por isso título/descrição do Google, quantidade de palavras e ano do rodapé não são argumento (devolvem null).
 function frase(a) {
   switch (a.kind) {
     case 'nao_responsivo':
       return {
-        text: 'no celular, a página fica mais larga que a tela e precisa de zoom para ler',
-        short: 'Não adaptado ao celular',
-        impacto: 'Para quem abre pelo celular, a primeira impressão já começa com esforço.',
+        text: 'no celular, a página fica mais larga que a tela: para ler, o cliente precisa dar zoom e arrastar para o lado',
+        short: 'No celular, o cliente precisa dar zoom',
+        impacto: 'Quem abre pelo celular encontra uma página que dá trabalho, e o próximo resultado da busca está a um toque.',
       };
     case 'subdominio_gratuito':
       return {
-        text: `o endereço do site é um subdomínio gratuito (${a.host})`,
-        short: 'Sem domínio próprio',
-        impacto: 'Um endereço próprio é um dos primeiros sinais de empresa estabelecida.',
+        text: `o endereço que vocês passam para os clientes é ${a.host}, de site gratuito`,
+        short: 'Endereço de site gratuito',
+        impacto: 'Para quem recebe o link, parece empresa provisória, o oposto do que vocês já construíram.',
       };
     case 'topo_sem_proposta':
       return {
         text: a.soNome || (a.titulo && !/^(seja )?bem[- ]vind/i.test(a.titulo) && a.titulo.split(' ').length <= 5)
-          ? `a primeira tela mostra só "${a.titulo}", sem dizer o que vocês fazem`
+          ? `quem chega vê só "${a.titulo}" na primeira tela, sem saber o que vocês resolvem nem para quem`
           : a.titulo && /^(seja )?bem[- ]vind/i.test(a.titulo)
-          ? `a primeira tela abre com "${a.titulo}", sem dizer o que vocês fazem`
-          : 'a primeira tela não diz com clareza o que vocês fazem',
-        short: 'Topo sem proposta clara',
-        impacto: 'Quem chega precisa rolar ou adivinhar para entender o que a empresa oferece.',
+          ? `quem chega lê "${a.titulo}" na primeira tela, sem saber o que vocês resolvem nem para quem`
+          : 'quem chega não descobre na primeira tela o que vocês resolvem nem para quem',
+        short: 'Quem chega não sabe o que vocês fazem',
+        impacto: 'É nesses primeiros segundos que o cliente decide se está no lugar certo ou volta para a busca.',
       };
     case 'servicos_sem_explicacao': {
       const nome = a.nome || 'serviços';
       return {
-        text: `os ${nome} aparecem só como uma lista de nomes, sem explicar o que cada um resolve`,
-        short: `${nome[0].toUpperCase()}${nome.slice(1)} sem explicação`,
-        impacto: 'Quem pesquisa não descobre o que cada um resolve para ele.',
+        text: `os ${nome} aparecem só como nomes; quem tem o problema não encontra ali o que resolve o caso dele`,
+        short: 'Cliente não vê o que pode contratar',
+        impacto: 'Quem chega com uma necessidade não se reconhece nos nomes e sai sem pedir orçamento.',
       };
     }
     case 'contato_no_fim':
       return {
-        text: 'o contato só aparece depois de rolar boa parte da página',
-        short: 'Contato escondido',
-        impacto: 'O próximo passo fica longe justamente quando o interesse é maior.',
+        text: 'para chamar vocês, o cliente precisa rolar boa parte da página até achar o contato',
+        short: 'Difícil chamar vocês',
+        impacto: 'O cliente que já quer orçamento precisa procurar como falar com vocês.',
       };
     case 'sem_cta_topo':
       return {
-        text: 'na primeira tela não há um botão para chamar a empresa',
-        short: 'Sem chamada na primeira tela',
-        impacto: 'Quem já está convencido precisa procurar como falar com vocês.',
+        text: 'na primeira tela não há nenhum botão para pedir orçamento ou chamar a empresa',
+        short: 'Nenhum botão para pedir orçamento',
+        impacto: 'Quem já chega decidido precisa procurar o próximo passo.',
       };
     case 'sem_whatsapp':
       return {
-        text: 'não há um botão de WhatsApp para chamar a empresa direto pelo site',
-        short: 'Sem botão de WhatsApp',
-        impacto: 'O caminho até a conversa fica mais longo do que precisa.',
+        text: 'não há um botão de WhatsApp: quem quer conversar agora precisa copiar o número ou preencher formulário',
+        short: 'Sem atalho para o WhatsApp',
+        impacto: 'O cliente que quer resolver rápido encontra um passo a mais justamente na hora de chamar.',
       };
     case 'sem_localizacao':
       return {
         text: 'o site não diz em que cidade ou região vocês atendem',
-        short: 'Sem localização clara',
-        impacto: 'Para clientes, buscadores e IAs, fica mais difícil ligar vocês à região.',
-      };
-    case 'pouco_conteudo':
-      return {
-        text: `a página inteira tem cerca de ${Math.round(a.palavras / 10) * 10} palavras para apresentar a empresa`,
-        short: 'Pouco conteúdo sobre a empresa',
-        impacto: 'Há pouco contexto para entender os serviços, a experiência e os diferenciais.',
-      };
-    case 'titulo_generico':
-      return {
-        text: `o título que aparece na busca do Google é só "${a.titulo}"`,
-        short: 'Título genérico no Google',
-        impacto: 'É o primeiro texto que alguém lê ao pesquisar vocês.',
-      };
-    case 'titulo_so_nome':
-      return {
-        text: `o título que aparece no Google é só o nome da empresa ("${a.titulo}")`,
-        short: 'Google não sabe o que vocês fazem',
-        impacto: 'Quem pesquisa pelo serviço não encontra uma pista do que vocês oferecem.',
-      };
-    case 'sem_descricao':
-      return {
-        text: 'o site não tem a descrição que o Google mostra na busca',
-        short: 'Sem descrição para o Google',
-        impacto: 'O resumo que aparece na pesquisa fica por conta do Google, e não da empresa.',
+        short: 'Cliente não sabe se vocês atendem ele',
+        impacto: 'Quem procura alguém perto fica sem saber se vale a pena chamar vocês.',
       };
     case 'sem_autoridade':
       return {
         text: 'o site não mostra a experiência, a formação ou a trajetória por trás da empresa',
-        short: 'Experiência não aparece',
-        impacto: 'É justamente o que dá segurança para quem ainda não conhece vocês.',
+        short: 'A experiência de vocês não aparece',
+        impacto: 'Quem ainda não conhece vocês não encontra o motivo para confiar na empresa.',
       };
     case 'sem_prova_social':
       return {
-        text: 'o site não mostra depoimentos ou avaliações de clientes',
-        short: 'Sem depoimentos de clientes',
-        impacto: 'Quem não conhece vocês não encontra a confirmação de outros clientes.',
+        text: 'em nenhum lugar do site um cliente conta como foi contratar vocês',
+        short: 'Nenhum cliente falando por vocês',
+        impacto: 'Quem está decidindo não encontra ninguém que já contratou e aprovou.',
       };
     case 'lento':
       return {
-        text: `no nosso teste, o site levou ${a.segundos} segundos para carregar`,
-        short: 'Carregamento lento',
-        impacto: 'A espera acontece justamente no primeiro contato com a empresa.',
+        text: `no nosso teste, o site levou ${a.segundos} segundos para aparecer`,
+        short: 'Cliente espera o site abrir',
+        impacto: 'Quem clicou na busca passa esses segundos olhando uma tela vazia.',
       };
     case 'sem_https':
       return {
-        text: 'o site ainda abre sem o cadeado de segurança (https)',
-        short: 'Site sem https',
-        impacto: 'O navegador marca a página como "não segura" para o visitante.',
+        text: 'ao abrir o site, o navegador mostra o aviso "Não seguro" ao lado do endereço',
+        short: 'Navegador avisa "Não seguro"',
+        impacto: 'É o primeiro recado que o cliente lê, antes mesmo do nome da empresa.',
       };
+    // Pontos de técnico, não de dono: ficam como fato medido para o analista, nunca no vídeo.
+    case 'pouco_conteudo':
+    case 'titulo_generico':
+    case 'titulo_so_nome':
+    case 'sem_descricao':
     default:
       return null;
   }

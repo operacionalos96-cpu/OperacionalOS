@@ -64,6 +64,8 @@ const out = (o) => console.log(JSON.stringify(o, null, 2));
       descricao_no_google: m.descricao || null,
       fatos_medidos: m.achados.map((x) => `${x.kind}: ${x.evidencia}`),
       diferencial_achado_no_texto: m.diferencial,
+      // muda sozinho: o print pode mostrar outro slide. Não cite nem use como anchor (ANALISTA.md).
+      textos_em_carrossel_nao_citar: m.carrossel,
       texto_da_pagina: m.texto,
       resultado: 'Escreva o JSON no formato de ANALISTA.md e rode: node analista.js concluir ' + ids.job_id + ' ' + ids.lease_id + ' <arquivo.json>',
     });
