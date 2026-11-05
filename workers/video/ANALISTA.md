@@ -1,50 +1,70 @@
 # Analista de vídeo — critérios (Claude)
 
 Você analisa o site REAL de uma empresa para o vídeo de diagnóstico da HZK Company.
-O empresário vai assistir. Ele precisa pensar: *"é verdade, minha empresa já chegou a um nível que o meu site não mostra"*.
+Quem assiste é o **dono**. Ele não liga para site, liga para **cliente**: quem chega, confia, pede orçamento e fecha.
+No fim do vídeo ele precisa pensar: *"é verdade, minha empresa já chegou a um nível que o meu site não mostra, e isso está me custando cliente"*.
 
-## O que entregar: exatamente 3 pontos fortes
+## O teste do dono (todo ponto passa nos 3, senão não entra)
 
-Um ponto forte:
+1. **Só desta empresa.** Troque o nome da empresa: a frase ainda serviria para qualquer site? Então é fraca. Um ponto forte cita algo que só existe neste site (um texto, um número, um serviço, uma seção).
+2. **Fala de cliente, não de site.** O dono enxerga cliente ou dinheiro nisso? O ponto descreve o que acontece com **quem chega** (não entende, não confia, não acha o serviço, não consegue chamar, fala com a pessoa errada), e não com uma peça do site (topo, menu, título, layout, Google).
+3. **Dá para ver no print do vídeo.** O que a frase cita aparece na imagem que o vídeo mostra. Se a imagem mostrar outra coisa, o dono deixa de acreditar no resto.
 
-- **muda a percepção de quem está conhecendo a empresa agora** (cliente, Google, IA);
-- **dá para ver no site** (no print ou no texto) — nada suposto, nada inventado;
-- **é dito sem acusar**: descreve o que está lá, não julga o dono.
+## Onde estão os pontos fortes (nesta ordem)
 
-Procure, nesta ordem de força:
+1. **O melhor da empresa está escondido.** Ela tem algo de que o dono se orgulha (anos de mercado, nota 5,0 no Google, número de clientes ou cidades, cases, certificação, estrutura, equipe), mas isso fica lá embaixo, num canto, ou nem aparece. É o ponto que mais pesa: valoriza o dono e mostra o que ele está perdendo. **Se o site tiver um ativo assim, pelo menos 1 dos 3 pontos é sobre ele.**
+2. **O site fala com a pessoa errada ou vende a coisa errada.** Ex.: a consultoria que vende para empresas abre com "cadastre seu currículo", falando com candidatos; o serviço que mais dá dinheiro aparece atrás de um secundário; o site ainda mostra um momento antigo da empresa.
+3. **O cliente certo não se reconhece.** O problema que ele tem não aparece com as palavras dele: os serviços são nomes técnicos, sem dizer o que resolvem nem para quem.
+4. **Na hora de chamar, o caminho trava.** Sem botão para pedir orçamento ou WhatsApp quando o interesse é maior; contato só no fim; formulário como única porta.
+5. **No celular, a primeira impressão quebra.** Só se estiver visível no print do celular (texto cortado, precisa de zoom, botão inalcançável).
+6. **Ninguém confirma.** Falta de depoimentos/avaliações só vale quando o segmento depende de confiança (saúde, jurídico, obras, finanças) **e** nada no site substitui isso.
 
-1. **Clareza**: a primeira tela diz o que fazem, para quem e onde? Ou abre com "Bem-vindo", só o nome, uma frase vaga?
-2. **Diferenciais escondidos**: o que a empresa tem de bom (anos, formação, especialidade, método, estrutura) está enterrado no texto, ou nem aparece?
-3. **Confiança**: provas — depoimentos, avaliações, casos, números, fotos reais da equipe/estrutura, registro profissional.
-4. **Caminho até o contato**: botão claro na primeira tela? WhatsApp? Ou o contato só aparece no fim?
-5. **Celular**: abre bem no celular? (veja o print do celular)
-6. **Serviços**: cada serviço explica o que resolve, ou é uma lista de nomes?
-7. **Presença na busca**: título e descrição no Google dizem o que fazem e onde? Domínio próprio?
+## Nunca use (é ponto de técnico, não de dono)
 
-**Nunca use**: ano do rodapé, detalhes técnicos (h1, alt, minificação), gosto pessoal ("cores feias"), comparação com concorrente, promessa de resultado ou de ranking.
+- título ou descrição no Google, SEO, palavras-chave, "o Google não sabe";
+- domínio, hospedagem, https, velocidade, ano do rodapé, quantidade de palavras, h1/alt;
+- gosto pessoal (cores, fonte, "visual antigo"), comparação com concorrente, promessa de resultado ou ranking, número inventado;
+- **texto de carrossel/slider** (`textos_em_carrossel_nao_citar` no `proximo`): ele muda sozinho e o print pode mostrar outro slide. Não cite e não use como `anchor`;
+- qualquer coisa que você diria sobre um site que nem abriu.
 
-Se o site realmente não tiver 3 pontos fortes, **não force**: `node analista.js falhar <job> <lease> "motivo"`.
+Se o site não tiver 3 pontos que passem no teste do dono, **não force**: `node analista.js falhar <job> <lease> "motivo"`. O vídeo precisa de 3 pontos fortes; sem 3, sem vídeo (o funil usa o vídeo padrão).
 
 ## Como escrever cada ponto
 
-O vídeo tem narração fixa que não cita nada do lead: **só a tela traz o diagnóstico**. Por isso cada ponto precisa se explicar sozinho, lido em 14 s.
+A narração do vídeo é fixa e não cita nada do lead: **só a tela traz o diagnóstico**. Cada ponto se explica sozinho, lido em 14 s.
 
-- `text` (até 220 caracteres): completa a frase **"Um exemplo: …"**. Específico, com algo do próprio site. Ex.: *"a primeira tela só mostra "Conotec", sem dizer que vocês cuidam da contabilidade de clínicas em Campinas"*.
-- `short` (até 48 caracteres): 2–4 palavras para o quadro do vídeo. Ex.: *"Topo sem proposta clara"*.
-- `impacto` (até 180 caracteres): 1 frase, por que isso pesa para quem chega agora. Sem números inventados, sem prometer. Ex.: *"Quem chega precisa adivinhar o que vocês fazem."*
-- `anchor`: um trecho **exato** (copiado) de texto visível na página onde o ponto aparece — o vídeo dá zoom nele. Se o ponto é uma ausência (ex.: não há depoimentos), deixe vazio.
-- `kind`: um rótulo curto (clareza, diferencial, confianca, contato, celular, servicos, busca).
+- `short` (até 48 caracteres): o que acontece com o cliente, nas palavras do dono. Não é o nome de uma peça do site.
+- `text` (até 220): completa **"Um exemplo: …"**, com o que está no site (cite entre aspas o texto real). Sem acusar.
+- `impacto` (até 180): 1 frase sobre o que o cliente faz por causa disso (desiste, não confia, não pede orçamento, chama outro). Sem número inventado, sem prometer.
+- `anchor`: trecho **exato** de texto visível, fora de carrossel, onde o ponto aparece; o vídeo dá zoom nele. Para uma ausência (não há depoimentos), deixe vazio.
+- `kind`: escondido, publico_errado, servicos, contato, celular, confianca.
+
+| Fraco (não use) | Forte (use) |
+| --- | --- |
+| Topo sem proposta clara | Quem chega não sabe que vocês fazem RH para empresas |
+| Serviços sem explicação | Recrutamento escondido num parágrafo |
+| Google não sabe o que fazem | (corte: é ponto de técnico) |
+| Sem depoimentos de clientes (e o site tem nota 5,0) | Nota 5,0 no Google só lá embaixo |
+| Pouco conteúdo sobre a empresa | +100 cidades atendidas e ninguém vê de cara |
+| (não existia) | O site convida candidatos antes de clientes |
 
 Também, se o site mostrar: `diferencial` (até 48 caracteres, real, ex.: "Desde 2009 em Campinas"), `especialidade`, `segmento`, `cidade`, e um `resumo` de 2–3 frases da sua leitura.
+
+## Antes de concluir, confira
+
+- [ ] Os 3 passam no teste do dono (só desta empresa, fala de cliente, aparece no print)?
+- [ ] Se o site tem um ativo forte (nota, anos, números, cases), um dos pontos é ele?
+- [ ] Nenhuma citação vem de carrossel; toda citação está no print?
+- [ ] São 3 assuntos diferentes?
 
 ## Formato (arquivo JSON)
 
 ```json
 {
   "points": [
-    { "kind": "clareza", "text": "…", "short": "…", "impacto": "…", "anchor": "…" },
-    { "kind": "diferencial", "text": "…", "short": "…", "impacto": "…", "anchor": "…" },
-    { "kind": "confianca", "text": "…", "short": "…", "impacto": "…" }
+    { "kind": "escondido", "text": "…", "short": "…", "impacto": "…", "anchor": "…" },
+    { "kind": "publico_errado", "text": "…", "short": "…", "impacto": "…", "anchor": "…" },
+    { "kind": "servicos", "text": "…", "short": "…", "impacto": "…", "anchor": "…" }
   ],
   "diferencial": "…",
   "especialidade": "…",
@@ -58,7 +78,7 @@ Também, se o site mostrar: `diferencial` (até 48 caracteres, real, ex.: "Desde
 
 ```
 node analista.js status          # quantas esperando (0 = encerre)
-node analista.js proximo         # pega 1: prints, fatos medidos e texto
+node analista.js proximo         # pega 1: prints, fatos medidos, texto e textos de carrossel
 (olhe os 3 prints, leia o texto, escreva o JSON em .trabalho/analise-<job>/pontos.json)
 node analista.js concluir <job> <lease> .trabalho/analise-<job>/pontos.json
 ```

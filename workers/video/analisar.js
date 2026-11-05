@@ -39,6 +39,23 @@ async function esperarFontes(page) {
   await new Promise((r) => setTimeout(r, 300));
 }
 
+// Congela carrosséis e animações antes de medir e tirar os prints. Sem isso, o analista lia um slide
+// ("PROPÓSITO E RESULTADOS", na FATD) e o print pegava outro ("ESTRATÉGIAS QUE CONECTAM"): a frase do
+// vídeo contradizia a imagem e o empresário deixava de acreditar no resto.
+async function congelar(page) {
+  await page.evaluate(() => {
+    const st = document.createElement('style');
+    st.textContent = '*,*::before,*::after{animation-play-state:paused!important;transition:none!important}';
+    document.head.appendChild(st);
+    for (const el of document.querySelectorAll('.swiper, .swiper-container')) { try { el.swiper?.autoplay?.stop(); } catch {} }
+    try { window.jQuery?.('.slick-slider').slick?.('slickPause'); } catch {}
+    try { window.jQuery?.('.owl-carousel').trigger?.('stop.owl.autoplay'); } catch {}
+    // autoplay de carrossel roda em setInterval/setTimeout: a página já carregou tudo, então para todos
+    const ultimo = setTimeout(() => {}, 0);
+    for (let i = 0; i <= ultimo; i++) { clearTimeout(i); clearInterval(i); }
+  }).catch(() => {});
+}
+
 // Repete `passos` se a página se recarregar no meio (o evaluate perde o contexto).
 async function mesmoSeRecarregar(page, passos, tentativas = 3) {
   for (let i = 1; ; i++) {
@@ -83,6 +100,17 @@ function medir(ctx, maxAltura) {
   const achados = [];
   const altura = Math.min(document.documentElement.scrollHeight, maxAltura);
   const dentro = (a) => a.y + a.h <= altura;
+  // Texto de carrossel/slider muda sozinho: não serve de prova (o print pode mostrar outro slide).
+  const CARROSSEL = /swiper|slick|carousel|slider|owl-|splide|flickity|glide|elementor-slide|n2-ss|rev_slider|rs-slide|slideshow|wpb_gallery/i;
+  const emCarrossel = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) if (CARROSSEL.test(`${e.className?.baseVal ?? e.className ?? ''} ${e.id} ${e.getAttribute('data-widget_type') || ''}`)) return true;
+    return false;
+  };
+  const blocosCarrossel = [...document.querySelectorAll('body *')].filter((e) => CARROSSEL.test(`${e.className?.baseVal ?? e.className ?? ''} ${e.id} ${e.getAttribute('data-widget_type') || ''}`));
+  const naTela = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.left >= -4 && r.right <= W + 4;
+  };
 
   // 2) / 3) Contato: WhatsApp/telefone só lá embaixo, ou nenhum botão de WhatsApp
   {
@@ -164,7 +192,11 @@ function medir(ctx, maxAltura) {
   }
 
   // 6) Sem depoimentos/avaliações de clientes
-  if (!/depoimento|avalia[cç][aãõ]|o que (nossos |os )?(clientes|pacientes)|(clientes|pacientes) (dizem|falam)|google reviews?|★★★/i.test(texto)) {
+  // Prova social também é depoimento entre aspas ("“Tive a oportunidade…” VANDERLEI") e nota/estrelas no Google:
+  // a FATD tinha os dois e o vídeo dizia "nenhum cliente falando por vocês" — ponto falso derruba o vídeo inteiro.
+  const citacao = /[“"«][^”"»]{80,}[”"»]/.test(texto);
+  const nota = /\b(nota|avalia[cç][aã]o)\b[^.]{0,20}\b[45]\s*[,.]\s*\d\b|\b[45][,.]\d\s*(estrelas|no google)|estrelas no google|\bcases? de sucesso\b|\bclientes atendidos\b/i.test(texto);
+  if (!citacao && !nota && !/depoimento|avalia[cç][aãõ]|o que (nossos |os )?(clientes|pacientes)|(clientes|pacientes) (dizem|falam)|google reviews?|★★★/i.test(texto)) {
     achados.push({ kind: 'sem_prova_social', prioridade: 50, area: null, evidencia: 'nenhuma menção a depoimentos/avaliações no texto da página' });
   }
 
@@ -211,7 +243,9 @@ function medir(ctx, maxAltura) {
   const ancoras = (ctx.ancoras || []).map((t) => {
     const alvo = norm(t).replace(/\s+/g, ' ').trim();
     if (alvo.length < 3) return null;
-    const els = [...document.querySelectorAll('body *')].filter((e) => visivel(e) && norm(e.innerText).replace(/\s+/g, ' ').includes(alvo));
+    // Trecho que está num carrossel não vira zoom (nem pelo bloco em volta dele): o print pode mostrar outro slide.
+    if (blocosCarrossel.some((e) => norm(e.innerText).replace(/\s+/g, ' ').includes(alvo))) return null;
+    const els = [...document.querySelectorAll('body *')].filter((e) => visivel(e) && naTela(e) && !emCarrossel(e) && norm(e.innerText).replace(/\s+/g, ' ').includes(alvo));
     const menor = els.sort((a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
     if (!menor) return null;
     const area = doc(bloco(menor, 120, 640).getBoundingClientRect());
@@ -243,7 +277,11 @@ function medir(ctx, maxAltura) {
   })();
 
   const descricao = (document.querySelector('meta[name="description"]')?.getAttribute('content') || '').trim();
-  return { achados, ancoras, altura, titulo: document.title, descricao, texto: texto.slice(0, 7000), diferencial: dif, cor, https: location.protocol === 'https:' };
+  // Textos que estão em carrossel: o analista não cita nem ancora nenhum deles.
+  const carrossel = [...new Set([...document.querySelectorAll('h1, h2, h3, p, span, a')]
+    .filter((e) => emCarrossel(e) && (e.innerText || '').trim().length > 6 && !e.querySelector('h1, h2, h3, p'))
+    .map((e) => e.innerText.replace(/\s+/g, ' ').trim().slice(0, 120)))].slice(0, 20);
+  return { achados, ancoras, altura, carrossel, titulo: document.title, descricao, texto: texto.slice(0, 7000), diferencial: dif, cor, https: location.protocol === 'https:' };
 }
 
 /** Analisa o site e salva home.png, pagina.png e mobile.png em `dir`. ctx = { segmento, cidade } do lead. */
@@ -264,6 +302,7 @@ async function analisarSite(browser, url, dir, ctx = {}) {
     await carregarTudo(page);
     await limparSobreposicoes(page);
     await esperarFontes(page);
+    await congelar(page);
     return page.evaluate(medir, { segmento: ctx.segmento || '', cidade: ctx.cidade || '', nome: ctx.nome || '', ancoras: ctx.ancoras || [] }, MAX_ALTURA);
   });
   await page.screenshot({ path: path.join(dir, 'home.png') });
@@ -281,6 +320,7 @@ async function analisarSite(browser, url, dir, ctx = {}) {
   const larguraMobile = await mesmoSeRecarregar(mob, async () => {
     await limparSobreposicoes(mob);
     await esperarFontes(mob);
+    await congelar(mob);
     return mob.evaluate(() => document.documentElement.scrollWidth);
   });
   await mob.screenshot({ path: path.join(dir, 'mobile.png') });
