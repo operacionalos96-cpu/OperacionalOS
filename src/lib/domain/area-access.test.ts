@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { areaLevel, canGrant, canReadArea, canSeeTask, canWriteArea, grantActive, type AreaGrant, type AreaLevel } from "./area-access"
+import { areaLevel, canGrant, canReadArea, canSeeTask, canWriteArea, grantActive, grantableLevels, type AreaGrant, type AreaLevel } from "./area-access"
 
 const now = new Date("2026-11-09T12:00:00Z")
 const fin = { id: "financeiro", restricted: true }
@@ -69,6 +69,12 @@ describe("quem concede", () => {
 
   it("sem gerir na área não concede nada, nem sendo admin", () => {
     expect(canGrant({ level: "admin" }, "aprovar", "ver")).toBe(false)
+  })
+
+  it("opções da tela: owner tudo menos vitrine; construtor até operar; demais nada", () => {
+    expect(grantableLevels({ level: "owner" }, "gerir")).toEqual(["ver", "operar", "aprovar", "gerir"])
+    expect(grantableLevels({ level: "operator" }, "gerir")).toEqual(["ver", "operar"])
+    expect(grantableLevels({ level: "admin" }, "aprovar")).toEqual([])
   })
 })
 
