@@ -17,6 +17,8 @@ export interface Area {
   /** Observação de aprovação ("contrato vai para CEO"). */
   approvalNote?: string
   order: number
+  /** Área restrita (ADR 0020): só owner e quem tem concessão recebem os dados; os demais ficam na vitrine. */
+  restricted?: boolean
 }
 
 /** Quem é quem agora: a CEO é quem tem o cargo "ceo" (Equipe › Cargos); founders têm o cargo "founder". */
