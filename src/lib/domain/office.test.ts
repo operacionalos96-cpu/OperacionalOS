@@ -5,7 +5,7 @@ describe("linhas do banco → estado", () => {
   it("ignora jobs terminados, acha quem delegou pelo job-pai e usa o sinal mais recente da Ponte", () => {
     const input = officeStateInput({
       office: { consent_at: "2026-11-10T10:00:00Z" },
-      agents: [{ id: "C", kind: "co_lider", parent_agent_id: null, name: "Coord", title: "Coordenador", paused: false }],
+      agents: [{ id: "C", parent_agent_id: null, name: "Coord", title: "Coordenador", paused: false, can_create_agents: true }],
       jobs: [
         { id: "u-pai", public_id: "job_pai", agent_id: "C", entity_id: "thr", status: "completed", claimed_at: null, started_at: null, parent_job_id: null, created_at: "t0" },
         { id: "u-filho", public_id: "job_filho", agent_id: "F", entity_id: "thr", status: "queued", claimed_at: null, started_at: null, parent_job_id: "u-pai", created_at: "t1" },
@@ -24,34 +24,29 @@ describe("linhas do banco → estado", () => {
   })
 })
 
-const ag = (id: string, kind: OfficeAgent["kind"], parentAgentId: string | null, paused = false): OfficeAgent => ({ id, kind, parentAgentId, name: id, title: id, paused })
-// co-líder C → funcionário F1 → funcionário F2 (3 níveis)
-const team = [ag("C", "co_lider", null), ag("F1", "funcionario", "C"), ag("F2", "funcionario", "F1")]
+const ag = (id: string, parentAgentId: string | null, paused = false): OfficeAgent => ({ id, parentAgentId, name: id, title: id, paused })
+// sem papel fixo: C (sem chefe) → F1 → F2 = 3 níveis; o nome "Big Boss" seria só um nome
+const team = [ag("C", null), ag("F1", "C"), ag("F2", "F1")]
 
-describe("organograma", () => {
-  it("aceita a estrutura normal e recusa o 4º nível", () => {
-    expect(validateAgentChange(team, { kind: "funcionario", parentAgentId: "C" })).toBeNull()
-    expect(validateAgentChange(team, { kind: "funcionario", parentAgentId: "F2" })).toBe("limit_depth")
-  })
-
-  it("um co-líder só, sem chefe; funcionário sempre com chefe", () => {
-    expect(validateAgentChange(team, { kind: "co_lider", parentAgentId: null })).toBe("one_co_lider")
-    expect(validateAgentChange([], { kind: "co_lider", parentAgentId: "X" })).toBe("parent_not_allowed")
-    expect(validateAgentChange(team, { kind: "funcionario", parentAgentId: null })).toBe("parent_required")
-    expect(validateAgentChange(team, { kind: "funcionario", parentAgentId: "nao-existe" })).toBe("parent_not_found")
+describe("organograma (opcional, sem papel fixo)", () => {
+  it("qualquer agente pode ficar sem chefe; recusa o 4º nível", () => {
+    expect(validateAgentChange(team, { parentAgentId: null })).toBeNull() // outro agente direto à pessoa
+    expect(validateAgentChange(team, { parentAgentId: "C" })).toBeNull()
+    expect(validateAgentChange(team, { parentAgentId: "F2" })).toBe("limit_depth")
+    expect(validateAgentChange(team, { parentAgentId: "nao-existe" })).toBe("parent_not_found")
   })
 
   it("limite de 20 agentes", () => {
-    const many = [ag("C", "co_lider", null), ...Array.from({ length: 19 }, (_, i) => ag(`F${i}`, "funcionario", "C"))]
-    expect(validateAgentChange(many, { kind: "funcionario", parentAgentId: "C" })).toBe("limit_agents")
+    const many = Array.from({ length: 20 }, (_, i) => ag(`A${i}`, null))
+    expect(validateAgentChange(many, { parentAgentId: null })).toBe("limit_agents")
   })
 
-  it("ao mover: sem ciclo, sem trocar o tipo, e a subárvore inteira cabe nos 3 níveis", () => {
-    expect(validateAgentChange(team, { id: "F1", kind: "funcionario", parentAgentId: "F2" })).toBe("cycle")
-    expect(validateAgentChange(team, { id: "F1", kind: "co_lider", parentAgentId: null })).toBe("kind_immutable")
-    const wide = [...team, ag("F3", "funcionario", "C")]
-    expect(validateAgentChange(wide, { id: "F1", kind: "funcionario", parentAgentId: "F3" })).toBe("limit_depth") // F1+F2 abaixo de F3 = 4 níveis
-    expect(validateAgentChange(wide, { id: "F2", kind: "funcionario", parentAgentId: "F3" })).toBeNull()
+  it("ao mover: sem ciclo, e a subárvore inteira cabe nos 3 níveis; pode voltar a ficar sem chefe", () => {
+    expect(validateAgentChange(team, { id: "F1", parentAgentId: "F2" })).toBe("cycle")
+    const wide = [...team, ag("F3", "C")]
+    expect(validateAgentChange(wide, { id: "F1", parentAgentId: "F3" })).toBe("limit_depth") // F1+F2 abaixo de F3 = 4 níveis
+    expect(validateAgentChange(wide, { id: "F2", parentAgentId: "F3" })).toBeNull()
+    expect(validateAgentChange(wide, { id: "F1", parentAgentId: null })).toBeNull()
   })
 })
 
@@ -75,7 +70,7 @@ describe("estados (office-state/v1)", () => {
   const job = (publicId: string, agentId: string, status: OfficeJob["status"], extra: Partial<OfficeJob> = {}): OfficeJob => ({ publicId, agentId, threadId: "thr_d", status, createdAt: "2026-11-10T11:00:00Z", ...extra })
   const base = (over: Partial<OfficeStateInput> = {}): OfficeStateInput => ({
     consent: true,
-    agents: [ag("C", "co_lider", null), ag("F1", "funcionario", "C"), ag("F2", "funcionario", "C", true)],
+    agents: [ag("C", null), ag("F1", "C"), ag("F2", "C", true)],
     jobs: [],
     threads: [{ id: "thr_d", kind: "direta" }, { id: "thr_c", kind: "canal" }],
     bridge: { lastSeenAt: "2026-11-10T11:59:30Z" },
@@ -108,16 +103,16 @@ describe("estados (office-state/v1)", () => {
     const s = deriveOfficeState(base({ jobs: [job("j2", "F1", "queued", { parentAgentId: "C", createdAt: "2026-11-10T11:30:00Z" }), job("j1", "C", "running")] }), now)
     expect(s.handoffs).toEqual([{ from_agent: "C", to_agent: "F1", job_id: "j2", at: "2026-11-10T11:30:00Z" }])
     expect(s.schema).toBe("office-state/v1")
-    expect(Object.keys(s.agents[0]).sort()).toEqual(["connection_id", "current", "id", "kind", "name", "parent_agent_id", "queue", "state", "title"])
+    expect(Object.keys(s.agents[0]).sort()).toEqual(["can_create_agents", "connection_id", "current", "id", "name", "parent_agent_id", "queue", "state", "title"])
   })
 
   it("IA indisponível: usa a reserva; sem nenhuma, diz se falta cota ou conexão", () => {
     const con = (id: string, status: "conectada" | "sem_cota" | "erro" | "desligada" | "pendente", quotaResetsAt: string | null = null) => ({ id, provider: id, kind: "chave" as const, status, quotaResetsAt })
     const agents = [
-      { ...ag("C", "co_lider", null), connectionId: "cota", backupModels: [{ connectionId: "ok", model: "m" }] }, // principal sem cota, reserva ok
-      { ...ag("F1", "funcionario", "C"), connectionId: "cota", backupModels: [{ connectionId: "off", model: "m" }] }, // tudo parado, há falta de cota
-      { ...ag("F2", "funcionario", "C"), connectionId: "off" }, // conexão desligada
-      { ...ag("F3", "funcionario", "C"), connectionId: null }, // sem IA escolhida
+      { ...ag("C", null), connectionId: "cota", backupModels: [{ connectionId: "ok", model: "m" }] }, // principal sem cota, reserva ok
+      { ...ag("F1", "C"), connectionId: "cota", backupModels: [{ connectionId: "off", model: "m" }] }, // tudo parado, há falta de cota
+      { ...ag("F2", "C"), connectionId: "off" }, // conexão desligada
+      { ...ag("F3", "C"), connectionId: null }, // sem IA escolhida
     ]
     const jobs = ["C", "F1", "F2", "F3"].map((a, i) => job(`j${i}`, a, "queued"))
     const s = deriveOfficeState(base({ agents, jobs, connections: [con("cota", "sem_cota", "2026-11-10T13:00:00Z"), con("ok", "conectada"), con("off", "desligada")] }), now)

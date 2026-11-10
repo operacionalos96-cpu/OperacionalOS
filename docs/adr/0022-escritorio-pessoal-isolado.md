@@ -5,7 +5,7 @@
 
 ## Contexto
 
-Cada pessoa vai ter um escritório de IA privado, com a própria equipe de agentes: um co-líder e funcionários abaixo dele (`docs/IA-OFFICE.md` §2). A especificação da V1 está em `docs/ESCRITORIO-PESSOAL.md`.
+Cada pessoa vai ter um escritório de IA privado, com a própria equipe de agentes. Nome, instruções e quem responde a quem são escolhas da pessoa: não há papel fixo ("Big Boss" é só um exemplo de nome), e um agente só cria outros se ela permitir (`docs/IA-OFFICE.md` §2). A especificação da V1 está em `docs/ESCRITORIO-PESSOAL.md`.
 
 O produto é **agnóstico** (decisão do Gabriel, 10/11/2026):
 - fila e memória nativas, sem Trello, Obsidian ou outra ferramenta externa no núcleo;
@@ -29,7 +29,7 @@ Fatos do código que pesaram:
    - **`claim_next_job`:** um worker só pega job do mesmo dono e respeita os limites do escritório: agente pausado não recebe, no máximo 2 em execução por agente, uma mensagem por vez por conversa;
    - **`job_event`:** job pessoal não gera evento na `events`;
    - **payload:** o job pessoal leva só ids; o texto fica em `office_messages`.
-4. **Limites no banco:** 20 agentes, 3 níveis, um co-líder, funcionário sempre com chefe, sem ciclo. As mesmas regras estão em `src/lib/domain/office.ts`, para a tela avisar antes.
+4. **Limites no banco:** 20 agentes, 3 níveis e sem ciclo. O organograma é opcional (qualquer agente pode ficar sem chefe), e `can_create_agents` marca o agente que pode propor agentes novos, sempre com o aprovar da pessoa. As mesmas regras estão em `src/lib/domain/office.ts`, para a tela avisar antes.
 5. **Estados exportáveis:**
    - `GET /api/escritorio/estado` devolve `office-state/v1`, calculado por `deriveOfficeState` (função pura) com a sessão do dono (RLS), e sem texto de conversa;
    - é o contrato que a Sede 3D vai ler como gêmeo digital (Etapa 7);
@@ -43,7 +43,7 @@ Fatos do código que pesaram:
 7. **Tarefas em árvore (`office_tasks`):**
    - pedido → subtarefas (`parent_task_id`, `root_task_id`), com responsável, estado e resumo do resultado;
    - `office_create_task` cria a tarefa, a conversa dela e a primeira entrega; cada entrega leva `ai_jobs.office_task_id`.
-   - É a base do Big Boss (E4) e da tabela de fluxo.
+   - É a base para um agente dividir tarefas entre outros (E4) e para a tabela de fluxo.
 8. **Uso (`office_usage`):** uma linha por entrega, com provedor, modelo, tokens, tempo, se foi grátis e o custo estimado. Só o dono lê; quem grava é o servidor, quando a Ponte conclui (E2).
 9. **Toda a execução da V1 roda na Ponte HZK**, no PC da pessoa, inclusive com chave de API: a chave nunca vai ao servidor, e a Vercel não segura processos longos.
    - **Primeira leva:** Ollama ou LM Studio locais e OpenRouter, que são grátis e sem dúvida de termos.

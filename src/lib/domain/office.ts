@@ -10,12 +10,16 @@ export const OFFICE_LIMITS = { agents: 20, depth: 3, parallelPerAgent: 2 } as co
 /** Sem sinal da Ponte por mais que isto = desligada (mesmo critério de saúde dos workers). */
 export const BRIDGE_ONLINE_MS = 2 * 60_000
 
-export type OfficeAgentKind = "co_lider" | "funcionario"
-
+/**
+ * Agente: nome, instruções e lugar no organograma são escolhas da pessoa. Não há papel fixo
+ * ("Big Boss" é só um exemplo de nome): um agente que pode criar agentes é o que tem
+ * `canCreateAgents`, e a pessoa também pode montar tudo à mão.
+ */
 export interface OfficeAgent {
   id: string
-  kind: OfficeAgentKind
   parentAgentId: string | null
+  /** pode propor agentes novos (sempre com o aprovar da pessoa) */
+  canCreateAgents?: boolean
   name: string
   title: string
   paused: boolean
@@ -39,12 +43,12 @@ export const connectionUsable = (c: OfficeConnection | undefined, now: Date) =>
 
 // ---------- organograma ----------
 
-export type AgentChangeError = "limit_agents" | "limit_depth" | "one_co_lider" | "parent_required" | "parent_not_allowed" | "parent_not_found" | "cycle" | "kind_immutable"
+export type AgentChangeError = "limit_agents" | "limit_depth" | "parent_not_found" | "cycle"
 
 export interface AgentChange {
   /** id de quem está sendo editado; ausente = novo agente */
   id?: string
-  kind: OfficeAgentKind
+  /** a quem responde no organograma; null = direto à pessoa */
   parentAgentId: string | null
 }
 
@@ -65,17 +69,13 @@ const heightOf = (agents: OfficeAgent[], id: string): number => 1 + Math.max(0, 
 const isDescendant = (agents: OfficeAgent[], ancestor: string, candidate: string): boolean =>
   agents.filter((a) => a.parentAgentId === ancestor).some((child) => child.id === candidate || isDescendant(agents, child.id, candidate))
 
-/** Mesmas travas do `office_upsert_agent`: 20 agentes, 3 níveis, um co-líder, funcionário com chefe, sem ciclo. */
+/** Mesmas travas do `office_upsert_agent`: 20 agentes, 3 níveis, sem ciclo. */
 export function validateAgentChange(agents: OfficeAgent[], change: AgentChange): AgentChangeError | null {
   const existing = change.id ? agents.find((a) => a.id === change.id) : undefined
-  if (existing && existing.kind !== change.kind) return "kind_immutable"
-  if (change.kind === "co_lider" && change.parentAgentId) return "parent_not_allowed"
-  if (change.kind === "funcionario" && !change.parentAgentId) return "parent_required"
   if (change.parentAgentId && !agents.some((a) => a.id === change.parentAgentId)) return "parent_not_found"
   const parentDepth = change.parentAgentId ? depthOf(agents, change.parentAgentId) : 0
   if (!existing) {
     if (agents.length >= OFFICE_LIMITS.agents) return "limit_agents"
-    if (change.kind === "co_lider" && agents.some((a) => a.kind === "co_lider")) return "one_co_lider"
     return parentDepth + 1 > OFFICE_LIMITS.depth ? "limit_depth" : null
   }
   if (change.parentAgentId && (change.parentAgentId === existing.id || isDescendant(agents, existing.id, change.parentAgentId))) return "cycle"
@@ -152,7 +152,7 @@ export interface OfficeStateV1 {
     id: string
     name: string
     title: string
-    kind: OfficeAgentKind
+    can_create_agents: boolean
     parent_agent_id: string | null
     connection_id: string | null
     state: AgentState
@@ -172,7 +172,7 @@ export interface OfficeRows {
   office: { consent_at: string | null } | null
   agents: {
     id: string
-    kind: OfficeAgentKind
+    can_create_agents?: boolean
     parent_agent_id: string | null
     name: string
     title: string
@@ -195,7 +195,7 @@ export function officeStateInput(rows: OfficeRows): OfficeStateInput {
     consent: !!rows.office?.consent_at,
     agents: rows.agents.map((a) => ({
       id: a.id,
-      kind: a.kind,
+      canCreateAgents: !!a.can_create_agents,
       parentAgentId: a.parent_agent_id,
       name: a.name,
       title: a.title,
@@ -264,7 +264,7 @@ export function deriveOfficeState(input: OfficeStateInput, now: Date): OfficeSta
       id: a.id,
       name: a.name,
       title: a.title,
-      kind: a.kind,
+      can_create_agents: !!a.canCreateAgents,
       parent_agent_id: a.parentAgentId,
       connection_id: a.connectionId ?? null,
       state,

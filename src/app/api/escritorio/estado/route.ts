@@ -18,7 +18,7 @@ export async function GET() {
 
   const [office, agents, jobs, threads, workers, connections] = await Promise.all([
     db.from("office").select("consent_at").eq("owner_team_id", member.teamId).maybeSingle(),
-    db.from("office_agents").select("id, kind, parent_agent_id, name, title, paused, connection_id, backup_models").eq("owner_team_id", member.teamId).order("created_at"),
+    db.from("office_agents").select("id, parent_agent_id, name, title, paused, connection_id, backup_models, can_create_agents").eq("owner_team_id", member.teamId).order("created_at"),
     db
       .from("ai_jobs")
       .select("id, public_id, agent_id, entity_id, status, claimed_at, started_at, parent_job_id, created_at")

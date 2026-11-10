@@ -42,7 +42,7 @@ create table if not exists public.office_agents (
   id              text primary key check (id ~ '^agt_[0-9A-HJKMNP-TV-Z]{26}$'),
   owner_team_id   text not null references public.office(owner_team_id),
   parent_agent_id text references public.office_agents(id),
-  kind            text not null check (kind in ('co_lider', 'funcionario')),
+  can_create_agents boolean not null default false,               -- a pessoa decide se este agente pode propor agentes novos
   name            text not null check (char_length(name) between 1 and 60),
   title           text not null check (char_length(title) between 1 and 80),
   description     text not null default '' check (char_length(description) <= 2000),
@@ -57,10 +57,8 @@ create table if not exists public.office_agents (
   version         int not null default 1,
   created_by      text not null,
   created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
-  check ((kind = 'co_lider') = (parent_agent_id is null))      -- co-líder responde à dona; funcionário sempre tem chefe
+  updated_at      timestamptz not null default now()
 );
-create unique index if not exists office_one_co_lider on public.office_agents (owner_team_id) where kind = 'co_lider';
 create index if not exists office_agents_owner_idx on public.office_agents (owner_team_id);
 
 create table if not exists public.office_agent_versions (
@@ -99,7 +97,7 @@ create table if not exists public.office_messages (
 );
 create index if not exists office_messages_thread_idx on public.office_messages (thread_id, created_at);
 
--- tarefas: o pedido e a árvore de subtarefas (o Big Boss divide; cada subtarefa tem um responsável)
+-- tarefas: o pedido e a árvore de subtarefas (um agente pode dividir; cada subtarefa tem um responsável)
 create table if not exists public.office_tasks (
   id                text primary key check (id ~ '^tsk_[0-9A-HJKMNP-TV-Z]{26}$'),
   owner_team_id     text not null references public.office(owner_team_id),
@@ -288,7 +286,8 @@ begin
 end;
 $$;
 
--- Nível do agente no organograma: co-líder = 1, funcionário dele = 2, abaixo = 3.
+-- Nível do agente no organograma: sem chefe = 1, abaixo dele = 2, abaixo = 3.
+-- Não há papel fixo: nome, instruções e quem responde a quem são escolhas da pessoa.
 create or replace function private.office_depth(p_agent text)
 returns int
 language sql
@@ -357,12 +356,13 @@ begin
 end;
 $$;
 
--- Cria (p_id null) ou edita um agente. Travas: 20 agentes, 3 níveis, um co-líder, sem ciclo;
+-- Cria (p_id null) ou edita um agente. Travas: 20 agentes, 3 níveis, sem ciclo;
 -- a conexão e as reservas precisam ser do próprio dono.
 create or replace function public.office_upsert_agent(
-  p_id text, p_kind text, p_parent text, p_name text, p_title text,
+  p_id text, p_parent text, p_name text, p_title text,
   p_description text default '', p_instructions text default '', p_model text default null, p_effort text default 'medium',
-  p_connection_id text default null, p_backup_models jsonb default '[]'::jsonb, p_capabilities text[] default array['texto']
+  p_connection_id text default null, p_backup_models jsonb default '[]'::jsonb, p_capabilities text[] default array['texto'],
+  p_can_create_agents boolean default false
 )
 returns text
 language plpgsql
@@ -388,23 +388,19 @@ begin
 
   if p_id is null then
     if (select count(*) from public.office_agents a where a.owner_team_id = v_me) >= 20 then raise exception 'office_limit_agents'; end if;
-    if p_kind = 'co_lider' and exists (select 1 from public.office_agents a where a.owner_team_id = v_me and a.kind = 'co_lider') then
-      raise exception 'office_one_co_lider';
-    end if;
     if v_parent_depth + 1 > 3 then raise exception 'office_limit_depth'; end if;
     v_id := private.ulid('agt');
-    insert into public.office_agents (id, owner_team_id, parent_agent_id, kind, name, title, description, instructions,
-                                      connection_id, model, backup_models, capabilities, effort, created_by)
-    values (v_id, v_me, p_parent, p_kind, trim(p_name), trim(p_title), coalesce(p_description, ''), coalesce(p_instructions, ''),
+    insert into public.office_agents (id, owner_team_id, parent_agent_id, name, title, description, instructions,
+                                      connection_id, model, backup_models, capabilities, effort, can_create_agents, created_by)
+    values (v_id, v_me, p_parent, trim(p_name), trim(p_title), coalesce(p_description, ''), coalesce(p_instructions, ''),
             p_connection_id, nullif(trim(coalesce(p_model, '')), ''), coalesce(p_backup_models, '[]'::jsonb),
-            coalesce(p_capabilities, array['texto']), coalesce(p_effort, 'medium'), v_me);
+            coalesce(p_capabilities, array['texto']), coalesce(p_effort, 'medium'), coalesce(p_can_create_agents, false), v_me);
     insert into public.office_agent_versions (agent_id, version, instructions, changed_by) values (v_id, 1, coalesce(p_instructions, ''), v_me);
     return v_id;
   end if;
 
   select * into v_old from public.office_agents a where a.id = p_id and a.owner_team_id = v_me for update;
   if v_old.id is null then raise exception 'office_agent_not_found'; end if;
-  if p_kind is distinct from v_old.kind then raise exception 'office_kind_immutable'; end if;
   if p_parent is not null and (
        p_parent = p_id
        or exists (with recursive down as (
@@ -421,7 +417,7 @@ begin
     description = coalesce(p_description, ''), instructions = coalesce(p_instructions, ''),
     connection_id = p_connection_id, model = nullif(trim(coalesce(p_model, '')), ''),
     backup_models = coalesce(p_backup_models, '[]'::jsonb), capabilities = coalesce(p_capabilities, array['texto']),
-    effort = coalesce(p_effort, 'medium'),
+    effort = coalesce(p_effort, 'medium'), can_create_agents = coalesce(p_can_create_agents, false),
     version = case when coalesce(p_instructions, '') is distinct from v_old.instructions then v_old.version + 1 else v_old.version end,
     updated_at = now()
   where id = p_id;
@@ -484,7 +480,7 @@ begin
 end;
 $$;
 
--- Conversa direta (1 agente) ou canal (2 a 20). Líder do canal: o informado, senão o co-líder, senão o primeiro.
+-- Conversa direta (1 agente) ou canal (2 a 20). Líder do canal (quem recebe sem menção): o informado, senão o primeiro.
 create or replace function public.office_open_thread(p_kind text, p_agent_ids text[], p_title text default '', p_lead text default null)
 returns text
 language plpgsql
@@ -504,7 +500,7 @@ begin
   end if;
   v_lead := case
     when p_lead is not null and p_lead = any (v_ids) then p_lead
-    else coalesce((select a.id from public.office_agents a where a.id = any (v_ids) and a.kind = 'co_lider'), v_ids[1])
+    else v_ids[1]
   end;
   v_id := private.ulid('thr');
   insert into public.office_threads (id, owner_team_id, kind, title, agent_ids, lead_agent_id)
@@ -577,7 +573,7 @@ begin
 end;
 $$;
 
--- Nova tarefa da pessoa para um agente (ou para o Big Boss): cria a tarefa, uma conversa só dela
+-- Nova tarefa da pessoa para um agente: cria a tarefa, uma conversa só dela
 -- e a primeira mensagem, que vira a entrega ligada à tarefa. Mesma chave = a mesma tarefa (não duplica).
 create or replace function public.office_create_task(
   p_title text, p_brief text, p_agent_id text, p_idempotency_key text, p_due_at timestamptz default null
@@ -620,7 +616,7 @@ declare f text;
 begin
   foreach f in array array[
     'public.office_accept_consent(text)',
-    'public.office_upsert_agent(text,text,text,text,text,text,text,text,text,text,jsonb,text[])',
+    'public.office_upsert_agent(text,text,text,text,text,text,text,text,text,jsonb,text[],boolean)',
     'public.office_upsert_connection(text,text,text,text)',
     'public.office_set_connection_enabled(text,boolean)',
     'public.office_create_task(text,text,text,text,timestamptz)',

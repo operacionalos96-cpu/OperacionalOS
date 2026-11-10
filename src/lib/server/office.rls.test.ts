@@ -24,8 +24,8 @@ async function fails(email: string, query: string, params: unknown[] = []) {
     return msg.match(/office_[a-z_]+/)?.[0] ?? msg
   }
 }
-const agent = async (email: string, kind: string, parent: string | null, name: string) =>
-  (await one<{ id: string }>(email, `select public.office_upsert_agent(null, $1, $2, $3, 'Cargo') as id`, [kind, parent, name])).id
+const agent = async (email: string, parent: string | null, name: string, canCreateAgents = false) =>
+  (await one<{ id: string }>(email, `select public.office_upsert_agent(null, $1, $2, 'Cargo', p_can_create_agents => $3) as id`, [parent, name, canCreateAgents])).id
 const thread = async (email: string, kind: string, ids: string[]) => (await one<{ id: string }>(email, `select public.office_open_thread($1, $2) as id`, [kind, ids])).id
 const send = (email: string, thr: string, body: string, key: string, mentions: string[] = []) =>
   one<{ message_id: string; created: boolean; deliveries: number }>(email, `select * from public.office_send_message($1, $2, $3, $4)`, [thr, body, key, mentions])
@@ -51,14 +51,14 @@ beforeAll(async () => {
 
 describe("termo e isolamento", () => {
   it("sem aceitar o termo, nada é criado", async () => {
-    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, 'co_lider', null, 'Coordenador', 'Cargo')`)).toBe("office_consent_required")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, null, 'Coordenador', 'Cargo')`)).toBe("office_consent_required")
   })
 
   it("cada um lê só o próprio escritório, nem founder lê o de outro", async () => {
     await as(GABRIEL, `select public.office_accept_consent('v1')`)
     await as(IGOR, `select public.office_accept_consent('v1')`)
-    C = await agent(GABRIEL, "co_lider", null, "Coordenador")
-    F1 = await agent(GABRIEL, "funcionario", C, "Redator")
+    C = await agent(GABRIEL, null, "Big Boss", true) // "Big Boss" é só um nome que a pessoa escolheu
+    F1 = await agent(GABRIEL, C, "Redator")
     expect(await as(GABRIEL, `select id from public.office_agents`)).toHaveLength(2)
     expect(await as(IGOR, `select id from public.office_agents`)).toHaveLength(0)
     expect(await as(ANA, `select id from public.office_agents`)).toHaveLength(0)
@@ -68,27 +68,28 @@ describe("termo e isolamento", () => {
   })
 
   it("o navegador não escreve direto nas tabelas", async () => {
-    expect(await fails(GABRIEL, `insert into public.office_agents (id, owner_team_id, kind, name, title, created_by) values ('agt_${"X".repeat(26)}', 'u1', 'co_lider', 'x', 'x', 'u1')`)).toBe("negado")
+    expect(await fails(GABRIEL, `insert into public.office_agents (id, owner_team_id, name, title, created_by) values ('agt_${"X".repeat(26)}', 'u1', 'x', 'x', 'u1')`)).toBe("negado")
     expect(await fails(GABRIEL, `update public.office_agents set paused = true`)).toBe("negado")
     expect(await fails(GABRIEL, `delete from public.office_messages`)).toBe("negado")
   })
 
   it("ninguém usa agente de outra pessoa como chefe", async () => {
-    expect(await fails(IGOR, `select public.office_upsert_agent(null, 'funcionario', $1, 'x', 'x')`, [C])).toBe("office_parent_not_found")
+    expect(await fails(IGOR, `select public.office_upsert_agent(null, $1, 'x', 'x')`, [C])).toBe("office_parent_not_found")
   })
 })
 
 describe("organograma: travas no banco", () => {
-  it("um co-líder, 3 níveis, sem ciclo, tipo fixo", async () => {
-    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, 'co_lider', null, 'Outro', 'Cargo')`)).toBe("office_one_co_lider")
-    const F2 = await agent(GABRIEL, "funcionario", F1, "Revisor")
-    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, 'funcionario', $1, 'Quarto', 'Cargo')`, [F2])).toBe("office_limit_depth")
-    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo')`, [F1, F2])).toBe("office_cycle")
-    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'co_lider', null, 'Redator', 'Cargo')`, [F1])).toBe("office_kind_immutable")
+  it("sem papel fixo: vários sem chefe; 3 níveis; sem ciclo; 'pode criar agentes' é escolha da pessoa", async () => {
+    const solto = await agent(GABRIEL, null, "Assistente de e-mail") // outro agente direto à pessoa, sem 'co-líder'
+    expect(await one(GABRIEL, `select parent_agent_id, can_create_agents from public.office_agents where id = $1`, [solto])).toEqual({ parent_agent_id: null, can_create_agents: false })
+    expect(await one(GABRIEL, `select can_create_agents from public.office_agents where id = $1`, [C])).toEqual({ can_create_agents: true })
+    const F2 = await agent(GABRIEL, F1, "Revisor")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, $1, 'Quarto', 'Cargo')`, [F2])).toBe("office_limit_depth")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo')`, [F1, F2])).toBe("office_cycle")
   })
 
   it("editar instruções sobe a versão e guarda o histórico", async () => {
-    await as(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', 'Escreva curto.')`, [F1, C])
+    await as(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo', '', 'Escreva curto.')`, [F1, C])
     expect(await as(GABRIEL, `select version, instructions from public.office_agent_versions where agent_id = $1 order by version`, [F1])).toEqual([
       { version: 1, instructions: "" },
       { version: 2, instructions: "Escreva curto." },
@@ -97,14 +98,14 @@ describe("organograma: travas no banco", () => {
 
   it("no máximo 20 agentes por escritório", async () => {
     const count = Number((await one<{ n: number }>(GABRIEL, `select count(*)::int as n from public.office_agents`)).n)
-    for (let i = count; i < 20; i++) await agent(GABRIEL, "funcionario", C, `Extra ${i}`)
-    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, 'funcionario', $1, 'Vigésimo primeiro', 'Cargo')`, [C])).toBe("office_limit_agents")
+    for (let i = count; i < 20; i++) await agent(GABRIEL, C, `Extra ${i}`)
+    expect(await fails(GABRIEL, `select public.office_upsert_agent(null, $1, 'Vigésimo primeiro', 'Cargo')`, [C])).toBe("office_limit_agents")
   })
 })
 
 describe("mensagens viram entregas na fila, sem duplicar", () => {
-  it("canal: sem menção vai ao líder (co-líder); com menção, a quem foi mencionado", async () => {
-    const canal = await thread(GABRIEL, "canal", [F1, C])
+  it("canal: sem menção vai ao líder (o informado ou o primeiro da lista); com menção, a quem foi mencionado", async () => {
+    const canal = await thread(GABRIEL, "canal", [C, F1])
     expect((await one<{ lead_agent_id: string }>(GABRIEL, `select lead_agent_id from public.office_threads where id = $1`, [canal])).lead_agent_id).toBe(C)
     const a = await send(GABRIEL, canal, "Bom dia, equipe", "chave-0001")
     expect(a).toMatchObject({ created: true, deliveries: 1 })
@@ -148,17 +149,17 @@ describe("conexões, IA do agente e reservas", () => {
   })
 
   it("agente escolhe a IA e as reservas; nada de conexão de outra pessoa", async () => {
-    await as(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', 'Escreva curto.', 'llama3.1', 'low', $3, $4::jsonb, array['texto','web'])`, [
+    await as(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo', '', 'Escreva curto.', 'llama3.1', 'low', $3, $4::jsonb, array['texto','web'])`, [
       F1, C, conOllama, JSON.stringify([{ connection_id: conRouter, model: "deepseek-r1:free" }]),
     ])
     expect(await one(GABRIEL, `select connection_id, model, backup_models, capabilities from public.office_agents where id = $1`, [F1])).toEqual({
       connection_id: conOllama, model: "llama3.1", backup_models: [{ connection_id: conRouter, model: "deepseek-r1:free" }], capabilities: ["texto", "web"],
     })
     const igorCon = (await one<{ id: string }>(IGOR, `select public.office_upsert_connection(null, 'chave', 'gemini', 'Gemini do Igor') as id`)).id
-    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', $3)`, [F1, C, igorCon])).toBe("office_connection_not_found")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo', '', '', null, 'low', $3)`, [F1, C, igorCon])).toBe("office_connection_not_found")
     const nine = JSON.stringify(Array.from({ length: 9 }, () => ({ connection_id: conRouter, model: "x" })))
-    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, nine])).toBe("office_invalid_backups")
-    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, JSON.stringify([{ connection_id: igorCon, model: "x" }])])).toBe("office_invalid_backups")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, nine])).toBe("office_invalid_backups")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, JSON.stringify([{ connection_id: igorCon, model: "x" }])])).toBe("office_invalid_backups")
   })
 
   it("desligar conexão é do dono; ninguém escreve a conexão de outro", async () => {
@@ -219,7 +220,7 @@ describe("fila: privacidade, dono do worker e limites", () => {
   })
 
   it("1 mensagem por vez por conversa, no máximo 2 por agente, agente pausado não recebe", async () => {
-    const R = await agent(IGOR, "co_lider", null, "Revisor do Igor")
+    const R = await agent(IGOR, null, "Revisor do Igor")
     const [t1, t2, t3] = [await thread(IGOR, "direta", [R]), await thread(IGOR, "direta", [R]), await thread(IGOR, "direta", [R])]
     await send(IGOR, t1, "um", "igor-k-0001")
     await send(IGOR, t1, "dois", "igor-k-0002")
@@ -230,7 +231,7 @@ describe("fila: privacidade, dono do worker e limites", () => {
     expect(a && b && a.entity_id !== b.entity_id).toBe(true) // nunca duas da mesma conversa
     expect(await claim(wid("J"), R)).toBeNull() // já tem 2 em execução
 
-    const P = await agent(IGOR, "funcionario", R, "Pausado")
+    const P = await agent(IGOR, R, "Pausado")
     await send(IGOR, await thread(IGOR, "direta", [P]), "oi", "igor-k-0005")
     await as(IGOR, `select public.office_set_agent_paused($1, true)`, [P])
     expect(await claim(wid("J"), P)).toBeNull()

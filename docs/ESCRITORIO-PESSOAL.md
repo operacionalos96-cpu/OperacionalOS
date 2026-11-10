@@ -31,7 +31,7 @@ O número segue o 0025 do PR #39. Se ele não entrar antes, renumerar.
 | Peça | O que faz |
 |---|---|
 | `office` | um por pessoa (`owner_team_id` = `members.team_id`), com a versão e a data do termo aceito |
-| `office_agents` | perfil, instruções, `parent_agent_id` (organograma), `kind` (`co_lider`/`funcionario`), `model` (null = padrão da assinatura), `effort`, `paused`, `version` |
+| `office_agents` | perfil, instruções, `parent_agent_id` (organograma opcional), `can_create_agents` (pode propor agentes; sem papel fixo), `model` (null = padrão da assinatura), `effort`, `paused`, `version` |
 | `office_agent_versions` | histórico das instruções (desfazer) |
 | `office_threads` | conversa `direta` (1 agente) ou `canal` (2 a 20, com `lead_agent_id`) |
 | `office_messages` | só acréscimo; `idempotency_key` única |
@@ -58,7 +58,7 @@ O número segue o 0025 do PR #39. Se ele não entrar antes, renumerar.
 
 **Funções (RPC, `security definer`, todas exigem o termo aceito, menos a de aceite):**
 - `office_accept_consent(p_version)`;
-- `office_upsert_agent(...)`: travas de 20 agentes, 3 níveis, um co-líder, sem ciclo, e o funcionário sempre tem chefe;
+- `office_upsert_agent(...)`: travas de 20 agentes, 3 níveis e sem ciclo; nome e instruções livres ("Big Boss" é só um exemplo);
 - `office_set_agent_paused(p_agent, p_paused)`;
 - `office_open_thread(p_kind, p_agent_ids, p_title, p_lead)`;
 - `office_send_message(p_thread, p_body, p_idem, p_mentions, p_reply_to)`: grava a mensagem e cria **uma entrega por destinatário**, com chave `dlv:<msg>:<agente>`. Um reenvio não duplica.
@@ -92,7 +92,7 @@ Regras puras e testadas, com as mesmas regras do banco para a tela poder avisar 
 ```json
 { "schema": "office-state/v1", "generated_at": "…", "consent": true,
   "bridge": { "online": false, "last_seen_at": null },
-  "agents": [ { "id": "agt_…", "name": "…", "title": "…", "kind": "co_lider", "parent_agent_id": null,
+  "agents": [ { "id": "agt_…", "name": "…", "title": "…", "can_create_agents": true, "parent_agent_id": null,
                 "state": "na_fila", "queue": { "queued": 1, "running": 0 },
                 "current": null } ],
   "handoffs": [] }
@@ -121,7 +121,7 @@ Regras puras e testadas, com as mesmas regras do banco para a tela poder avisar 
 | Etapa | O que entra |
 |---|---|
 | **P3** | portões G0 automático / G1 em lote / G2 bloqueio do agente, e ações na empresa com auditoria |
-| **P4** | co-líder propõe agentes |
+| **P4** | agentes com `can_create_agents` propõem agentes novos (a pessoa aprova) |
 | **P5** | delegação (handoffs) e canais com triagem |
 | **P6** | memória nativa (candidato → validado) e standby com tarefas locais |
 | **P7** | Sede 3D como gêmeo digital, lendo `office-state/v1` |
