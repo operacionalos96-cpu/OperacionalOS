@@ -109,7 +109,7 @@ describe("mensagens viram entregas na fila, sem duplicar", () => {
     const a = await send(GABRIEL, canal, "Bom dia, equipe", "chave-0001")
     expect(a).toMatchObject({ created: true, deliveries: 1 })
     expect(await as(GABRIEL, `select agent_id, payload from public.ai_jobs where causation_id = $1`, [a.message_id])).toEqual([
-      { agent_id: C, payload: { message_id: a.message_id, thread_id: canal } },
+      { agent_id: C, payload: { message_id: a.message_id, thread_id: canal, task_id: null } },
     ])
     const b = await send(GABRIEL, canal, "Redator, rascunhe o post", "chave-0002", [F1, "agt_de_fora"])
     expect(await as(GABRIEL, `select agent_id from public.ai_jobs where causation_id = $1`, [b.message_id])).toEqual([{ agent_id: F1 }])
@@ -129,6 +129,67 @@ describe("mensagens viram entregas na fila, sem duplicar", () => {
     expect(await fails(IGOR, `select * from public.office_send_message($1, 'oi', 'chave-igor-1')`, [d])).toBe("office_thread_not_found")
     expect(await fails(GABRIEL, `select * from public.office_send_message($1, '   ', 'chave-vazia-1')`, [d])).toBe("office_invalid_body")
     expect(await fails(GABRIEL, `select public.office_open_thread('direta', array[$1, $2])`, [C, F1])).toBe("office_direct_needs_one")
+  })
+})
+
+describe("conexões, IA do agente e reservas", () => {
+  let conOllama: string, conRouter: string
+
+  it("conexão guarda só a descrição; cada um vê só as suas", async () => {
+    conOllama = (await one<{ id: string }>(GABRIEL, `select public.office_upsert_connection(null, 'local', 'Ollama', 'Ollama no PC') as id`)).id
+    conRouter = (await one<{ id: string }>(GABRIEL, `select public.office_upsert_connection(null, 'chave', 'openrouter', 'OpenRouter grátis') as id`)).id
+    expect(await as(GABRIEL, `select provider, status from public.office_connections order by created_at`)).toEqual([
+      { provider: "ollama", status: "pendente" },
+      { provider: "openrouter", status: "pendente" },
+    ])
+    expect(await as(IGOR, `select 1 from public.office_connections`)).toHaveLength(0)
+    const cols = await db.sql<{ column_name: string }>(`select column_name from information_schema.columns where table_name = 'office_connections'`)
+    expect(cols.map((c) => c.column_name).some((c) => /key|secret|token|senha/i.test(c))).toBe(false) // nenhum lugar para segredo
+  })
+
+  it("agente escolhe a IA e as reservas; nada de conexão de outra pessoa", async () => {
+    await as(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', 'Escreva curto.', 'llama3.1', 'low', $3, $4::jsonb, array['texto','web'])`, [
+      F1, C, conOllama, JSON.stringify([{ connection_id: conRouter, model: "deepseek-r1:free" }]),
+    ])
+    expect(await one(GABRIEL, `select connection_id, model, backup_models, capabilities from public.office_agents where id = $1`, [F1])).toEqual({
+      connection_id: conOllama, model: "llama3.1", backup_models: [{ connection_id: conRouter, model: "deepseek-r1:free" }], capabilities: ["texto", "web"],
+    })
+    const igorCon = (await one<{ id: string }>(IGOR, `select public.office_upsert_connection(null, 'chave', 'gemini', 'Gemini do Igor') as id`)).id
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', $3)`, [F1, C, igorCon])).toBe("office_connection_not_found")
+    const nine = JSON.stringify(Array.from({ length: 9 }, () => ({ connection_id: conRouter, model: "x" })))
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, nine])).toBe("office_invalid_backups")
+    expect(await fails(GABRIEL, `select public.office_upsert_agent($1, 'funcionario', $2, 'Redator', 'Cargo', '', '', null, 'low', null, $3::jsonb)`, [F1, C, JSON.stringify([{ connection_id: igorCon, model: "x" }])])).toBe("office_invalid_backups")
+  })
+
+  it("desligar conexão é do dono; ninguém escreve a conexão de outro", async () => {
+    await as(GABRIEL, `select public.office_set_connection_enabled($1, false)`, [conRouter])
+    expect((await one<{ status: string }>(GABRIEL, `select status from public.office_connections where id = $1`, [conRouter])).status).toBe("desligada")
+    expect(await fails(IGOR, `select public.office_set_connection_enabled($1, true)`, [conRouter])).toBe("office_connection_not_found")
+    expect(await fails(GABRIEL, `update public.office_connections set status = 'conectada'`)).toBe("negado")
+  })
+})
+
+describe("tarefas", () => {
+  it("nova tarefa cria a conversa, a mensagem e a entrega ligada a ela; sem duplicar", async () => {
+    const t = await one<{ task_id: string; thread_id: string; message_id: string; created: boolean }>(GABRIEL,
+      `select * from public.office_create_task('Pesquisa: clínicas em Curitiba', 'Levante 30 clínicas e compare preços.', $1, 'tarefa-0001')`, [C])
+    expect(t.created).toBe(true)
+    expect(await one(GABRIEL, `select root_task_id, status, assigned_agent_id, thread_id from public.office_tasks where id = $1`, [t.task_id])).toEqual({
+      root_task_id: t.task_id, status: "aberta", assigned_agent_id: C, thread_id: t.thread_id,
+    })
+    expect(await as(GABRIEL, `select agent_id, office_task_id from public.ai_jobs where causation_id = $1`, [t.message_id])).toEqual([{ agent_id: C, office_task_id: t.task_id }])
+    const again = await one(GABRIEL, `select * from public.office_create_task('Pesquisa: clínicas em Curitiba', 'x', $1, 'tarefa-0001')`, [C])
+    expect(again).toEqual({ ...t, created: false })
+    expect(await as(GABRIEL, `select 1 from public.office_tasks where title like 'Pesquisa: clínicas%'`)).toHaveLength(1)
+    expect(await as(IGOR, `select 1 from public.office_tasks`)).toHaveLength(0)
+    expect(await fails(IGOR, `select * from public.office_create_task('x', '', $1, 'tarefa-igor-1')`, [C])).toBe("office_agent_not_found")
+  })
+
+  it("uso: só o dono lê; ninguém grava pela tela", async () => {
+    await db.sql(`insert into public.office_usage (owner_team_id, job_public_id, agent_id, provider, model, input_tokens, output_tokens, free) values ('u1', 'job_teste_uso', $1, 'ollama', 'llama3.1', 120, 80, true)`, [F1])
+    expect(await as(GABRIEL, `select provider, input_tokens from public.office_usage`)).toEqual([{ provider: "ollama", input_tokens: 120 }])
+    expect(await as(IGOR, `select 1 from public.office_usage`)).toHaveLength(0)
+    expect(await fails(GABRIEL, `insert into public.office_usage (owner_team_id, job_public_id, agent_id, provider, model) values ('u1', 'job_falso', 'x', 'x', 'x')`)).toBe("negado")
   })
 })
 

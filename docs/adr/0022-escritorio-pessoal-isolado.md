@@ -35,6 +35,20 @@ Fatos do código que pesaram:
    - é o contrato que a Sede 3D vai ler como gêmeo digital (Etapa 7);
    - as tabelas entram no Realtime, onde a RLS também vale.
 
+6. **Multiprovedor desde a base** (decisão do Gabriel, 10/11/2026: cada pessoa conecta IAs grátis ou pagas, como num provedor de IA):
+   - **`office_connections`:** só a descrição (`local`, `chave` ou `assinatura`; provedor; estado). **Não existe coluna para chave ou token**: o segredo fica no PC, na Ponte HZK;
+   - **agente:** ganha `connection_id`, `model`, `backup_models` (até 8 reservas, usadas quando a cota acaba) e `capabilities` (texto, imagem, código, arquivo, web). Conexão e reservas precisam ser do próprio dono;
+   - **estados novos:** `sem_cota` e `sem_conexao`, quando nem a IA principal nem as reservas estão disponíveis;
+   - **catálogo** de provedores em `src/lib/domain/office-providers.ts`, com aviso de termos nas assinaturas.
+7. **Tarefas em árvore (`office_tasks`):**
+   - pedido → subtarefas (`parent_task_id`, `root_task_id`), com responsável, estado e resumo do resultado;
+   - `office_create_task` cria a tarefa, a conversa dela e a primeira entrega; cada entrega leva `ai_jobs.office_task_id`.
+   - É a base do Big Boss (E4) e da tabela de fluxo.
+8. **Uso (`office_usage`):** uma linha por entrega, com provedor, modelo, tokens, tempo, se foi grátis e o custo estimado. Só o dono lê; quem grava é o servidor, quando a Ponte conclui (E2).
+9. **Toda a execução da V1 roda na Ponte HZK**, no PC da pessoa, inclusive com chave de API: a chave nunca vai ao servidor, e a Vercel não segura processos longos.
+   - **Primeira leva:** Ollama ou LM Studio locais e OpenRouter, que são grátis e sem dúvida de termos.
+   - **Depois:** as assinaturas (Claude Code, Codex, Gemini CLI) e as chaves pagas, com o aviso de termos.
+
 ## Consequências
 
 - **Limite do modo servidor:** quem administra o Supabase consegue, tecnicamente, ler as conversas. Isso fica escrito no termo de aceite (versão gravada em `office.consent_version`).

@@ -16,9 +16,9 @@ export async function GET() {
   if (!member) return NextResponse.json({ erro: "não autorizado" }, { status: 401, headers: noStore })
   const db = await supabaseServer()
 
-  const [office, agents, jobs, threads, workers] = await Promise.all([
+  const [office, agents, jobs, threads, workers, connections] = await Promise.all([
     db.from("office").select("consent_at").eq("owner_team_id", member.teamId).maybeSingle(),
-    db.from("office_agents").select("id, kind, parent_agent_id, name, title, paused").eq("owner_team_id", member.teamId).order("created_at"),
+    db.from("office_agents").select("id, kind, parent_agent_id, name, title, paused, connection_id, backup_models").eq("owner_team_id", member.teamId).order("created_at"),
     db
       .from("ai_jobs")
       .select("id, public_id, agent_id, entity_id, status, claimed_at, started_at, parent_job_id, created_at")
@@ -27,8 +27,9 @@ export async function GET() {
       .limit(500),
     db.from("office_threads").select("id, kind").eq("owner_team_id", member.teamId).eq("archived", false),
     db.from("workers").select("last_seen_at, enabled").eq("owner_team_id", member.teamId),
+    db.from("office_connections").select("id, provider, kind, status, quota_resets_at").eq("owner_team_id", member.teamId),
   ])
-  const failed = [office, agents, jobs, threads, workers].find((r) => r.error)
+  const failed = [office, agents, jobs, threads, workers, connections].find((r) => r.error)
   if (failed?.error) {
     console.error("[escritorio/estado]", failed.error.message)
     return NextResponse.json({ erro: "falhou ao ler o escritório" }, { status: 500, headers: noStore })
@@ -49,6 +50,7 @@ export async function GET() {
     jobs: jobRows,
     threads: (threads.data ?? []) as OfficeRows["threads"],
     workers: (workers.data ?? []) as OfficeRows["workers"],
+    connections: (connections.data ?? []) as NonNullable<OfficeRows["connections"]>,
   }
   return NextResponse.json(deriveOfficeState(officeStateInput(rows), new Date()), { headers: noStore })
 }

@@ -19,7 +19,23 @@ export interface OfficeAgent {
   name: string
   title: string
   paused: boolean
+  /** IA escolhida (conexão); null = ainda sem IA */
+  connectionId?: string | null
+  /** reservas em ordem, usadas quando a cota da principal acaba */
+  backupModels?: { connectionId: string; model: string }[]
 }
+
+export type ConnectionStatus = "pendente" | "conectada" | "sem_cota" | "erro" | "desligada"
+export interface OfficeConnection {
+  id: string
+  provider: string
+  kind: "local" | "chave" | "assinatura"
+  status: ConnectionStatus
+  quotaResetsAt?: string | null
+}
+/** Pode receber trabalho agora? (`pendente` = a Ponte ainda vai conferir; conta como disponível) */
+export const connectionUsable = (c: OfficeConnection | undefined, now: Date) =>
+  !!c && (c.status === "conectada" || c.status === "pendente" || (c.status === "sem_cota" && !!c.quotaResetsAt && new Date(c.quotaResetsAt) <= now))
 
 // ---------- organograma ----------
 
@@ -97,6 +113,8 @@ export type AgentState =
   | "ponte_desligada"
   | "na_fila"
   | "manutencao"
+  | "sem_cota"
+  | "sem_conexao"
   | "ocioso"
 
 export interface OfficeJob {
@@ -121,6 +139,8 @@ export interface OfficeStateInput {
   approvals?: { agentId: string; gate: "lote" | "bloqueio" }[]
   /** tarefas locais de standby em andamento (P6) */
   maintenance?: string[]
+  /** conexões de IA do dono (só a descrição; segredos ficam na Ponte) */
+  connections?: OfficeConnection[]
 }
 
 export interface OfficeStateV1 {
@@ -134,11 +154,13 @@ export interface OfficeStateV1 {
     title: string
     kind: OfficeAgentKind
     parent_agent_id: string | null
+    connection_id: string | null
     state: AgentState
     queue: { queued: number; running: number }
     current: { job_id: string; thread_id: string | null; started_at: string | null } | null
   }[]
   handoffs: { from_agent: string; to_agent: string; job_id: string; at: string }[]
+  connections: { id: string; provider: string; kind: OfficeConnection["kind"]; status: ConnectionStatus }[]
 }
 
 const RUNNING = new Set(["claimed", "running"])
@@ -148,7 +170,17 @@ export const ACTIVE_JOB_STATUSES = ["queued", "retry_scheduled", "claimed", "run
 /** Linhas do banco (como a RLS devolve ao dono) → entrada de `deriveOfficeState`. */
 export interface OfficeRows {
   office: { consent_at: string | null } | null
-  agents: { id: string; kind: OfficeAgentKind; parent_agent_id: string | null; name: string; title: string; paused: boolean }[]
+  agents: {
+    id: string
+    kind: OfficeAgentKind
+    parent_agent_id: string | null
+    name: string
+    title: string
+    paused: boolean
+    connection_id?: string | null
+    backup_models?: { connection_id: string; model: string }[]
+  }[]
+  connections?: { id: string; provider: string; kind: OfficeConnection["kind"]; status: ConnectionStatus; quota_resets_at: string | null }[]
   /** jobs ativos do dono + os jobs-pai deles (para achar quem delegou) */
   jobs: { id: string; public_id: string; agent_id: string; entity_id: string | null; status: string; claimed_at: string | null; started_at: string | null; parent_job_id: string | null; created_at: string }[]
   threads: { id: string; kind: "direta" | "canal" }[]
@@ -161,7 +193,17 @@ export function officeStateInput(rows: OfficeRows): OfficeStateInput {
   const seen = rows.workers.filter((w) => w.enabled && w.last_seen_at).map((w) => w.last_seen_at as string).sort()
   return {
     consent: !!rows.office?.consent_at,
-    agents: rows.agents.map((a) => ({ id: a.id, kind: a.kind, parentAgentId: a.parent_agent_id, name: a.name, title: a.title, paused: a.paused })),
+    agents: rows.agents.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      parentAgentId: a.parent_agent_id,
+      name: a.name,
+      title: a.title,
+      paused: a.paused,
+      connectionId: a.connection_id ?? null,
+      backupModels: (a.backup_models ?? []).map((b) => ({ connectionId: b.connection_id, model: b.model })),
+    })),
+    connections: (rows.connections ?? []).map((c) => ({ id: c.id, provider: c.provider, kind: c.kind, status: c.status, quotaResetsAt: c.quota_resets_at })),
     jobs: rows.jobs
       .filter((j) => active.has(j.status))
       .map((j) => ({
@@ -187,6 +229,16 @@ export function deriveOfficeState(input: OfficeStateInput, now: Date): OfficeSta
   const channels = new Set(input.threads.filter((t) => t.kind === "canal").map((t) => t.id))
   const approvals = input.approvals ?? []
   const maintenance = new Set(input.maintenance ?? [])
+  const connections = input.connections ?? []
+  const conn = (id: string | null | undefined) => connections.find((c) => c.id === id)
+  /** Sem IA disponível (principal e reservas): diz se é falta de cota ou de conexão. */
+  const blockedBy = (a: OfficeAgent): "sem_cota" | "sem_conexao" | null => {
+    const options = [a.connectionId, ...(a.backupModels ?? []).map((b) => b.connectionId)].filter((id): id is string => !!id)
+    if (options.some((id) => connectionUsable(conn(id), now))) return null
+    return options.some((id) => conn(id)?.status === "sem_cota") ? "sem_cota" : "sem_conexao"
+  }
+  // Sem a lista de conexões (dados antigos), não dá para julgar a IA: não marca o agente.
+  const judgeConnections = input.connections !== undefined
 
   const agents = input.agents.map((a) => {
     const mine = input.jobs.filter((j) => j.agentId === a.id)
@@ -204,9 +256,7 @@ export function deriveOfficeState(input: OfficeStateInput, now: Date): OfficeSta
               ? "conversando"
               : "trabalhando"
             : queued > 0
-              ? online
-                ? "na_fila"
-                : "ponte_desligada"
+              ? (judgeConnections && blockedBy(a)) || (online ? "na_fila" : "ponte_desligada")
               : maintenance.has(a.id)
                 ? "manutencao"
                 : "ocioso"
@@ -216,6 +266,7 @@ export function deriveOfficeState(input: OfficeStateInput, now: Date): OfficeSta
       title: a.title,
       kind: a.kind,
       parent_agent_id: a.parentAgentId,
+      connection_id: a.connectionId ?? null,
       state,
       queue: { queued, running: running.length },
       current: current ? { job_id: current.publicId, thread_id: current.threadId, started_at: current.startedAt ?? current.claimedAt ?? null } : null,
@@ -227,5 +278,13 @@ export function deriveOfficeState(input: OfficeStateInput, now: Date): OfficeSta
     .sort((x, y) => x.createdAt.localeCompare(y.createdAt))
     .map((j) => ({ from_agent: j.parentAgentId as string, to_agent: j.agentId, job_id: j.publicId, at: j.createdAt }))
 
-  return { schema: "office-state/v1", generated_at: now.toISOString(), consent: input.consent, bridge: { online, last_seen_at: lastSeen }, agents, handoffs }
+  return {
+    schema: "office-state/v1",
+    generated_at: now.toISOString(),
+    consent: input.consent,
+    bridge: { online, last_seen_at: lastSeen },
+    agents,
+    handoffs,
+    connections: connections.map((c) => ({ id: c.id, provider: c.provider, kind: c.kind, status: c.status })),
+  }
 }

@@ -36,6 +36,14 @@ O número segue o 0025 do PR #39. Se ele não entrar antes, renumerar.
 | `office_threads` | conversa `direta` (1 agente) ou `canal` (2 a 20, com `lead_agent_id`) |
 | `office_messages` | só acréscimo; `idempotency_key` única |
 | `ai_jobs.owner_team_id`, `workers.owner_team_id` | null = da empresa (como hoje); preenchido = do escritório pessoal |
+| `office_connections` | IAs da pessoa: tipo (`local`/`chave`/`assinatura`), provedor, rótulo, estado (`pendente`, `conectada`, `sem_cota`, `erro`, `desligada`), modelos informados pela Ponte. **Sem coluna de segredo** |
+| `office_agents.connection_id` / `backup_models` / `capabilities` | a IA do agente, até 8 reservas para quando a cota acabar, e o que ele faz |
+| `office_tasks` | pedido → subtarefas, com responsável, estado, resultado e prazo; `ai_jobs.office_task_id` liga a entrega à tarefa |
+| `office_usage` | uso por entrega (provedor, modelo, tokens, tempo, grátis/pago, custo estimado); só o dono lê |
+
+**Funções novas:** `office_upsert_connection`, `office_set_connection_enabled` e `office_create_task` (tarefa + conversa + primeira entrega, sem duplicar).
+**Estados novos:** `sem_cota` e `sem_conexao`, quando a IA principal e todas as reservas estão indisponíveis.
+**Catálogo:** `src/lib/domain/office-providers.ts`.
 
 **Isolamento:**
 - **`office_*`:** só o dono lê, **sem exceção para founder**. O navegador não escreve direto: tudo passa pelas funções abaixo.
@@ -102,7 +110,9 @@ Regras puras e testadas, com as mesmas regras do banco para a tela poder avisar 
   4. roda a **CLI da assinatura logada no PC** (Claude Code primeiro);
   5. progresso ao vivo;
   6. `complete_job` grava a mensagem do agente na mesma transação, ou `fail_job` com retry.
-- **Sem chave de API e sem custo de token.** O limite de uso da própria assinatura aparece como motivo de espera, e a fila retoma sozinha.
+- **Toda a execução da V1 roda aqui** (decisão de 10/11/2026), inclusive com chave de API: a chave fica no PC, e o servidor só guarda a descrição da conexão.
+- **Primeira leva de provedores:** Ollama ou LM Studio (locais) e OpenRouter (modelos `:free`). Depois vêm as assinaturas (Claude Code, Codex, Gemini CLI) e as chaves pagas, com o aviso de termos do catálogo.
+- **Cota esgotada:** a Ponte marca a conexão `sem_cota` (com `quota_resets_at`) e o agente segue pela primeira reserva disponível. Cada entrega grava uma linha em `office_usage`.
 - **Ferramentas:** só responder e relatar progresso. Arquivo, terminal e ações ficam para a P3, atrás dos portões de aprovação.
 - **A conferir antes de codar:** os termos atuais do Claude Code e do Agent SDK sobre automatizar a sessão de uma assinatura. A ideia é usar a CLI oficial, no PC da própria pessoa, para o trabalho dela.
 

@@ -108,6 +108,25 @@ describe("estados (office-state/v1)", () => {
     const s = deriveOfficeState(base({ jobs: [job("j2", "F1", "queued", { parentAgentId: "C", createdAt: "2026-11-10T11:30:00Z" }), job("j1", "C", "running")] }), now)
     expect(s.handoffs).toEqual([{ from_agent: "C", to_agent: "F1", job_id: "j2", at: "2026-11-10T11:30:00Z" }])
     expect(s.schema).toBe("office-state/v1")
-    expect(Object.keys(s.agents[0]).sort()).toEqual(["current", "id", "kind", "name", "parent_agent_id", "queue", "state", "title"])
+    expect(Object.keys(s.agents[0]).sort()).toEqual(["connection_id", "current", "id", "kind", "name", "parent_agent_id", "queue", "state", "title"])
+  })
+
+  it("IA indisponível: usa a reserva; sem nenhuma, diz se falta cota ou conexão", () => {
+    const con = (id: string, status: "conectada" | "sem_cota" | "erro" | "desligada" | "pendente", quotaResetsAt: string | null = null) => ({ id, provider: id, kind: "chave" as const, status, quotaResetsAt })
+    const agents = [
+      { ...ag("C", "co_lider", null), connectionId: "cota", backupModels: [{ connectionId: "ok", model: "m" }] }, // principal sem cota, reserva ok
+      { ...ag("F1", "funcionario", "C"), connectionId: "cota", backupModels: [{ connectionId: "off", model: "m" }] }, // tudo parado, há falta de cota
+      { ...ag("F2", "funcionario", "C"), connectionId: "off" }, // conexão desligada
+      { ...ag("F3", "funcionario", "C"), connectionId: null }, // sem IA escolhida
+    ]
+    const jobs = ["C", "F1", "F2", "F3"].map((a, i) => job(`j${i}`, a, "queued"))
+    const s = deriveOfficeState(base({ agents, jobs, connections: [con("cota", "sem_cota", "2026-11-10T13:00:00Z"), con("ok", "conectada"), con("off", "desligada")] }), now)
+    expect(states(s)).toEqual({ C: "na_fila", F1: "sem_cota", F2: "sem_conexao", F3: "sem_conexao" })
+    expect(s.connections.map((c) => c.status)).toEqual(["sem_cota", "conectada", "desligada"])
+    // a cota voltou (horário passou): o agente sai de sem_cota
+    const later = deriveOfficeState(base({ agents, jobs, connections: [con("cota", "sem_cota", "2026-11-10T11:00:00Z"), con("off", "desligada")] }), now)
+    expect(states(later).F1).toBe("na_fila")
+    // sem a lista de conexões (dado antigo), não julga a IA
+    expect(states(deriveOfficeState(base({ agents, jobs }), now)).F3).toBe("na_fila")
   })
 })
