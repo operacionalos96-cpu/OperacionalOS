@@ -10,6 +10,7 @@ import { startOps, useOps, type JobRow, type WorkerRow } from "@/components/ai-o
 import { JobsMonitor, STATUS_LABEL } from "@/components/ai-office/jobs-monitor"
 import { WebhooksPanel } from "@/components/ai-office/webhooks-panel"
 import { WorkerHealthLine, WorkersPanel } from "@/components/ai-office/workers-panel"
+import { SedeView } from "@/components/ai-office/sede/sede-view"
 import { conversionData, rejectionLabel } from "@/lib/domain/prospecting"
 import { useEventFeed } from "@/lib/event-service"
 import { relative } from "@/lib/format"
@@ -38,7 +39,7 @@ export default function AiOfficePage() {
   const jobs = useOps((s) => s.jobs)
   const workers = useOps((s) => s.workers)
   const opsMissing = useOps((s) => s.missing)
-  const [tab, setTab] = useState<"workforce" | "jobs" | "webhooks" | "workers">("workforce")
+  const [tab, setTab] = useState<"workforce" | "sede" | "jobs" | "webhooks" | "workers">("workforce")
   const [activityFilter, setActivityFilter] = useState<"all" | "suggestions" | "executions" | "failures" | "learning">("all")
 
   useEffect(() => {
@@ -77,12 +78,14 @@ export default function AiOfficePage() {
             { value: "jobs", label: `Jobs${jobs.some((j) => j.status === "dead_letter") ? " ⚠" : ""}` },
             { value: "webhooks", label: "Webhooks" },
             { value: "workers", label: "Workers" },
+            { value: "sede", label: "Sede 3D" },
           ]}
         />
-        {opsMissing && tab !== "workforce" && <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0011 no Supabase para ativar a fila, os workers e os webhooks.</p>}
+        {opsMissing && tab !== "workforce" && tab !== "sede" && <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Rode o SQL 0011 no Supabase para ativar a fila, os workers e os webhooks.</p>}
         {tab === "jobs" && <JobsMonitor />}
         {tab === "webhooks" && <WebhooksPanel />}
         {tab === "workers" && <WorkersPanel />}
+        {tab === "sede" && <SedeView />}
         {tab === "workforce" && (
         <>
         {!agentsLoaded ? null : agents.length === 0 ? (
