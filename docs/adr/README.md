@@ -37,3 +37,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0017](0017-rotinas-no-fazendo-agora.md) | Rotinas no "fazendo agora": a Prospecção aparece no online | Aceito |
 | [0019](0019-captura-inteligente-de-tarefas.md) | Captura inteligente de tarefas: IA só propõe, servidor valida, pessoa confirma | Proposto |
 | [0020](0020-acesso-por-area.md) | Acesso por área no banco: áreas restritas, concessões e vitrine | Proposto |
+| [0022](0022-escritorio-pessoal-isolado.md) | Escritório pessoal: privado por dono, sobre a fila que já existe | Proposto |
