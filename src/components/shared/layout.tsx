@@ -71,12 +71,21 @@ export function PageHeader({
         <div className={cn("page-container flex flex-col gap-3 transition-[padding] duration-(--dur-3) ease-(--ease-std)", compact ? "py-2" : "pt-6 pb-3")}>
           {back && !compact && <Breadcrumb href={back.href} label={back.label} current={title ?? info?.title} />}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <h1 className={cn("truncate font-semibold tracking-tight transition-[font-size] duration-(--dur-3)", compact ? "text-lg" : "text-2xl")}>{title ?? info?.title}</h1>
-              {(description ?? info?.purpose) && !compact && <p className="t-desc mt-0.5 text-sm">{description ?? info?.purpose}</p>}
+            <div className="min-w-0 flex-1 basis-64">
+              {/* Assinatura do guia HZK: traço laranja + área em caixa alta, título firme, apoio em serifa. */}
+              {info?.section && !compact && !back && (
+                <p className="t-label mb-2 flex items-center gap-2.5">
+                  <span aria-hidden className="hzk-dash" />
+                  {info.section}
+                </p>
+              )}
+              <h1 className={cn("truncate font-semibold tracking-[-0.03em] transition-[font-size] duration-(--dur-3)", compact ? "text-lg" : "text-[2rem] leading-tight")}>
+                {title ?? info?.title}
+              </h1>
+              {(description ?? info?.purpose) && !compact && <p className="hzk-voice mt-1 text-[0.9375rem] text-muted-foreground">{description ?? info?.purpose}</p>}
             </div>
             {(info || actions) && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="hzk-aura-group flex flex-wrap items-center gap-2">
                 {info && <PageHelp page={info} />}
                 {actions}
               </div>
