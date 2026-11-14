@@ -52,9 +52,31 @@ as $$
   select coalesce(p_area is not null and (
     private.is_at_least('owner')
     or coalesce(private.area_level(p_area) = 'gerir', false)
-    or exists (select 1 from public.areas a where a.id = p_area and a.data -> 'owner' ->> 'memberId' = private.my_team_id())
+    -- dono cadastrado na área só vale se ele também alcança a área (revisão de segurança A1)
+    or (exists (select 1 from public.areas a where a.id = p_area and a.data -> 'owner' ->> 'memberId' = private.my_team_id())
+        and private.area_rank(private.area_level(p_area)) >= private.area_rank('operar'))
   ), false);
 $$;
+
+-- Trocar o dono cadastrado de uma área restrita é ato de founder (senão um admin vira "responsável").
+create or replace function private.dock_guard_area_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (coalesce((old.data ->> 'restricted')::boolean, false) or coalesce((new.data ->> 'restricted')::boolean, false))
+     and (old.data -> 'owner') is distinct from (new.data -> 'owner')
+     and auth.jwt() ->> 'email' is not null and not private.is_at_least('owner') then
+    raise exception 'dock_area_owner_founder_only' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists guard_area_owner on public.areas;
+create trigger guard_area_owner before update of data on public.areas
+  for each row execute function private.dock_guard_area_owner();
 
 -- Nível de UMA PESSOA numa área, sem depender da sessão (o motor não tem a sessão da pessoa).
 -- Mesma regra de private.area_level (0025); se uma mudar, a outra muda junto.
@@ -104,14 +126,21 @@ create table if not exists public.dock_provider_policies (
   set_by      text not null,
   set_at      timestamptz not null default now()
 );
+-- endereços (host) do provedor: o personalizado que aponta para eles herda a classificação
+alter table public.dock_provider_policies add column if not exists hosts text[] not null default '{}';
 insert into public.dock_provider_policies (provider, data_class, note, source_url, checked_on, set_by) values
   ('ollama',   'local',  'Roda no PC; nada sai.', 'https://docs.ollama.com/api/openai-compatibility', '2026-11-12', 'sistema'),
   ('lmstudio', 'local',  'Roda no PC; nada sai.', 'https://lmstudio.ai/docs/developer/openai-compat', '2026-11-12', 'sistema'),
   ('gemini',   'treina', 'No plano grátis o Google usa o conteúdo para melhorar os produtos.', 'https://aistudio.google.com/docs/pricing', '2026-11-12', 'sistema')
 on conflict (provider) do nothing;
+update public.dock_provider_policies set hosts = array['generativelanguage.googleapis.com', 'aistudio.google.com']
+where provider = 'gemini' and hosts = '{}';
 
--- Sem linha na tabela = "conferir". Personalizado e ACP são sempre "conferir": o Dock não sabe quem está do outro lado.
-create or replace function private.office_data_class(p_kind text, p_provider text)
+-- Sem linha na tabela = "conferir".
+--  local: só vale "local" se a política também disser local (nome de provedor de nuvem não vira local);
+--  compatível: herda a classificação do provedor dono do host do endereço (o pior, se houver mais de um);
+--  ACP: sempre "conferir" (o Dock não sabe quem está do outro lado).
+create or replace function private.office_data_class(p_kind text, p_provider text, p_endpoint text default null)
 returns text
 language sql
 stable
@@ -119,8 +148,13 @@ security definer
 set search_path = ''
 as $$
   select case
-    when p_kind = 'local' then 'local'
-    when p_kind in ('compativel', 'acp') then 'conferir'
+    when p_kind = 'local' then
+      case when exists (select 1 from public.dock_provider_policies pp where pp.provider = p_provider and pp.data_class = 'local') then 'local' else 'conferir' end
+    when p_kind = 'compativel' then coalesce((
+      select pp.data_class from public.dock_provider_policies pp
+      where p_endpoint is not null and substring(lower(p_endpoint) from '^https?://([^/:]+)') = any (pp.hosts)
+      order by case pp.data_class when 'treina' then 0 when 'conferir' then 1 else 2 end limit 1), 'conferir')
+    when p_kind = 'acp' then 'conferir'
     else coalesce((select pp.data_class from public.dock_provider_policies pp where pp.provider = p_provider), 'conferir')
   end;
 $$;
@@ -440,7 +474,8 @@ create table if not exists public.office_approvals (
   approver        text not null default 'dono' check (approver in ('dono', 'founder')),
   origin          text not null check (origin in ('humano', 'rotina', 'bot', 'externo')),
   origin_detail   text not null default '' check (char_length(origin_detail) <= 300),
-  title           text not null check (char_length(title) between 1 and 160),
+  action_label    text not null default '' check (char_length(action_label) <= 120),  -- o que a ação é, pelo catálogo (não pela IA)
+  title           text not null check (char_length(title) between 1 and 160),         -- a descrição do bot
   summary         text not null default '' check (char_length(summary) <= 2000),
   draft           jsonb not null check (jsonb_typeof(draft) = 'object' and pg_column_size(draft) < 32000),  -- os argumentos que SERÃO executados
   draft_edited    boolean not null default false,
@@ -449,6 +484,8 @@ create table if not exists public.office_approvals (
   decided_by      text,
   decided_at      timestamptz,
   decision_note   text check (decision_note is null or char_length(decision_note) <= 600),
+  owner_ok_at     timestamptz,     -- dinheiro: o dono confirmou
+  founder_ok_at   timestamptz,     -- dinheiro: um founder confirmou (os dois precisam)
   executed_at     timestamptz,
   result_summary  text check (result_summary is null or char_length(result_summary) <= 2000),
   idempotency_key text not null unique check (char_length(idempotency_key) between 8 and 100),
@@ -686,6 +723,11 @@ begin
   if p_kind = 'assinatura' then raise exception 'office_kind_not_offered'; end if;
   -- programa de agente (ACP) roda processo no PC: espera a área isolada
   if p_kind = 'acp' and private.office_limit('acp_liberado') = 0 then raise exception 'office_kind_not_released'; end if;
+  -- "local" só para provedor que roda no PC (senão o porteiro trataria uma nuvem como local)
+  if p_kind = 'local' and not exists (select 1 from public.dock_provider_policies pp
+       where pp.provider = lower(trim(p_provider)) and pp.data_class = 'local') then
+    raise exception 'office_provider_not_local';
+  end if;
   -- personalizado e ACP: a pessoa aceita o aviso ("você responde por este endereço" / termos do programa)
   if p_kind in ('compativel', 'acp') and (p_terms_version is null or char_length(trim(p_terms_version)) = 0) then
     raise exception 'office_terms_required';
@@ -800,6 +842,14 @@ as $$
 declare v_files jsonb := coalesce(p_files, '[]'::jsonb);
 begin
   if coalesce(p_has_scripts, false) and private.office_limit('scripts_liberados') = 0 then raise exception 'dock_scripts_not_released'; end if;
+  -- cada arquivo: {path, content}; caminho relativo e limpo; extensão de programa só com has_scripts
+  if exists (select 1 from jsonb_array_elements(v_files) f where
+       jsonb_typeof(f) <> 'object' or not (f ? 'path' and f ? 'content') or jsonb_typeof(f -> 'content') <> 'string'
+       or f ->> 'path' !~ '^[A-Za-z0-9_-]+(/[A-Za-z0-9._-]+){0,3}$' or f ->> 'path' ~ '[.][.]'
+       or ((f ->> 'path' ~* '^scripts/' or f ->> 'path' ~* '[.](ps1|psm1|bat|cmd|sh|py|js|mjs|exe|vbs|dll|msi|lnk)$')
+           and not coalesce(p_has_scripts, false))) then
+    raise exception 'dock_invalid_files';
+  end if;
   if exists (select 1 from unnest(coalesce(p_required, '{}')) r where not exists (select 1 from public.dock_connectors c where c.id = r)) then
     raise exception 'dock_unknown_connector';
   end if;
@@ -1178,6 +1228,8 @@ begin
     package_version = excluded.package_version, package_sha256 = excluded.package_sha256, min_level = excluded.min_level, wave = excluded.wave,
     source_url = excluded.source_url, source_checked_on = excluded.source_checked_on,
     status = 'rascunho', approved_by = null, approved_at = null, tools_sha256 = null, updated_by = excluded.updated_by, updated_at = now();
+  -- servidor, pacote ou nível mudou: ninguém mantém "sempre permitir" de algo que não foi o aprovado
+  delete from public.office_action_grants g where g.connector_id = lower(trim(p_id));
   return lower(trim(p_id));
 end;
 $$;
@@ -1197,10 +1249,8 @@ begin
   update public.dock_connectors set status = 'rascunho', approved_by = null, approved_at = null, tools_sha256 = null,
     updated_by = v_me, updated_at = now() where id = p_connector;
   if not found then raise exception 'dock_unknown_connector'; end if;
-  -- a ação deixou de ser C: o "sempre permitir" dela acaba para todos os bots
-  if p_class is distinct from 'C' or coalesce(p_sends_outside, false) or coalesce(p_money, false) or not coalesce(p_enabled, true) then
-    delete from public.office_action_grants g where g.connector_id = p_connector and g.action_key = p_action_key;
-  end if;
+  -- qualquer mudança na ação (ferramenta, teto, área, classe) acaba com o "sempre permitir" dela
+  delete from public.office_action_grants g where g.connector_id = p_connector and g.action_key = p_action_key;
   insert into public.dock_connector_actions (connector_id, action_key, tool_name, label, action_class, max_items, sends_outside, money, area_id, enabled)
   values (p_connector, p_action_key, p_tool_name, trim(p_label), p_class, coalesce(p_max_items, 1), coalesce(p_sends_outside, false),
           coalesce(p_money, false), p_area, coalesce(p_enabled, true))
@@ -1223,7 +1273,7 @@ begin
   -- Pergunta ao Igor (nota 42): exigir que quem aprova seja diferente de quem editou por último?
   --   and updated_by <> v_me
   update public.dock_connectors set status = 'aprovado', approved_by = v_me, approved_at = now(), tools_sha256 = p_tools_sha256
-  where id = p_id and status = 'rascunho' and source_url is not null and (transport = 'interno' or p_tools_sha256 is not null);
+  where id = p_id and status in ('rascunho', 'suspenso') and source_url is not null and (transport = 'interno' or p_tools_sha256 is not null);
   if not found then raise exception 'dock_connector_not_ready'; end if;
 end;
 $$;
@@ -1391,8 +1441,9 @@ set search_path = ''
 as $$
   insert into public.dock_action_log (owner_team_id, agent_id, agent_name, connector_id, action_key, action_class, area_id, item_count,
                                       origin, data_class, outcome, basis, actor, approval_id, job_public_id)
-  values (p_owner, p_agent, coalesce((select a.name from public.office_agents a where a.id = p_agent), ''), p_connector, p_action, p_class,
-          p_area, coalesce(p_items, 1), p_origin, p_data_class, p_outcome, left(coalesce(p_basis, ''), 60), coalesce(p_actor, 'bot'), p_approval, p_job);
+  values (left(p_owner, 64), left(p_agent, 64), coalesce((select left(a.name, 60) from public.office_agents a where a.id = p_agent), ''),
+          left(p_connector, 64), left(p_action, 64), left(p_class, 1), left(p_area, 64), coalesce(p_items, 1), left(p_origin, 20),
+          left(p_data_class, 20), p_outcome, left(coalesce(p_basis, ''), 60), left(coalesce(p_actor, 'bot'), 64), left(p_approval, 64), left(p_job, 64));
 $$;
 
 -- TODA ação de conector "da empresa" passa aqui ANTES de acontecer, inclusive leitura.
@@ -1431,6 +1482,8 @@ begin
   if not exists (select 1 from public.workers w where w.id = p_worker_id and w.enabled and w.owner_team_id = r.owner_team_id) then
     raise exception 'office_worker_mismatch' using errcode = '42501';
   end if;
+  -- ação aprovada roda pelo office_take_approval, nunca por um pedido novo dentro dela
+  if r.job_type <> 'office_reply' then raise exception 'office_job_mismatch' using errcode = '42501'; end if;
   if p_idempotency_key is null or char_length(p_idempotency_key) not between 8 and 100 then raise exception 'office_invalid_key'; end if;
 
   -- o mesmo pedido de novo devolve a mesma resposta (o motor pergunta de novo depois da aprovação)
@@ -1451,13 +1504,16 @@ begin
   v_class := v_act.action_class;
   if v_class is not null and v_items > v_act.max_items then v_class := 'D'; end if;
   -- 3. origem: quem decide é o servidor (pela entrega) e o motor (conteúdo de fora lido nesta entrega), nunca o bot
+  -- "humano" só por lista positiva: entrega nascida de mensagem da própria pessoa
   v_origin := case when coalesce(p_tainted, false) then 'externo'
                    when r.parent_job_id is not null then 'bot'
                    when r.payload ->> 'origin' = 'rotina' then 'rotina'
-                   else 'humano' end;
-  v_data := private.office_data_class(v_ia.kind, v_ia.provider);
+                   when r.payload ? 'message_id' and r.created_by = r.owner_team_id then 'humano'
+                   else 'bot' end;
+  v_data := private.office_data_class(v_ia.kind, v_ia.provider, v_ia.endpoint);
 
   v_deny := case
+    when not exists (select 1 from public.members m where m.team_id = r.owner_team_id and m.active) then 'dono_inativo'
     when v_agent.id is null then 'bot_nao_encontrado'
     when exists (select 1 from public.office o where o.owner_team_id = r.owner_team_id and o.suspended_at is not null) then 'escritorio_suspenso'
     when v_agent.paused then 'bot_pausado'
@@ -1466,7 +1522,7 @@ begin
     when v_act.connector_id is null or not v_act.enabled then 'acao_desconhecida'
     when v_inst.agent_id is null then 'conector_nao_instalado'
     when v_agent.access_level < v_con.min_level then 'nivel_insuficiente'
-    when v_inst.read_only and v_class in ('C', 'D') then 'so_leitura'
+    when v_inst.read_only and v_class <> 'A' then 'so_leitura'
     when v_ia.id is null or not private.office_connection_allowed(p_agent_id, r.entity_id, p_connection_id) then 'ia_nao_autorizada'
     -- dado da empresa não vai para provedor que treina com o conteúdo
     when v_data = 'treina' then 'provedor_treina_com_dados'
@@ -1514,10 +1570,10 @@ begin
   if p_draft is null or jsonb_typeof(p_draft) <> 'object' then raise exception 'office_invalid_draft'; end if;
   v_apr := private.ulid('apr');
   insert into public.office_approvals (id, owner_team_id, agent_id, job_public_id, thread_id, connector_id, action_key, action_class, gate, approver,
-                                       origin, origin_detail, title, summary, draft, item_count, idempotency_key, expires_at)
+                                       origin, origin_detail, action_label, title, summary, draft, item_count, idempotency_key, expires_at)
   values (v_apr, r.owner_team_id, p_agent_id, p_job_public_id, r.entity_id, p_connector_id, p_action_key, v_class,
           case when v_class = 'D' then 'bloqueio' else 'lote' end, case when v_act.money then 'founder' else 'dono' end,
-          v_origin, left(coalesce(p_origin_detail, ''), 300), left(coalesce(nullif(trim(coalesce(p_title, '')), ''), v_act.label), 160),
+          v_origin, left(coalesce(p_origin_detail, ''), 300), left(v_act.label, 120), left(coalesce(nullif(trim(coalesce(p_title, '')), ''), v_act.label), 160),
           left(coalesce(p_summary, ''), 2000), p_draft, v_items, p_idempotency_key, now() + interval '7 days');
   perform private.dock_log_action(r.owner_team_id, p_agent_id, p_connector_id, p_action_key, v_class, v_act.area_id, v_items, v_origin,
                                   v_data, 'aguardando', 'aprovacao', 'bot', v_apr, p_job_public_id);
@@ -1525,7 +1581,33 @@ begin
 end;
 $$;
 
+-- A aprovação ainda vale? A ação, o cargo, a área e o escritório podem ter mudado desde o pedido.
+-- null = vale; texto = por que não vale (aí ela é cancelada e o bot precisa pedir de novo).
+create or replace function private.office_approval_problem(p_id text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when not exists (select 1 from public.members m where m.team_id = a.owner_team_id and m.active
+                     and m.role_level in ('owner', 'admin', 'operator')) then 'dono_sem_cargo'
+    when exists (select 1 from public.office o where o.owner_team_id = a.owner_team_id and o.suspended_at is not null) then 'escritorio_suspenso'
+    when x.connector_id is null then 'acao_mudou'
+    when x.money and a.approver <> 'founder' then 'acao_mudou'
+    when (x.action_class = 'D' or x.sends_outside) and a.action_class <> 'D' then 'acao_mudou'
+    when a.item_count > x.max_items and a.action_class <> 'D' then 'acao_mudou'
+    when x.area_id is not null
+         and private.area_rank(private.area_level_of(a.owner_team_id, x.area_id)) < private.area_rank('operar') then 'cargo_nao_alcanca'
+    else null end
+  from public.office_approvals a
+  left join public.dock_connector_actions x on x.connector_id = a.connector_id and x.action_key = a.action_key and x.enabled
+  where a.id = p_id;
+$$;
+
 -- A pessoa decide. Pode editar o rascunho: o que for aprovado é o que será executado.
+-- Só o DONO edita o rascunho. Dinheiro precisa do dono E de um founder (em qualquer ordem).
 -- Aprovar cria uma entrega "office_action": o motor executa o rascunho guardado, sem passar pela IA.
 create or replace function public.office_decide_approval(
   p_id text, p_approve boolean, p_draft jsonb default null, p_always boolean default false, p_note text default null
@@ -1539,6 +1621,10 @@ declare
   v_me text := private.my_team_id();
   a public.office_approvals;
   v_ok boolean := coalesce(p_approve, false);
+  v_problem text;
+  v_owner_ok timestamptz;
+  v_founder_ok timestamptz;
+  v_done boolean;
 begin
   if v_me is null then raise exception 'office_not_member'; end if;
   select * into a from public.office_approvals x where x.id = p_id for update;
@@ -1547,9 +1633,36 @@ begin
   end if;
   if a.status <> 'pendente' then raise exception 'office_approval_closed'; end if;
   if a.expires_at <= now() then raise exception 'office_approval_expired'; end if;
-  -- dinheiro: só founder aprova (o dono pode recusar)
-  if v_ok and a.approver = 'founder' and not private.is_at_least('owner') then raise exception 'office_needs_founder' using errcode = '42501'; end if;
+  if p_draft is not null and a.owner_team_id <> v_me then raise exception 'office_only_owner_edits' using errcode = '42501'; end if;
   if v_ok and p_draft is not null and (jsonb_typeof(p_draft) <> 'object' or pg_column_size(p_draft) >= 32000) then raise exception 'office_invalid_draft'; end if;
+
+  -- reconfere: se algo mudou desde o pedido, a aprovação é cancelada (o bot pede de novo)
+  v_problem := private.office_approval_problem(a.id);
+  if v_ok and v_problem is not null then
+    update public.office_approvals set status = 'cancelada', decided_by = v_me, decided_at = now(),
+      decision_note = 'cancelada: ' || v_problem where id = p_id;
+    perform private.dock_log_action(a.owner_team_id, a.agent_id, a.connector_id, a.action_key, a.action_class, null, a.item_count, a.origin,
+                                    null, 'negada', v_problem, v_me, a.id, a.job_public_id);
+    return;
+  end if;
+
+  -- dinheiro: dono E founder; o que faltar fica esperando (editar o rascunho zera a confirmação do founder)
+  if v_ok and a.approver = 'founder' then
+    v_owner_ok := case when a.owner_team_id = v_me then now() else a.owner_ok_at end;
+    v_founder_ok := case when p_draft is not null and p_draft is distinct from a.draft then null else a.founder_ok_at end;
+    if private.is_at_least('owner') then v_founder_ok := now(); end if;
+    v_done := v_owner_ok is not null and v_founder_ok is not null;
+    update public.office_approvals set owner_ok_at = v_owner_ok, founder_ok_at = v_founder_ok,
+      draft = coalesce(p_draft, draft), draft_edited = draft_edited or (p_draft is not null and p_draft is distinct from a.draft)
+    where id = p_id;
+    if not v_done then
+      perform private.dock_log_action(a.owner_team_id, a.agent_id, a.connector_id, a.action_key, a.action_class, null, a.item_count, a.origin,
+                                      null, 'aguardando', case when v_owner_ok is null then 'falta_dono' else 'falta_founder' end, v_me, a.id, a.job_public_id);
+      return;
+    end if;
+    select * into a from public.office_approvals x where x.id = p_id;
+    p_draft := null;
+  end if;
 
   if coalesce(p_always, false) then
     -- nunca para D, nunca a partir de pedido que não veio da própria pessoa, nunca por terceiro
@@ -1563,7 +1676,7 @@ begin
 
   update public.office_approvals set status = case when v_ok then 'aprovada' else 'recusada' end,
     draft = case when v_ok and p_draft is not null then p_draft else draft end,
-    draft_edited = v_ok and p_draft is not null and p_draft is distinct from a.draft,
+    draft_edited = draft_edited or (v_ok and p_draft is not null and p_draft is distinct from a.draft),
     decided_by = v_me, decided_at = now(), decision_note = left(p_note, 600)
   where id = p_id;
   perform private.dock_log_action(a.owner_team_id, a.agent_id, a.connector_id, a.action_key, a.action_class, null, a.item_count, a.origin,
@@ -1597,6 +1710,13 @@ begin
   end if;
   select * into a from public.office_approvals x where x.id = p_approval_id and x.owner_team_id = r.owner_team_id for update;
   if a.id is null or a.status <> 'aprovada' then raise exception 'office_approval_closed'; end if;
+  -- bot pausado: não executa agora (a entrega volta para a fila e roda depois de retomar)
+  if exists (select 1 from public.office_agents g where g.id = a.agent_id and g.paused) then raise exception 'office_agent_paused'; end if;
+  -- algo mudou desde a aprovação (ação, cargo, área, dono inativo): não executa
+  if private.office_approval_problem(a.id) is not null then
+    update public.office_approvals set status = 'cancelada', decision_note = left('cancelada: ' || private.office_approval_problem(a.id), 600) where id = a.id;
+    return;
+  end if;
   -- o catálogo, a instalação ou o escritório podem ter mudado entre o pedido e a aprovação
   if exists (select 1 from public.office o where o.owner_team_id = a.owner_team_id and o.suspended_at is not null)
      or not exists (select 1 from public.dock_connectors c
@@ -1649,7 +1769,11 @@ declare
 begin
   r := private.lock_leased(p_job_public_id, p_lease_id);
   if r.owner_team_id is null or r.job_type not in ('office_reply', 'office_action') then raise exception 'office_job_mismatch' using errcode = '42501'; end if;
-  select c.provider into v_provider from public.office_connections c where c.id = p_connection_id and c.owner_team_id = r.owner_team_id;
+  -- ação aprovada não passa pela IA: a mensagem dela não leva conexão nem modelo
+  if r.job_type = 'office_action' then
+    p_connection_id := null; p_model := null; p_fallback_from := null; p_fallback_reason := null;
+  end if;
+  select c.provider into v_provider from public.office_connections c where p_connection_id is not null and c.id = p_connection_id and c.owner_team_id = r.owner_team_id;
   if r.job_type = 'office_reply' and (v_provider is null or not private.office_connection_allowed(r.agent_id, r.entity_id, p_connection_id)) then
     raise exception 'office_connection_not_allowed' using errcode = '42501';
   end if;
@@ -1777,6 +1901,7 @@ begin
     v_thread := rt.thread_id;
     v_key := 'rtn:' || rt.id || ':' || to_char(rt.next_run_at at time zone 'UTC', 'YYYYMMDDHH24MI');
     if exists (select 1 from public.office o where o.owner_team_id = rt.owner_team_id and o.consent_at is not null and o.suspended_at is null)
+       and exists (select 1 from public.members m where m.team_id = rt.owner_team_id and m.active)
        and not exists (select 1 from public.office_messages m where m.idempotency_key = v_key) then
       if v_thread is null then
         v_thread := private.ulid('thr');
@@ -1863,7 +1988,8 @@ begin
     execute format('grant execute on function %s to authenticated', f);
   end loop;
   foreach f in array array[
-    'private.area_level_of(text,text)', 'private.office_data_class(text,text)', 'private.office_connection_allowed(text,text,text)',
+    'private.area_level_of(text,text)', 'private.office_data_class(text,text,text)', 'private.office_connection_allowed(text,text,text)',
+    'private.office_approval_problem(text)', 'private.dock_guard_area_owner()',
     'private.office_skill_version_for(text,text)', 'private.office_next_run(text,time,int,int,text,timestamptz)',
     'private.dock_add_skill_version(text,int,text,text,text,jsonb,jsonb,int,text[],boolean,text,text,text)',
     'private.dock_log_action(text,text,text,text,text,text,int,text,text,text,text,text,text,text)',
