@@ -1,5 +1,6 @@
 import "server-only"
 import { JOB_TYPES, afterFailure, mergeConfig, pollAdvice, validateJobResult, type QueueConfig } from "@/lib/domain/jobs"
+import { OFFICE_JOB_TYPES, validateOfficeResult } from "./dock-engine"
 import { supabaseAdmin } from "./supabase-admin"
 import type { Worker } from "./workers"
 
@@ -37,7 +38,7 @@ function dbError(error: { message?: string; code?: string }): never {
 }
 
 const PUBLIC_FIELDS =
-  "public_id, job_type, agent_id, preferred_model, required_capabilities, entity_type, entity_id, status, priority, payload, result, error, created_at, available_at, claimed_at, started_at, completed_at, failed_at, first_failed_at, claimed_by, engine, lease_expires_at, attempt_count, max_attempts, idempotency_key, correlation_id, causation_id, created_by, updated_at"
+  "public_id, job_type, agent_id, preferred_model, required_capabilities, entity_type, entity_id, status, priority, payload, result, error, created_at, available_at, claimed_at, started_at, completed_at, failed_at, first_failed_at, claimed_by, engine, lease_expires_at, attempt_count, max_attempts, idempotency_key, correlation_id, causation_id, created_by, updated_at, owner_team_id"
 
 export type JobRow = Record<string, unknown> & { public_id: string; job_type: string; agent_id: string; status: string; claimed_by: string | null; lease_id?: string | null; attempt_count: number; max_attempts: number }
 
@@ -81,6 +82,11 @@ async function ownJob(w: Worker, publicId: string) {
   const job = data as unknown as JobRow
   // Worker só enxerga jobs do próprio agente (ou os que ele pegou).
   if (w.agent_id && job.agent_id !== w.agent_id && job.claimed_by !== w.id) throw new JobError("job não encontrado", 404)
+  // Escritório pessoal (0026): trabalhador da empresa não vê entrega de ninguém; o PC liberado só vê
+  // as do próprio dono que ele mesmo pegou.
+  const owner = (job.owner_team_id as string | null | undefined) ?? null
+  if ((w.ownerTeamId ?? null) !== owner) throw new JobError("job não encontrado", 404)
+  if (owner && job.claimed_by !== w.id) throw new JobError("job não encontrado", 404)
   return job
 }
 
@@ -205,7 +211,7 @@ export async function videoUploadUrl(w: Worker, id: string, lease: string) {
 /** Concluir: valida o schema do tipo ANTES; inválido não conclui (o worker corrige ou falha). */
 export async function completeJob(w: Worker, id: string, lease: string, raw: unknown) {
   const job = await ownJob(w, id)
-  const v = validateJobResult(job.job_type, raw)
+  const v = OFFICE_JOB_TYPES.has(job.job_type) ? validateOfficeResult(job.job_type, raw) : validateJobResult(job.job_type, raw)
   if (!v.ok) throw new JobError("resultado inválido para o tipo do job", 422, { errors: v.errors, schema: RESULT_SCHEMAS[job.job_type] })
   // Vídeo: o arquivo tem que ser o DESTE lead e DESTE job (o que create_upload_urls devolveu).
   if (job.job_type === "render_prospect_video") {
