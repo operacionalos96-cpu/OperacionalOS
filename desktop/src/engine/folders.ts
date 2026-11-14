@@ -70,7 +70,6 @@ export function createFolderGuard(opts: FolderGuardOptions) {
   function lexicalCheck(input: unknown): string {
     if (typeof input !== "string" || !input.trim()) throw new FolderError("caminho_vazio", "caminho vazio")
     if (input.length > 1000) throw new FolderError("caminho_longo", "caminho longo demais")
-    // eslint-disable-next-line no-control-regex
     if (/[\u0000-\u001f]/.test(input)) throw new FolderError("caminho_invalido", "caminho com caractere de controle")
     if (win) {
       const s = input.replace(/\//g, "\\")

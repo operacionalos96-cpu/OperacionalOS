@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- teste lê JSON do banco e de servidores falsos; o formato é conferido pelas asserções */
 /**
  * Adaptadores contra um servidor falso local (HTTP de verdade, em 127.0.0.1): formato do pedido,
  * chave só no cabeçalho, ferramentas, sem cota com horário de volta, chave recusada e endereço trocado.

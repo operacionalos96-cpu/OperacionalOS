@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- teste lê JSON do banco e de servidores falsos; o formato é conferido pelas asserções */
 /**
  * HZK Dock v3, PC liberado e funções do motor NO POSTGRES DE VERDADE (migration 0028, fatias 4 e 5 da nota 32).
  * Confere, logado como cada pessoa e como o servidor: pedir, aprovar e desligar um PC; o contexto da

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- teste lê JSON do banco e de servidores falsos; o formato é conferido pelas asserções */
 import { createHash } from "node:crypto"
 import { describe, expect, it } from "vitest"
 import type { ServerClient } from "./client"
@@ -91,9 +92,9 @@ describe("motor", () => {
 
   it("'Parar tudo' no meio da resposta devolve a entrega à fila e não posta nada", async () => {
     const calls: { tool: string; args: any }[] = []
-    let e!: ReturnType<typeof createEngine>
-    const adapter: ChatAdapter = { supportsTools: async () => true, chat: async () => { await e.stopAll(); return { text: "tarde demais", toolCalls: [], usage: { input: 0, output: 0 }, model: "m" } } }
-    e = createEngine({ client: fakeClient(delivery(), calls), vault: memoryVault(), foldersFor: () => null, confirmedLevel: () => 1, adapterFactory: () => adapter })
+    const box: { e?: ReturnType<typeof createEngine> } = {}
+    const adapter: ChatAdapter = { supportsTools: async () => true, chat: async () => { await box.e!.stopAll(); return { text: "tarde demais", toolCalls: [], usage: { input: 0, output: 0 }, model: "m" } } }
+    const e = (box.e = createEngine({ client: fakeClient(delivery(), calls), vault: memoryVault(), foldersFor: () => null, confirmedLevel: () => 1, adapterFactory: () => adapter }))
     await e.tick(0)
     expect(calls.some((c) => c.tool === "release_job")).toBe(true)
     expect(calls.some((c) => c.tool === "office_post_message")).toBe(false)

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- teste lê JSON do banco e de servidores falsos; o formato é conferido pelas asserções */
 /**
  * PONTA A PONTA do HZK Dock no PC (fatias 4 e 5), sem nada de fora desta máquina:
  *   banco    = Postgres de teste (PGlite) com TODAS as migrations reais;

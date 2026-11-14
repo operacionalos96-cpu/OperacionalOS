@@ -231,7 +231,7 @@ export function createEngine(deps: EngineDeps) {
       const useTools = await adapter.supportsTools(model)
       const tools: ToolDef[] = []
       const companyActions = new Map<string, { connector: DeliveryConnector; action: DeliveryConnector["actions"][number] }>()
-      let inline: SkillPackage[] = []
+      const inline: SkillPackage[] = []
       if (useTools) {
         if (d.skills.length) tools.push({ name: "skill_ler", description: "Abre as instruções completas de uma skill.", parameters: { type: "object", properties: { nome: { type: "string" } }, required: ["nome"] } })
         if (guard) tools.push(...folderTools())
