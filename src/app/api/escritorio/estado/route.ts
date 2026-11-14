@@ -16,7 +16,7 @@ export async function GET() {
   if (!member) return NextResponse.json({ erro: "não autorizado" }, { status: 401, headers: noStore })
   const db = await supabaseServer()
 
-  const [office, agents, jobs, threads, workers, connections] = await Promise.all([
+  const [office, agents, jobs, threads, workers, connections, approvals] = await Promise.all([
     db.from("office").select("consent_at").eq("owner_team_id", member.teamId).maybeSingle(),
     db.from("office_agents").select("id, parent_agent_id, name, title, paused, connection_id, backup_models, can_create_agents").eq("owner_team_id", member.teamId).order("created_at"),
     db
@@ -28,8 +28,10 @@ export async function GET() {
     db.from("office_threads").select("id, kind").eq("owner_team_id", member.teamId).eq("archived", false),
     db.from("workers").select("last_seen_at, enabled").eq("owner_team_id", member.teamId),
     db.from("office_connections").select("id, provider, kind, status, quota_resets_at").eq("owner_team_id", member.teamId),
+    // aprovações do porteiro esperando a pessoa (Dock v3, migration 0027): acendem o avatar
+    db.from("office_approvals").select("agent_id, gate").eq("owner_team_id", member.teamId).eq("status", "pendente").gt("expires_at", new Date().toISOString()),
   ])
-  const failed = [office, agents, jobs, threads, workers, connections].find((r) => r.error)
+  const failed = [office, agents, jobs, threads, workers, connections, approvals].find((r) => r.error)
   if (failed?.error) {
     console.error("[escritorio/estado]", failed.error.message)
     return NextResponse.json({ erro: "falhou ao ler o escritório" }, { status: 500, headers: noStore })
@@ -52,5 +54,7 @@ export async function GET() {
     workers: (workers.data ?? []) as OfficeRows["workers"],
     connections: (connections.data ?? []) as NonNullable<OfficeRows["connections"]>,
   }
-  return NextResponse.json(deriveOfficeState(officeStateInput(rows), new Date()), { headers: noStore })
+  const input = officeStateInput(rows)
+  input.approvals = ((approvals.data ?? []) as { agent_id: string; gate: "lote" | "bloqueio" }[]).map((a) => ({ agentId: a.agent_id, gate: a.gate }))
+  return NextResponse.json(deriveOfficeState(input, new Date()), { headers: noStore })
 }
