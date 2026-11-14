@@ -242,7 +242,7 @@ export function BotApps({ d, a }: { d: DockData; a: DockAgent }) {
           )
         })}
       </div>
-      <p className="t-desc">Na classe C dá para "sempre permitir" por ação, neste bot, por 90 dias. A classe D sempre pede uma pessoa.</p>
+      <p className="t-desc">Na classe C dá para “sempre permitir” por ação, neste bot, por 90 dias. A classe D sempre pede uma pessoa.</p>
     </div>
   )
 }

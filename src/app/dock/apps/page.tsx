@@ -87,7 +87,7 @@ export default function DockAppsPage() {
           <Input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://" />
           <Label>Para quê?</Label>
           <Textarea value={form.why} onChange={(e) => setForm({ ...form, why: e.target.value })} placeholder="O que o bot faria com ele" />
-          <p className="t-desc">O pedido vai para "Precisa de você" dos founders. Um app só entra no catálogo depois que um founder confere a fonte e as ações.</p>
+          <p className="t-desc">O pedido vai para “Precisa de você” dos founders. Um app só entra no catálogo depois que um founder confere a fonte e as ações.</p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setReq(false)}>Cancelar</Button>
             <Button variant="brand" disabled={!form.name.trim() || !form.why.trim() || (!!form.url && !form.url.startsWith("https://"))}

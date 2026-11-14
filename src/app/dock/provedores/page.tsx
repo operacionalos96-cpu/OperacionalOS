@@ -90,7 +90,7 @@ export default function DockProvidersPage() {
         <p className="t-desc">Um endereço compatível com a OpenAI: um servidor seu ou outro provedor.</p>
         <div><Button variant="outline" onClick={() => setConnect("custom")}>Adicionar endereço</Button></div>
       </Card>
-      <p className="t-desc">Cada provedor mostra a fonte oficial conferida em 12/11/2026. Sem fonte, fica "a confirmar" e sem botão.</p>
+      <p className="t-desc">Cada provedor mostra a fonte oficial conferida em 12/11/2026. Sem fonte, fica “a confirmar” e sem botão.</p>
 
       <Dialog open={!!connect} onOpenChange={(o) => !o && setConnect(null)}>
         <DialogContent>
@@ -99,7 +99,7 @@ export default function DockProvidersPage() {
             <>
               <Label>Nome</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: Servidor da HZK" />
               <Label>Endereço (compatível com a OpenAI)</Label><Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://meu-servidor/v1" />
-              {endpoint && !endpointOk(endpoint) && <p className="text-xs text-danger">Use https (ou http só para o próprio PC), sem usuário, senha ou "?".</p>}
+              {endpoint && !endpointOk(endpoint) && <p className="text-xs text-danger">Use https (ou http só para o próprio PC), sem usuário, senha ou “?”.</p>}
               <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={ack} onChange={(e) => setAck(e.target.checked)} />Entendi: eu respondo por este endereço. O Dock não conferiu quem está do outro lado.</label>
             </>
           ) : connect ? (

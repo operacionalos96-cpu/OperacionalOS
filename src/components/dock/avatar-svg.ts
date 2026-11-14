@@ -37,7 +37,7 @@ function sphere(v: string, S: number, color: string, gid: string, micro?: boolea
   return { defs: g + ember, body: `<g class="sphere"><circle r="${S}" fill="url(#g${gid})"/>${v === "C" ? `<circle r="${S}" fill="url(#e${gid})"/>` : ""}${v === "A" ? `<ellipse cx="-${S * .28}" cy="-${S * .42}" rx="${S * .42}" ry="${S * .24}" fill="#fff" opacity=".10" transform="rotate(-28 -${S * .28} -${S * .42})"/>` : ""}<circle r="${S - .5}" fill="none" stroke="var(--rim)" stroke-width="${micro ? 4 : 1}"/></g>` }
 }
 
-function glyphMark(glyph: string, S: number, _size: number) {
+function glyphMark(glyph: string, S: number) {
   if (!glyph) return ""
   if (GLYPH_SVG[glyph]) return `<g fill="#f3f4f6" stroke="#f3f4f6" transform="scale(${(S / 23).toFixed(2)})">${GLYPH_SVG[glyph]}</g>`
   const fs = S * (glyph.length > 1 ? .74 : .95)
@@ -125,7 +125,7 @@ export function avatarSvg(o: any, prefix: string): string {
   for (const k of ["cota", "conexao", "ponte"]) extra += `<g class="badge b-${k}" transform="translate(34 34)"><circle r="${size >= 120 ? 12 : 16}" fill="var(--badge)" stroke="var(--surface-2)" stroke-width="3.5"/><g fill="none" stroke="var(--badge-fg)" stroke-width="${size >= 120 ? 1.8 : 2.4}" stroke-linecap="round" stroke-linejoin="round" transform="scale(${size >= 120 ? .8 : 1.05})">${ICONS[k]}</g></g>`
 
   const shown = state === "concluiu" ? "ocioso" : state
-  return `<svg class="dock-av" data-level="${level}" data-state="${shown}" data-demo="${state === "concluiu" ? "done" : ""}" width="${size}" height="${size}" viewBox="-50 -50 100 100" role="img" aria-label="nível ${level}, ${state}"><defs>${defs}</defs>${back}${sp.body}${glyphMark(glyph, S, size)}${front}${extra}</svg>`
+  return `<svg class="dock-av" data-level="${level}" data-state="${shown}" data-demo="${state === "concluiu" ? "done" : ""}" width="${size}" height="${size}" viewBox="-50 -50 100 100" role="img" aria-label="nível ${level}, ${state}"><defs>${defs}</defs>${back}${sp.body}${glyphMark(glyph, S)}${front}${extra}</svg>`
 }
 
 
