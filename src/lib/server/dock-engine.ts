@@ -97,7 +97,7 @@ export function dockEngineTools(rpc: Rpc): Record<string, EngineTool> {
     },
     office_post_message: {
       description: "Grava a mensagem do bot com a IA que respondeu (e a troca para a reserva, se houve).",
-      input: schema(["seq", "body", "connection_id"], {
+      input: schema(["seq", "body"], {
         seq: { type: "number" }, kind: { type: "string" }, body: { type: "string" }, report: { type: "object" },
         connection_id: { type: "string" }, model: { type: "string" }, fallback_from: { type: "string" }, fallback_reason: { type: "string" },
       }),
@@ -108,7 +108,8 @@ export function dockEngineTools(rpc: Rpc): Record<string, EngineTool> {
         const args = {
           p_job_public_id: job, p_lease_id: l, p_seq: int(a, "seq", 0, 999, 0), p_kind: kind,
           p_body: text(a, "body", 32000, true), p_report: obj(a, "report", 30000),
-          p_connection_id: id(a, "connection_id", ID.connection), p_model: text(a, "model", 120),
+          // entrega office_action não grava IA (a ação aprovada roda sem a IA; o banco zera de qualquer jeito)
+          p_connection_id: a.connection_id == null ? null : id(a, "connection_id", ID.connection), p_model: text(a, "model", 120),
           p_fallback_from: text(a, "fallback_from", 120), p_fallback_reason: text(a, "fallback_reason", 200),
         }
         await check(w, job, l)
