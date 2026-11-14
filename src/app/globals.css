@@ -7,9 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: "Milliard", var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-serif: "Kefa III", "Kefa", var(--font-hzk-serif), Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -86,12 +87,12 @@
 }
 
 /*
- * Direção visual "Dashboard V18": claro e arejado por padrão. Fundo cinza-azulado,
- * cards brancos que flutuam (sombra longa e suave, quase sem borda), cantos bem
- * arredondados e barra lateral em pílula escura só com ícones.
- * Identidade HZK: grafite azulado = base (barra lateral, botões principais, texto);
- * laranja = ação (item ativo, links, foco, destaques). Verde só marca positivo.
- * O tema escuro segue as mesmas regras, invertidas.
+ * Direção visual "Órbita" (identidade HZK, 11/11/2026), tirada do guia "HZK Company projeto base":
+ * "um universo digital organizado". Editorial e arquitetônica: fundo mineral, superfícies brancas
+ * separadas por linhas finas (quase sem sombra), cantos contidos, órbitas finas com nós no fundo,
+ * títulos com o traço laranja e frases de apoio em serifa.
+ * Grafite azulado = base (texto, botões principais); laranja = só o que age, conecta ou pede atenção
+ * (item ativo, foco, destaques). Verde só marca positivo. O tema escuro é o grafite do guia.
  */
 :root {
   color-scheme: light;
@@ -100,53 +101,55 @@
    * cinza grafite = equilíbrio e suporte. */
   --hzk-navy: #1b2432;
   --hzk-orange: #ea5b25;
-  --hzk-orange-soft: rgb(234 91 37 / 11%);
+  --hzk-orange-soft: rgb(234 91 37 / 10%);
   --hzk-gray: #535353;
+  --hzk-mineral: #f5f5f2;
   --highlight: var(--hzk-orange);
   --highlight-soft: var(--hzk-orange-soft);
-  --background: oklch(0.972 0.004 255);
-  --foreground: oklch(0.19 0.01 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0 0);
+  --background: var(--hzk-mineral);
+  --foreground: var(--hzk-navy);
+  --card: #ffffff;
+  --card-foreground: var(--hzk-navy);
+  --popover: #ffffff;
+  --popover-foreground: var(--hzk-navy);
   --primary: var(--hzk-navy);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.006 255);
-  --secondary-foreground: oklch(0.21 0 0);
-  --muted: oklch(0.955 0.006 255);
-  --muted-foreground: oklch(0.47 0.014 255); /* 4,5:1 sobre o fundo (briefing: texto secundário) */
-  --accent: oklch(0.95 0.012 255);
-  --accent-foreground: oklch(0.21 0 0);
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeea;
+  --secondary-foreground: var(--hzk-navy);
+  --muted: #efefeb;
+  --muted-foreground: #5a5c60; /* cinza grafite do guia, 6:1 sobre o mineral */
+  --accent: #ecece7;
+  --accent-foreground: var(--hzk-navy);
   --destructive: oklch(0.58 0.19 25);
-  --border: oklch(0.925 0.006 255);
-  --input: oklch(0.9 0.008 255);
+  --border: #e1e1db;
+  --input: #d6d6cf;
   --ring: var(--hzk-orange);
 
   --brand: var(--hzk-orange);
-  --brand-foreground: oklch(0.99 0 0);
+  --brand-foreground: #ffffff;
   --brand-soft: var(--hzk-orange-soft);
   --success: oklch(0.55 0.14 152);
   --success-soft: oklch(0.55 0.14 152 / 10%);
-  --warning: oklch(0.64 0.14 70);
+  --warning: oklch(0.62 0.13 70);
   --warning-soft: oklch(0.7 0.14 75 / 14%);
   --danger: oklch(0.58 0.19 25);
   --danger-soft: oklch(0.58 0.19 25 / 9%);
   --info: oklch(0.5 0 0);
-  --info-soft: oklch(0.5 0 0 / 8%);
+  --info-soft: oklch(0.5 0 0 / 7%);
 
-  /* Estágios = rampa SEQUENCIAL neutra (ordem do funil); só "ganho" é verde. */
-  /* Etapas do funil com cor própria (mock do Pipeline): novo laranja, contato azul, proposta cinza, negociação coral. */
+  /* Etapas do funil com cor própria: novo laranja, contato azul, proposta cinza, negociação coral. */
   --stage-novo: var(--hzk-orange);
-  --stage-contato: oklch(0.62 0.15 245);
+  --stage-contato: oklch(0.6 0.13 245);
   --stage-proposta: oklch(0.6 0.01 255);
   --stage-negociacao: oklch(0.62 0.19 25);
 
-  --shadow-card: 0 1px 2px oklch(0.3 0.04 255 / 4%), 0 10px 30px -14px oklch(0.3 0.06 255 / 14%);
-  --sheen-color: color-mix(in oklch, var(--hzk-orange) 9%, transparent);
-  --shadow-lift: 0 2px 4px oklch(0.3 0.04 255 / 4%), 0 22px 44px -18px oklch(0.3 0.08 255 / 26%);
+  /* Linha no lugar de sombra: a superfície se separa do mineral pela borda, não por "flutuar". */
+  --shadow-card: 0 1px 0 rgb(27 36 50 / 3%);
+  --sheen-color: color-mix(in oklch, var(--hzk-orange) 7%, transparent);
+  --shadow-lift: 0 1px 0 rgb(27 36 50 / 4%), 0 18px 40px -26px rgb(27 36 50 / 28%);
 
-  /* Semântica fixa dos gráficos (briefing): entradas/positivo = verde; saídas/atraso = coral suave;
+
+  /* Semântica fixa dos gráficos: entradas/positivo = verde; saídas/atraso = coral suave;
    * laranja fica só para ação e para a linha do saldo. */
   --chart-in: oklch(0.58 0.13 152);
   --chart-out: oklch(0.66 0.13 28);
@@ -155,43 +158,52 @@
   --chart-3: oklch(0.45 0 0);
   --chart-4: oklch(0.6 0 0);
   --chart-5: oklch(0.82 0 0);
-  --radius: 0.7rem;
-  --sidebar: var(--hzk-navy);
-  --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.97 0.006 255);
+  --radius: 0.6rem;
+  /* Menu claro, como as peças do guia: superfície branca com linha fina; a tela atual é o nó laranja. */
+  --sidebar: #f7f7f4;
+  --sidebar-foreground: var(--hzk-navy);
+  --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: var(--hzk-navy);
-  --sidebar-accent: oklch(1 0 0 / 9%);
-  --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  /* Menu de vidro fosco: branco desfocado que desce para um calor laranja bem leve. */
+  --rail-bg: linear-gradient(180deg, rgb(255 255 255 / 82%) 0%, rgb(255 255 255 / 58%) 48%, rgb(246 226 214 / 62%) 100%);
+  --rail-edge: rgb(255 255 255 / 90%);
+  --rail-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px rgb(27 36 50 / 7%), 0 0 0 6px rgb(255 255 255 / 38%), 0 28px 56px -30px rgb(27 36 50 / 38%);
+  --rail-pick-shadow: 0 1px 0 #ffffff inset, 0 0 0 1px rgb(27 36 50 / 6%), 0 8px 18px -8px rgb(27 36 50 / 35%);
+  --orbit-line: rgb(27 36 50 / 17%);
+  --orbit-node: rgb(27 36 50 / 30%);
+  --orbit-star: rgb(27 36 50 / 22%);
+  --sidebar-accent: rgb(27 36 50 / 5%);
+  --sidebar-accent-foreground: var(--hzk-navy);
+  --sidebar-border: #e1e1db;
   --sidebar-ring: var(--hzk-orange);
 }
 
 .dark {
   color-scheme: dark;
   --highlight: #f06a36;
-  --highlight-soft: rgb(240 106 54 / 15%);
-  --background: #0e131b;
-  --foreground: #e8ecf2;
-  --card: #151c27;
-  --card-foreground: #e8ecf2;
-  --popover: #1c2533; /* nível 3: modal/popover */
-  --popover-foreground: #e8ecf2;
-  --primary: #e8ecf2;
+  --highlight-soft: rgb(240 106 54 / 14%);
+  --background: #121924;
+  --foreground: #eef0f3;
+  --card: #1a2230;
+  --card-foreground: #eef0f3;
+  --popover: #202a39; /* nível 3: modal/popover */
+  --popover-foreground: #eef0f3;
+  --primary: #eef0f3;
   --primary-foreground: #1b2432;
-  --secondary: #1c2431;
-  --secondary-foreground: #e8ecf2;
-  --muted: #1c2431;
-  --muted-foreground: #9ca6b7; /* 4,5:1 sobre o card escuro */
-  --accent: #222b3a;
-  --accent-foreground: #e8ecf2;
+  --secondary: #1f2836;
+  --secondary-foreground: #eef0f3;
+  --muted: #1f2836;
+  --muted-foreground: #a3abb8; /* 4,5:1 sobre o card escuro */
+  --accent: #232d3c;
+  --accent-foreground: #eef0f3;
   --destructive: oklch(0.66 0.17 24);
-  --border: #263041;
-  --input: #2e3a4d;
+  --border: #2a3445;
+  --input: #344054;
   --ring: #f06a36;
 
   --brand: #f06a36;
   --brand-foreground: #ffffff;
-  --brand-soft: rgb(240 106 54 / 15%);
+  --brand-soft: rgb(240 106 54 / 14%);
   --success: oklch(0.7 0.15 152);
   --success-soft: oklch(0.7 0.15 152 / 12%);
   --warning: oklch(0.78 0.12 75);
@@ -206,10 +218,10 @@
   --stage-proposta: #8c96a8;
   --stage-negociacao: #ef4f4f;
 
-  /* Aresta de vidro: 1px de luz no topo do card dá a sensação de camada sobre o fundo. */
-  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 5%), 0 12px 32px -18px rgb(0 0 0 / 70%);
-  --sheen-color: rgb(255 255 255 / 7%);
-  --shadow-lift: 0 8px 24px -12px rgb(0 0 0 / 70%);
+  --shadow-card: none;
+  --sheen-color: rgb(255 255 255 / 6%);
+  --shadow-lift: 0 18px 40px -22px rgb(0 0 0 / 75%);
+
 
   --chart-in: oklch(0.72 0.14 152);
   --chart-out: oklch(0.72 0.12 28);
@@ -218,26 +230,35 @@
   --chart-3: #9aa4b5;
   --chart-4: #7d889b;
   --chart-5: #d3d9e3;
-  --sidebar: #1f2937; /* um nível acima do card: a pílula volta a flutuar */
+  --sidebar: #141a25;
   --sidebar-foreground: #e8ecf2;
-  --sidebar-primary: oklch(0.95 0.008 255);
+  --sidebar-primary: #f2f3f5;
   --sidebar-primary-foreground: #1b2432;
-  --sidebar-accent: rgb(255 255 255 / 8%);
-  --sidebar-accent-foreground: #e8ecf2;
-  --sidebar-border: rgb(255 255 255 / 10%);
+  /* Vidro escuro: grafite que desce para uma brasa laranja, como a pílula escura da referência. */
+  --rail-bg: linear-gradient(180deg, rgb(38 47 63 / 88%) 0%, rgb(18 24 34 / 92%) 52%, rgb(52 26 20 / 90%) 100%);
+  --rail-edge: rgb(255 255 255 / 9%);
+  --rail-shadow: inset 0 1px 0 rgb(255 255 255 / 9%), 0 0 0 6px rgb(255 255 255 / 3%), 0 28px 56px -26px rgb(0 0 0 / 85%);
+  --rail-pick-shadow: 0 10px 22px -10px rgb(0 0 0 / 80%);
+  --orbit-line: rgb(255 255 255 / 14%);
+  --orbit-node: rgb(255 255 255 / 42%);
+  --orbit-star: rgb(255 255 255 / 25%);
+  --sidebar-accent: rgb(255 255 255 / 6%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2a3445;
   --sidebar-ring: #f06a36;
 }
 
-/* Cards flutuantes: todo bloco "border bg-card" vira superfície branca com sombra
- * longa e borda quase invisível (padrão do app inteiro, sem mexer em cada tela). */
+/* Superfícies: todo bloco "border bg-card" fica separado do fundo por uma linha fina,
+ * quase sem sombra (padrão do app inteiro, sem mexer em cada tela). */
 @layer components {
   :where(.bg-card.border, [data-slot="card"]) {
-    border-color: color-mix(in oklch, var(--border) 55%, transparent);
+    /* Sem borda: a superfície se separa do fundo só pelo tom (referência aprovada pelo Gabriel). */
+    border-color: transparent;
     box-shadow: var(--shadow-card);
-  }
-  /* Modo escuro: borda de 1 px a 6% de branco separa o card do fundo (briefing). */
-  :where(.dark) :where(.bg-card.border, [data-slot="card"]) {
-    border-color: rgb(255 255 255 / 6%);
+    /* Fosco: a superfície deixa passar, desfocadas, as órbitas e os brilhos do fundo. */
+    background-color: color-mix(in oklch, var(--card) 84%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
   }
 }
 
@@ -247,12 +268,11 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Luz ambiente: dois brilhos muito suaves da marca no fundo. Estático (não anima, não pesa). */
+    /* Dois brilhos muito suaves (grafite em cima, laranja embaixo, à esquerda): é o que o vidro do
+     * menu desfoca. As órbitas ficam no componente OrbitField. */
     background-image:
-      radial-gradient(60rem 40rem at 100% -10%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%),
-      radial-gradient(50rem 36rem at -10% 110%, color-mix(in oklch, var(--hzk-navy) 5%, transparent), transparent 70%),
-      /* Brasa no canto inferior direito (mock): a mesma luz laranja dos traços LED dos cards. */
-      radial-gradient(32rem 20rem at 105% 110%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 70%);
+      radial-gradient(40rem 34rem at -6% 108%, color-mix(in oklch, var(--brand) 13%, transparent), transparent 70%),
+      radial-gradient(36rem 30rem at -8% -10%, color-mix(in oklch, var(--hzk-navy) 9%, transparent), transparent 70%);
     background-attachment: fixed;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
@@ -477,12 +497,11 @@
 @utility btn-tonal {
   color: color-mix(in oklch, var(--brand), var(--foreground) 32%);
   background: color-mix(in oklch, var(--brand) 11%, var(--card));
-  border-color: color-mix(in oklch, var(--brand) 28%, transparent);
+  border-color: transparent;
   transition: transform 180ms var(--ease-out), background-color 180ms, border-color 180ms;
   &:hover {
     transform: translateY(-1px);
     background: color-mix(in oklch, var(--brand) 17%, var(--card));
-    border-color: color-mix(in oklch, var(--brand) 45%, transparent);
   }
   &:active {
     transform: translateY(0) scale(0.98);
@@ -491,12 +510,13 @@
 
 /* Botão de superfície: fundo do card + borda fina; no hover a borda e o tom clareiam. */
 @utility btn-surface {
-  background: var(--card);
+  /* Sem contorno: só tom. */
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  border-color: transparent !important;
   transition: transform 180ms var(--ease-out), background-color 180ms, border-color 180ms, color 180ms;
   &:hover {
     transform: translateY(-1px);
-    background: var(--accent);
-    border-color: color-mix(in oklch, var(--foreground) 22%, var(--border));
+    background: color-mix(in oklch, var(--foreground) 10%, transparent);
   }
   &:active {
     transform: translateY(0) scale(0.98);
@@ -522,21 +542,21 @@
 @utility t-title {
   font-size: 1rem;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--foreground);
 }
 @utility t-label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 @utility t-value {
-  font-size: 1.75rem;
-  line-height: 1.1;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 2rem;
+  line-height: 1.05;
+  font-weight: 300;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
 }
@@ -806,3 +826,261 @@
 .card-out-right { animation: card-out-right 220ms var(--ease-in) forwards; }
 .card-out-left { animation: card-out-left 220ms var(--ease-in) forwards; }
 .card-rise { animation: card-rise 220ms var(--ease-out); }
+
+/* ---------- Assinatura HZK ----------
+ * hzk-dash: o traço laranja curto do guia, antes de um título ou rótulo.
+ * hzk-voice: a voz de apoio (Kefa III no guia), em serifa itálica, para frases de contexto. */
+@utility hzk-dash {
+  display: inline-block;
+  width: 1.25rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--highlight);
+  vertical-align: middle;
+}
+@utility hzk-voice {
+  /* Subtítulo: a mesma família do título, leve e suave. A serifa da marca (Kefa) fica para peças
+   * de marketing; no app ela pesou (Gabriel, 11/11/2026). */
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- Menu de vidro e campo de órbitas (identidade HZK) ---------- */
+.hzk-glass-rail {
+  background: var(--rail-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--rail-edge);
+  box-shadow: var(--rail-shadow);
+}
+.hzk-rail-pick {
+  box-shadow: var(--rail-pick-shadow);
+}
+.hzk-orbit-field {
+  width: min(60vw, 920px);
+  height: min(72vh, 660px);
+}
+.hzk-orbit-line { stroke: var(--orbit-line); stroke-width: 1; }
+.hzk-orbit-dashed { stroke-dasharray: 2 7; }
+.hzk-orbit-node { fill: var(--orbit-node); }
+.hzk-orbit-node-hot { fill: var(--highlight); }
+.hzk-node-halo { fill: var(--highlight); opacity: 0.16; }
+.hzk-star { fill: var(--orbit-star); animation: hzk-twinkle 6s ease-in-out infinite; }
+/* Cada nó gira em volta do sol (690, 120 no desenho). */
+.hzk-orbit-spin {
+  transform-box: view-box;
+  transform-origin: 690px 120px;
+  animation: hzk-spin linear infinite;
+}
+@keyframes hzk-spin { to { transform: rotate(360deg); } }
+/* A linha do Z aparece no alinhamento (início de cada ciclo de 144 s) e some quando os nós se afastam. */
+.hzk-align-line {
+  stroke: var(--highlight);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 340;
+  animation: hzk-align 144s linear infinite;
+}
+@keyframes hzk-align {
+  0% { opacity: 0.9; stroke-dashoffset: 340; }
+  0.8% { opacity: 0.9; stroke-dashoffset: 0; }
+  1.8% { opacity: 0.9; stroke-dashoffset: 0; }
+  3.2% { opacity: 0; stroke-dashoffset: 0; }
+  99% { opacity: 0; stroke-dashoffset: 340; }
+  100% { opacity: 0.9; stroke-dashoffset: 340; }
+}
+@keyframes hzk-twinkle { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hzk-star, .hzk-orbit-spin { animation: none; }
+  .hzk-align-line { animation: none; opacity: 0.6; stroke-dashoffset: 0; }
+}
+
+
+/* Botão "+": laranja 100% fosco (gradiente suave, sem grão e sem brilho). No hover, um anel de órbita aparece
+ * devagar e o nó dá uma volta com aceleração e freada suaves, parando no alto enquanto o mouse estiver
+ * em cima. Ao sair, anel e nó somem juntos, devagar. */
+.hzk-plus {
+  position: relative;
+  overflow: visible;
+  background:
+    linear-gradient(165deg, #f07a43 0%, #ea5b25 50%, #cf4a1d 100%);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 10px 22px -12px rgb(234 91 37 / 65%);
+  transition: transform 260ms var(--ease-out), box-shadow 260ms;
+}
+.hzk-plus::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
+  border: 1px solid rgb(234 91 37 / 40%);
+  /* o nó vive no próprio anel: some junto com ele */
+  background: radial-gradient(circle at 50% 0, #ea5b25 0 3px, rgb(234 91 37 / 22%) 3.5px 6px, transparent 6.5px);
+  opacity: 0;
+  transform: scale(0.82) rotate(-200deg);
+  transition: opacity 420ms var(--ease-out), transform 520ms var(--ease-emphasized);
+  pointer-events: none;
+}
+.hzk-plus:hover { box-shadow: 0 14px 26px -12px rgb(234 91 37 / 75%); }
+.hzk-plus:hover::before {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  transition: opacity 420ms var(--ease-out), transform 1600ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+.hzk-plus:hover svg { animation: hzk-plus-breathe 1.2s var(--ease-out); }
+.hzk-plus:active { transform: scale(0.93); }
+@keyframes hzk-plus-breathe { 0% { transform: scale(1); } 35% { transform: scale(0.84); } 100% { transform: scale(1); } }
+
+/* Luz difusa passando pelo símbolo fosco, a cada 8 s. */
+.hzk-mark-pass { animation: hzk-pass 8s var(--ease-std) infinite; }
+@keyframes hzk-pass {
+  0%, 70% { transform: rotate(18deg) translateX(0); }
+  100% { transform: rotate(18deg) translateX(230px); }
+}
+
+.hzk-mark { transform-origin: center; transition: transform 300ms var(--ease-spring); }
+.hzk-mark:hover { transform: scale(1.05); }
+
+/* Auréola fosca: o desenho do fundo fica desfocado em volta do que está na frente. */
+.hzk-aura { position: relative; isolation: isolate; }
+.hzk-aura::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  z-index: -1;
+  border-radius: 28px;
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent);
+  mask-image: radial-gradient(closest-side, #000 62%, transparent);
+  pointer-events: none;
+}
+.hzk-aura-group > * { position: relative; isolation: isolate; }
+.hzk-aura-group > *::before {
+  content: "";
+  position: absolute;
+  inset: -12px -14px;
+  z-index: -1;
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent);
+  pointer-events: none;
+}
+
+/* Sinal de "tem mais embaixo": os três nós da marca descendo, um após o outro. */
+.hzk-scroll-cue { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hzk-scroll-cue i { display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--highlight); opacity: 0.25; animation: hzk-cue 1.6s ease-in-out infinite; }
+.hzk-scroll-cue i:nth-child(2) { animation-delay: 0.2s; }
+.hzk-scroll-cue i:nth-child(3) { animation-delay: 0.4s; }
+button:hover > .hzk-scroll-cue i { animation: none; opacity: 1; }
+@keyframes hzk-cue { 0%, 100% { opacity: 0.2; transform: translateY(-1px); } 50% { opacity: 1; transform: translateY(1px); } }
+@media (prefers-reduced-motion: reduce) {
+  .hzk-scroll-cue i, .hzk-plus:hover svg, .hzk-mark-pass { animation: none; }
+  .hzk-scroll-cue i { opacity: 0.7; }
+}
+
+/* Órbita vista de lado: o mesmo sistema, inclinado por inteiro em perspectiva (o sol é o pivô). */
+.hzk-orbit-field svg {
+  transform: perspective(1300px) rotateX(42deg) rotateZ(-12deg);
+  transform-origin: 86% 19%;
+}
+
+/* ======================================================================================
+ * Sistema visual Órbita · regra de cantos por papel e superfícies sem borda (nota 34)
+ * Fica FORA das camadas do Tailwind de propósito: vale para o app inteiro, por cima das
+ * classes de cada tela, para a regra ser uma só.
+ *   ação (botões) ............ pílula           --r-action
+ *   seleção (aba, item ativo)  quadrado arred.  --r-select
+ *   conteúdo (cartão, janela)  arredondado     --r-content / --r-window
+ *   dado (etiqueta, campo) ... quase reto       --r-data / --r-field
+ * O que flutua (menus, janelas, dicas) é VIDRO; o que separa é o TOM, não a linha.
+ * ====================================================================================== */
+:root {
+  --r-action: 999px;
+  --r-select: 11px;
+  --r-content: 18px;
+  --r-window: 22px;
+  --r-field: 9px;
+  --r-data: 6px;
+  --field-line: color-mix(in oklch, var(--foreground) 13%, transparent);
+  --float-bg: color-mix(in oklch, var(--popover) 86%, transparent);
+  --float-shadow: 0 1px 0 rgb(255 255 255 / 60%) inset, 0 0 0 1px rgb(27 36 50 / 6%), 0 24px 48px -24px rgb(27 36 50 / 35%);
+}
+.dark {
+  --float-shadow: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 0 0 1px rgb(255 255 255 / 6%), 0 24px 48px -20px rgb(0 0 0 / 80%);
+}
+
+/* Ação */
+[data-slot="button"] { border-radius: var(--r-action); }
+[data-slot="button-group"] [data-slot="button"] { border-radius: var(--r-select); }
+
+/* Conteúdo */
+[data-slot="card"] { border-radius: var(--r-content); border-color: transparent; }
+
+/* Dado */
+[data-slot="badge"] { border-radius: var(--r-data); border-color: transparent; }
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"],
+[data-slot="input-group"] {
+  border-radius: var(--r-field);
+  border-color: var(--field-line);
+  background-color: color-mix(in oklch, var(--card) 70%, transparent);
+}
+[data-slot="input-group"] [data-slot="input-group-control"] { background-color: transparent; }
+
+/* Seleção: abas como trilho de tom, a ativa em quadrado arredondado */
+[data-slot="tabs-list"]:not([data-variant="line"]) {
+  border-radius: calc(var(--r-select) + 3px);
+  background-color: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+[data-slot="tabs-trigger"] { border-radius: var(--r-select); border-color: transparent !important; }
+[data-slot="tabs-trigger"][data-active],
+[data-slot="tabs-trigger"][data-state="active"] {
+  background-color: var(--card);
+  box-shadow: 0 1px 2px rgb(27 36 50 / 8%), 0 6px 14px -8px rgb(27 36 50 / 25%);
+}
+.dark [data-slot="tabs-trigger"][data-active],
+.dark [data-slot="tabs-trigger"][data-state="active"] { background-color: color-mix(in oklch, var(--foreground) 12%, transparent); box-shadow: none; }
+
+/* O que flutua: vidro, sem anel de borda */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="select-content"],
+[data-slot="popover-content"],
+[data-slot="command"] {
+  border-radius: 16px;
+  background-color: var(--float-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: var(--float-shadow);
+}
+[data-slot="dialog-content"] {
+  border-radius: var(--r-window);
+  background-color: var(--float-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  box-shadow: var(--float-shadow);
+}
+[data-slot="dialog-footer"] { border-radius: 0 0 var(--r-window) var(--r-window); border-color: transparent; }
+[data-slot="dropdown-menu-item"],
+[data-slot="dropdown-menu-checkbox-item"],
+[data-slot="dropdown-menu-radio-item"],
+[data-slot="dropdown-menu-sub-trigger"],
+[data-slot="select-item"],
+[data-slot="command-item"] { border-radius: 9px; }
+[data-slot="tooltip-content"] { border-radius: 9px; }
+
+/* Caixas com borda feita à mão nas telas: viram tom. Ficam de fora as bordas com significado
+ * (marca, aviso, erro, sucesso), as tracejadas (áreas de soltar) e os campos de digitar. */
+:where(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl).border:not([data-slot]):not(input):not(textarea):not(select):not(.border-dashed):not([class*="border-brand"]):not([class*="border-highlight"]):not([class*="border-warning"]):not([class*="border-danger"]):not([class*="border-success"]):not([class*="border-destructive"]):not([class*="border-info"]):not([class*="border-stage"]) {
+  border-color: transparent;
+}
+:where(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl).border:not([data-slot]):not(input):not(textarea):not(select):not(.border-dashed):not([class*="bg-"]):not([class*="border-brand"]):not([class*="border-highlight"]):not([class*="border-warning"]):not([class*="border-danger"]):not([class*="border-success"]):not([class*="border-destructive"]):not([class*="border-info"]):not([class*="border-stage"]) {
+  background-color: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
