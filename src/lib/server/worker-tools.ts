@@ -1,6 +1,8 @@
 import "server-only"
 import { claimNext, completeJob, failJob, getJob, jobContext, peekNext, queueStatus, releaseJob, renewLease, reportProgress, searchKnowledge, startJob, videoUploadUrl, JobError } from "./jobs"
 import { queueConfig } from "./jobs"
+import { EngineArgError, dockEngineTools } from "./dock-engine"
+import { supabaseAdmin } from "./supabase-admin"
 import { SCOPES, requireScope, type Scope, type Worker } from "./workers"
 
 /**
@@ -109,6 +111,40 @@ export const TOOLS: Record<string, Tool> = {
     input: { type: "object", properties: { query: { type: "string" } } },
     run: (_w, a) => searchKnowledge(typeof a.query === "string" ? a.query : ""),
   },
+}
+
+/**
+ * Ferramentas do motor do HZK Dock (PC liberado), escopo office:engine. A regra fica no banco
+ * (0027/0028); aqui só o transporte e a tradução do erro. Os códigos office_… e dock_… voltam como estão,
+ * para o motor decidir (ex.: office_connection_not_allowed não tenta de novo).
+ */
+async function engineRpc(fn: string, args: Record<string, unknown>) {
+  const { data, error } = await supabaseAdmin().rpc(fn, args)
+  if (error) {
+    const m = error.message ?? ""
+    if (/lease_lost|lease_expired/.test(m)) throw new JobError(m.includes("expired") ? "lease_expired" : "lease_lost", 409)
+    if (/job_not_found/.test(m)) throw new JobError("job não encontrado", 404)
+    const code = m.match(/(?:office|dock)_[a-z_0-9]+/)?.[0]
+    if (code) throw new JobError(code, /mismatch|not_allowed|founder/.test(code) ? 403 : 409)
+    throw new JobError("erro no Dock", 500)
+  }
+  return data
+}
+for (const [name, t] of Object.entries(dockEngineTools(engineRpc))) {
+  TOOLS[name] = {
+    description: t.description,
+    scope: "office:engine",
+    input: t.input,
+    run: async (w, a) => {
+      if (w.kind !== "pc" || !w.ownerTeamId) throw new JobError("só o PC liberado usa as ferramentas do Dock", 403)
+      try {
+        return await t.run(w.id, a)
+      } catch (e) {
+        if (e instanceof EngineArgError) throw new JobError(e.message, 400)
+        throw e
+      }
+    },
+  }
 }
 
 export function toolsFor(w: Worker) {

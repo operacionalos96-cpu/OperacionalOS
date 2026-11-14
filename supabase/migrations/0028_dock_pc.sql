@@ -186,6 +186,21 @@ begin
 end;
 $$;
 
+-- A mesma conferência, para a rota chamar antes das funções da 0027 que só recebem o lease
+-- (office_post_agent_message, office_take_approval, office_finish_action).
+create or replace function public.office_engine_check(p_worker_id text, p_job_public_id text, p_lease_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare r public.ai_jobs;
+begin
+  r := private.office_engine_job(p_worker_id, p_job_public_id, p_lease_id);
+  return r.job_type;
+end;
+$$;
+
 -- Origem do pedido, calculada pelo servidor (a mesma regra do porteiro, office_request_action).
 create or replace function private.office_job_origin(r public.ai_jobs)
 returns text
@@ -369,6 +384,7 @@ begin
   end loop;
   foreach f in array array[
     'public.office_delivery(text,text,uuid)',
+    'public.office_engine_check(text,text,uuid)',
     'public.office_skill_package(text,text,uuid,text,int)',
     'public.office_report_connection(text,text,uuid,text,text,timestamptz)',
     'public.office_record_usage(text,text,uuid,text,text,int,int,int,text)'

@@ -60,8 +60,8 @@ beforeAll(async () => {
 describe("a migration", () => {
   it("roda de novo sem quebrar (idempotente)", async () => {
     await db.pg.exec(readFileSync(join(process.cwd(), "supabase", "migrations", "0028_dock_pc.sql"), "utf8"))
-    const f = await db.sql<{ n: number }>(`select count(*)::int n from pg_proc where proname in ('office_request_pc','dock_decide_pc','office_disable_pc','office_delivery','office_skill_package','office_report_connection','office_record_usage')`)
-    expect(f[0].n).toBe(7)
+    const f = await db.sql<{ n: number }>(`select count(*)::int n from pg_proc where proname in ('office_request_pc','dock_decide_pc','office_disable_pc','office_delivery','office_engine_check','office_skill_package','office_report_connection','office_record_usage')`)
+    expect(f[0].n).toBe(8)
   })
 })
 
@@ -167,6 +167,8 @@ describe("entrega: o motor recebe só o que o bot pode usar (office-delivery/v1)
     expect(await fails(null, `select public.office_delivery($1, $2, $3)`, [PC_BETO, JOB, LEASE])).toBe("office_job_mismatch")
     expect(await fails(null, `select public.office_delivery($1, $2, gen_random_uuid())`, [PC_ANA, JOB])).toBe("lease_lost")
     expect(await fails(ANA, `select public.office_delivery($1, $2, $3::uuid)`, [PC_ANA, JOB, LEASE])).toBe("negado")
+    expect(await fails(null, `select public.office_engine_check($1, $2, $3)`, [PC_BETO, JOB, LEASE])).toBe("office_job_mismatch")
+    expect((await srv<{ t: string }>(`select public.office_engine_check($1, $2, $3) t`, [PC_ANA, JOB, LEASE])).t).toBe("office_reply")
   })
 
   it("IA sem cota fica marcada; a resposta pela reserva grava a troca; IA não escolhida é recusada", async () => {
