@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { beforeAll, describe, expect, it } from "vitest"
+import { beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { createTestDb, type TestDb } from "./test-db"
 
 let db: TestDb
@@ -307,8 +307,8 @@ describe("porteiro: toda ação de conector da empresa passa pelo servidor", () 
   it("conector suspenso e escritório suspenso param na hora", async () => {
     await as(GABRIEL, `select public.dock_suspend_connector('github')`)
     expect(await ask("ler_codigo")).toMatchObject({ decision: "negada", reason: "conector_fora_do_catalogo" })
-    await as(GABRIEL, `select public.dock_approve_connector('github', $1)`, [sha("b")]).catch(() => null)
-    await db.sql(`update public.dock_connectors set status = 'aprovado' where id = 'github'`)
+    // suspenso volta pela função, com nova conferência das ferramentas
+    expect(await fails(GABRIEL, `select public.dock_approve_connector('github', $1)`, [sha("b")])).toBe("ok")
     await as(GABRIEL, `select public.dock_set_office_suspended('u3', true)`)
     expect(await ask("ler_codigo")).toMatchObject({ decision: "negada", reason: "escritorio_suspenso" })
     await as(GABRIEL, `select public.dock_set_office_suspended('u3', false)`)
@@ -356,5 +356,149 @@ describe("conversa: qual IA respondeu, troca de IA, continuar com outro bot, rot
     expect(j.payload.origin).toBe("rotina")
     const r = await srv<{ decision: string }>(`select * from public.office_request_action($1, $2, $3, $4, 'github', 'abrir_pr', $5, 1, false, '', 'PR', '', '{}'::jsonb, 'rotina-pr-0001')`, [wid("A"), j.public_id, j.lease_id, BOT, CONN_OR])
     expect(r.decision).toBe("aguardando")
+  })
+})
+
+/**
+ * Regressões da revisão de segurança (Fable 5.2, 14/11/2026): cada achado provado vira um teste
+ * que reproduz o ataque e precisa continuar falhando para o atacante.
+ */
+describe("revisão de segurança: achados corrigidos", () => {
+  const CARLA = "carla@hzk.test" // admin SEM acesso à produção
+  let JOB2: string, LEASE2: string
+  const ask2 = (action: string, opts: { conn?: string; items?: number; tainted?: boolean } = {}) =>
+    srv<{ decision: string; approval: string | null; reason: string; klass: string }>(
+      `select * from public.office_request_action($1, $2, $3, $4, 'github', $5, $6, $7, $8, '', 'Pedido do bot', '', '{"x":1}'::jsonb, $9)`,
+      [wid("A"), JOB2, LEASE2, BOT, action, opts.conn ?? CONN_OR, opts.items ?? 1, opts.tainted ?? false, `r-${action.slice(0, 20)}-${Math.random().toString(36).slice(2, 10)}`],
+    )
+  const action = (key: string, klass: string, money = false, outside = false, area: string | null = null) =>
+    as(GABRIEL, `select public.dock_save_connector_action('github', $1, $1, $1, $2, 1, $3, $4, $5)`, [key, klass, outside, money, area])
+  const reapprove = () => as(GABRIEL, `select public.dock_approve_connector('github', $1)`, [sha("c")])
+  const status = async (id: string) => srv<{ status: string; decision_note: string | null }>(`select status, decision_note from public.office_approvals where id = $1`, [id])
+  // cada teste parte do zero: as recusas dos testes anteriores (5 em 10 min pausam o bot) ficam "antigas"
+  beforeEach(async () => {
+    await db.pg.exec(`alter table public.dock_action_log disable trigger forbid_change;
+      update public.dock_action_log set created_at = now() - interval '1 hour';
+      alter table public.dock_action_log enable trigger forbid_change;`)
+    if (BOT) await db.sql(`update public.office_agents set paused = false where id = $1`, [BOT])
+  })
+
+  it("prepara uma entrega nova da Ana", async () => {
+    await db.sql(`insert into public.members (email, team_id, display_name, role_level, active) values ('${CARLA}', 'u5', 'Carla', 'admin', true)`)
+    await db.sql(`select public.complete_job(public_id, lease_id, '{}'::jsonb) from public.ai_jobs where owner_team_id = 'u3' and status in ('claimed', 'running')`)
+    await as(ANA, `select public.office_set_thread_model($1, $2, null)`, [THREAD, BOT])
+    await as(ANA, `select * from public.office_send_message($1, 'Mais um pedido', 'msg-key-0002')`, [THREAD])
+    const j = await srv<{ public_id: string; lease_id: string }>(`select public_id, lease_id from public.claim_next_job($1, array['office_reply'], null)`, [wid("A")])
+    JOB2 = j.public_id
+    LEASE2 = j.lease_id
+    expect(JOB2).toBeTruthy()
+  })
+
+  it("A1: admin não vira responsável de área restrita trocando o dono", async () => {
+    expect(await fails(CARLA, `update public.areas set data = jsonb_set(data, '{owner}', '{"memberId":"u5"}') where id = 'producao'`)).toBe("dock_area_owner_founder_only")
+    // mesmo que o dono seja trocado fora da tela, sem acesso à área ele não é responsável
+    await db.sql(`update public.areas set data = jsonb_set(data, '{owner}', '{"memberId":"u5"}') where id = 'producao'`)
+    expect(await fails(CARLA, `select public.dock_save_skill(null, 'area', 'producao', 'Injetada', '', '1.0', null, 'x')`)).toBe("dock_use_proposal")
+    expect(await as(CARLA, `select id from public.dock_skill_proposals`)).toEqual([])
+    await db.sql(`update public.areas set data = jsonb_set(data, '{owner}', '{"memberId":"u1"}') where id = 'producao'`)
+  })
+
+  it("A2: o bloqueio do provedor que treina não cai com 'local' falso nem com o endereço do Google", async () => {
+    expect(await fails(ANA, `select public.office_save_connection(null, 'local', 'gemini', 'Gemini local')`)).toBe("office_provider_not_local")
+    const gg = (await one<{ id: string }>(ANA, `select public.office_save_connection(null, 'compativel', 'meugoogle', 'Google', p_endpoint => 'https://generativelanguage.googleapis.com/v1beta/openai', p_terms_version => 'v1') as id`)).id
+    await as(ANA, `select public.office_set_thread_model($1, $2, $3)`, [THREAD, BOT, gg])
+    expect(await ask2("ler_codigo", { conn: gg })).toMatchObject({ decision: "negada", reason: "provedor_treina_com_dados" })
+    await as(ANA, `select public.office_set_thread_model($1, $2, null)`, [THREAD, BOT])
+  })
+
+  it("M5: conector em só leitura barra também a classe B", async () => {
+    await as(ANA, `select public.office_install_connector($1, 'github', true)`, [BOT])
+    expect(await ask2("comentar")).toMatchObject({ decision: "negada", reason: "so_leitura" })
+    expect(await ask2("ler_codigo")).toMatchObject({ decision: "permitida" })
+    await as(ANA, `select public.office_install_connector($1, 'github', false)`, [BOT])
+  })
+
+  it("M4: mudar o conector ou a ação apaga o 'sempre permitir'", async () => {
+    await as(ANA, `select public.office_set_action_grant($1, 'github', 'abrir_pr', true)`, [BOT])
+    await action("abrir_pr", "C") // mesma classe, mas a ação foi mexida (teto, ferramenta…)
+    expect((await srv<{ n: number }>(`select count(*)::int n from public.office_action_grants where connector_id = 'github'`)).n).toBe(0)
+    await reapprove()
+    await as(ANA, `select public.office_set_action_grant($1, 'github', 'abrir_pr', true)`, [BOT])
+    await as(GABRIEL, `select public.dock_save_connector('github', 'GitHub', 'programacao', '', 'empresa', 'http', 0, 1, p_server_host => 'outro.servidor.com', p_source_url => 'https://github.com/github/github-mcp-server')`)
+    expect((await srv<{ n: number }>(`select count(*)::int n from public.office_action_grants where connector_id = 'github'`)).n).toBe(0)
+    await reapprove()
+  })
+
+  it("A3 + B1: aprovação de uma ação que virou D com dinheiro é cancelada, não aprovada pelo dono sozinho", async () => {
+    const r = await ask2("abrir_pr", { tainted: true })
+    expect(r.decision).toBe("aguardando")
+    expect((await srv<{ action_label: string }>(`select action_label from public.office_approvals where id = $1`, [r.approval])).action_label).toBe("abrir_pr")
+    await action("abrir_pr", "D", true, true)
+    await reapprove()
+    expect(await fails(ANA, `select public.office_decide_approval($1, true)`, [r.approval])).toBe("ok")
+    expect(await status(r.approval!)).toEqual({ status: "cancelada", decision_note: "cancelada: acao_mudou" })
+    expect((await srv<{ n: number }>(`select count(*)::int n from public.ai_jobs where idempotency_key = $1`, [`act:${r.approval}`])).n).toBe(0)
+    await action("abrir_pr", "C")
+    await reapprove()
+  })
+
+  it("A4: quem perdeu a área não aprova ação daquela área", async () => {
+    await action("mover_tarefa", "C", false, false, "producao")
+    await reapprove()
+    const r = await ask2("mover_tarefa", { tainted: true })
+    expect(r.decision).toBe("aguardando")
+    await db.sql(`delete from public.area_access where member_id = 'u3' and area_id = 'producao'`)
+    await as(ANA, `select public.office_decide_approval($1, true)`, [r.approval])
+    expect((await status(r.approval!)).status).toBe("cancelada")
+    await db.sql(`insert into public.area_access (member_id, area_id, level, granted_by) values ('u3', 'producao', 'operar', 'u1')`)
+  })
+
+  it("M1: dentro de uma ação aprovada não se pede ação nova ao porteiro", async () => {
+    const r = await ask2("abrir_pr", { tainted: true })
+    await as(ANA, `select public.office_decide_approval($1, true)`, [r.approval])
+    const act = await srv<{ public_id: string; lease_id: string }>(`select public_id, lease_id from public.claim_next_job($1, array['office_action'], null)`, [wid("A")])
+    expect(await fails(null, `select * from public.office_request_action($1, $2, $3, $4, 'github', 'abrir_pr', $5, 1, false, '', 't', '', '{}'::jsonb, 'dentro-acao-01')`, [wid("A"), act.public_id, act.lease_id, BOT, CONN_OR])).toBe("office_job_mismatch")
+    await db.sql(`select * from public.office_take_approval($1, $2, $3)`, [act.public_id, act.lease_id, r.approval])
+    await db.sql(`select public.office_finish_action($1, $2, $3, true, 'ok')`, [act.public_id, act.lease_id, r.approval])
+  })
+
+  it("M2 + B3 + B4: dinheiro pede dono E founder; só o dono edita; bot pausado não executa; ação aprovada não leva IA", async () => {
+    await action("pagar", "D", true, true)
+    await reapprove()
+    const r = await ask2("pagar")
+    expect(r).toMatchObject({ decision: "aguardando", klass: "D" })
+    expect((await as(IGOR, `select id from public.office_approvals where id = $1`, [r.approval])).length).toBe(1)
+    expect(await fails(IGOR, `select public.office_decide_approval($1, true, '{"para":"conta-do-igor"}'::jsonb)`, [r.approval])).toBe("office_only_owner_edits")
+    await as(IGOR, `select public.office_decide_approval($1, true)`, [r.approval])
+    expect((await status(r.approval!)).status).toBe("pendente") // falta o dono
+    await as(ANA, `select public.office_decide_approval($1, true)`, [r.approval])
+    expect((await status(r.approval!)).status).toBe("aprovada")
+    const act = await srv<{ public_id: string; lease_id: string }>(`select public_id, lease_id from public.claim_next_job($1, array['office_action'], null)`, [wid("A")])
+    await as(ANA, `select public.office_set_agent_paused($1, true)`, [BOT])
+    expect(await fails(null, `select * from public.office_take_approval($1, $2, $3)`, [act.public_id, act.lease_id, r.approval])).toBe("office_agent_paused")
+    await as(ANA, `select public.office_set_agent_paused($1, false)`, [BOT])
+    expect((await srv<{ args: { x: number } }>(`select * from public.office_take_approval($1, $2, $3)`, [act.public_id, act.lease_id, r.approval])).args).toEqual({ x: 1 })
+    await db.sql(`select public.office_post_agent_message($1, $2, 1, 'texto', 'Pago', null, 'con_qualquer', 'x')`, [act.public_id, act.lease_id])
+    expect(await srv(`select connection_id, model from public.office_messages where job_public_id = $1`, [act.public_id])).toEqual({ connection_id: null, model: null })
+    await db.sql(`select public.office_finish_action($1, $2, $3, true, 'ok')`, [act.public_id, act.lease_id, r.approval])
+  })
+
+  it("M3: pacote de skill com caminho sujo ou programa escondido é recusado", async () => {
+    const bad1 = JSON.stringify([{ path: "../../AppData/Startup/x.bat", content: "x" }])
+    const bad2 = JSON.stringify([{ path: "scripts/run.ps1", content: "x" }])
+    const good = JSON.stringify([{ path: "exemplos/pedido.md", content: "Exemplo" }])
+    expect(await fails(ANA, `select public.dock_save_skill(null, 'pessoal', null, 'A', '', '0.1', null, 'x', p_files => $1::jsonb)`, [bad1])).toBe("dock_invalid_files")
+    expect(await fails(ANA, `select public.dock_save_skill(null, 'pessoal', null, 'B', '', '0.1', null, 'x', p_files => $1::jsonb)`, [bad2])).toBe("dock_invalid_files")
+    expect(await fails(ANA, `select public.dock_save_skill(null, 'pessoal', null, 'C', '', '0.1', null, 'x', p_files => $1::jsonb)`, [good])).toBe("ok")
+  })
+
+  it("M6 + B2: dono desativado: o porteiro nega e a rotina não roda; o registro tem tamanho limitado", async () => {
+    await db.sql(`update public.members set active = false where team_id = 'u3'`)
+    expect(await ask2("ler_codigo")).toMatchObject({ decision: "negada", reason: "dono_inativo" })
+    await db.sql(`update public.office_routines set next_run_at = now() - interval '1 minute' where owner_team_id = 'u3'`)
+    expect((await srv<{ n: number }>(`select public.office_run_due_routines() n`)).n).toBe(0)
+    await db.sql(`update public.members set active = true where team_id = 'u3'`)
+    await ask2("x".repeat(5000))
+    expect((await srv<{ n: number }>(`select max(char_length(action_key))::int n from public.dock_action_log`)).n).toBeLessThanOrEqual(64)
   })
 })
