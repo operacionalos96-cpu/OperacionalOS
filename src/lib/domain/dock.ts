@@ -344,3 +344,8 @@ export function endpointOk(url: string) {
   if (!/^https?:\/\/[a-z0-9.-]{1,200}(:[0-9]{1,5})?(\/[a-z0-9._~/-]{0,200})?$/.test(u)) return false
   return u.startsWith("https://") || /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(u)
 }
+
+/** Nome legível da área quando ela não está na lista carregada (ex.: modo demonstração). */
+const AREA_NAMES: Record<string, string> = { producao: "Produção", comercial: "Comercial", design: "Design", operacao: "Operação", marketing: "Marketing", financeiro: "Financeiro" }
+export const areaLabel = (id: string | null, areas: { id: string; name: string }[]) =>
+  id ? areas.find((a) => a.id === id)?.name ?? AREA_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1) : "Pessoal"

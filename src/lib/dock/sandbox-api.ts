@@ -212,8 +212,9 @@ export function sandboxDockApi(): DockApi {
       }
       const pr = /\bpr\b|publica|abr(a|ir) (um )?pull/i.test(text)
       const gh = d.agentConnectors.find((c) => c.agentId === agentId && c.connectorId === "github")
+      const granted0 = !!gh && !gh.readOnly && d.grants.some((g) => g.agentId === agentId && g.connectorId === "github" && g.actionKey === "abrir_pr")
       const body = pr && gh
-        ? "Pronto para abrir o PR. É uma ação de classe C no GitHub da HZK: mandei para você aprovar."
+        ? granted0 ? "Abrindo o PR: você deixou \"sempre permitir\" ligado para isso." : gh.readOnly ? "Eu abriria o PR, mas o GitHub está em só leitura para mim." : "Pronto para abrir o PR. É uma ação de classe C no GitHub da HZK: mandei para você aprovar."
         : `Feito. Resumo do pedido: "${text.slice(0, 90)}${text.length > 90 ? "…" : ""}". Se quiser, viro isso uma tarefa com prazo.`
       d.messages.push(msg({ threadId, authorType: "agent", authorId: agentId, body, connectionId: conn.id, provider: conn.provider, model: (fallbackFrom ? a.backupModels.find((x) => x.connectionId === conn!.id)?.model : pick.model) ?? conn.models[0] ?? null, fallbackFrom, fallbackReason }))
       d.usage.push({ agentId, connectionId: conn.id, provider: conn.provider, model: "x", free: conn.provider !== "claude", costUsd: conn.provider === "claude" ? 0.01 : null, fallbackFrom, createdAt: iso() })

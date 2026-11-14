@@ -116,18 +116,22 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {agent && <LevelTag level={agent.accessLevel} />}
             {lead && (
-              <button onClick={() => setSwap(true)} title="Trocar a IA só nesta conversa" className="inline-flex items-center gap-1 rounded-[5px] bg-info-soft px-2 py-0.5 text-xs font-medium">
+              <button onClick={() => setSwap(true)} title="Trocar a IA só nesta conversa" className="inline-flex max-w-full items-center gap-1 truncate rounded-[5px] bg-info-soft px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                 <CpuIcon className="size-3" />{conn?.label ?? "sem IA"}{cur.model ? ` · ${cur.model}` : ""}{cur.override ? " (só aqui)" : ""}
               </button>
             )}
             {!agent && <span className="text-xs text-muted-foreground">{members.map((m) => m.name).join(", ")}</span>}
           </div>
         </div>
-        {agent && (["config", "skills", "apps"] as const).map((p) => (
-          <Button key={p} size="sm" variant={panel === p ? "secondary" : "ghost"} onClick={() => onPanel(p)}>
-            {p === "config" ? <SlidersHorizontalIcon /> : null}{p === "config" ? "Configurar" : p === "skills" ? "Skills" : "Apps"}
-          </Button>
-        ))}
+        {agent && (
+          <div className="flex gap-1 max-sm:w-full">
+            {(["config", "skills", "apps"] as const).map((p) => (
+              <Button key={p} size="sm" variant={panel === p ? "secondary" : "ghost"} onClick={() => onPanel(p)}>
+                {p === "config" ? <SlidersHorizontalIcon /> : null}{p === "config" ? "Configurar" : p === "skills" ? "Skills" : "Apps"}
+              </Button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div ref={stream} className="grid flex-1 content-start gap-4 overflow-auto px-4 pb-4 max-lg:max-h-[60dvh] lg:max-h-[62dvh]">

@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest"
 import { PAGES, pageFor } from "./pages"
 
 const APP = join(process.cwd(), "src", "app")
-/** Telas fora do menu: login, senha, autenticação e detalhes de um item. */
-const OUTSIDE_MENU = /^(login|redefinir-senha|auth|api)(\/|$)|\[[^\]]+\]|^equipe\/cofre$/
+/** Telas fora do menu: login, senha, autenticação, detalhes de um item e as sub-telas do HZK Dock (navegação interna dele). */
+const OUTSIDE_MENU = /^(login|redefinir-senha|auth|api)(\/|$)|\[[^\]]+\]|^equipe\/cofre$|^dock\/[a-z]+$/
 
 function pageRoutes(dir = APP): string[] {
   const routes: string[] = []
