@@ -37,10 +37,10 @@ const msg = (p: Partial<DockMessage> & Pick<DockMessage, "threadId" | "authorTyp
 
 function seed(): DockData {
   const agents: DockAgent[] = [
-    agent({ id: "agt_pesq", name: "Pesquisadora", title: "Pesquisa mercado e concorrentes", avatarColor: "aco", avatarGlyph: "lupa", accessLevel: 1, connectionId: "con_or", backupModels: [{ connectionId: "con_ollama", model: "qwen3:14b" }], origin: "modelo_area", instructions: "Pesquise em fontes públicas e sempre dê o link." }),
-    agent({ id: "agt_dev", name: "Dev do site", title: "Faz e mantém os sites dos clientes", avatarStyle: "halo", avatarColor: "musgo", avatarGlyph: "codigo", accessLevel: 1, connectionId: "con_claude", model: "claude-sonnet-5-5", backupModels: [{ connectionId: "con_or", model: "qwen3-coder:free" }], origin: "modelo_area", instructions: "Siga o Padrão de código HZK. Escreva os testes; eles rodam no GitHub quando o PR abre." }),
+    agent({ id: "agt_pesq", name: "Pesquisadora", title: "Pesquisa mercado e concorrentes", avatarColor: "aco", avatarGlyph: "capsula", accessLevel: 1, connectionId: "con_or", backupModels: [{ connectionId: "con_ollama", model: "qwen3:14b" }], origin: "modelo_area", instructions: "Pesquise em fontes públicas e sempre dê o link." }),
+    agent({ id: "agt_dev", name: "Dev do site", title: "Faz e mantém os sites dos clientes", avatarStyle: "halo", avatarColor: "musgo", avatarGlyph: "largo", accessLevel: 1, connectionId: "con_claude", model: "claude-sonnet-5-5", backupModels: [{ connectionId: "con_or", model: "qwen3-coder:free" }], origin: "modelo_area", instructions: "Siga o Padrão de código HZK. Escreva os testes; eles rodam no GitHub quando o PR abre." }),
     agent({ id: "agt_coord", name: "Coordenadora", title: "Divide pedidos grandes e junta o resultado", avatarColor: "grafite", connectionId: "con_claude", model: "claude-sonnet-5-5", canCreateAgents: true }),
-    agent({ id: "agt_ana", name: "Analista", title: "Números do funil e do caixa", avatarStyle: "saturno", avatarColor: "vinho", avatarGlyph: "barras", accessLevel: 1, connectionId: "con_gemini", model: "gemini-3.8-flash", origin: "modelo_area" }),
+    agent({ id: "agt_ana", name: "Analista", title: "Números do funil e do caixa", avatarStyle: "saturno", avatarColor: "vinho", avatarGlyph: "ponto", accessLevel: 1, connectionId: "con_gemini", model: "gemini-3.8-flash", origin: "modelo_area" }),
     agent({ id: "agt_org", name: "Organizadora", title: "Minha semana, prazos e lembretes", avatarColor: "areia", connectionId: "con_ollama", model: "qwen3:14b", origin: "modelo_pessoal" }),
   ]
   const threads = [

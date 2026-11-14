@@ -50,7 +50,7 @@ export default function DockPcPage() {
           return (
             <Hint key={l.n} text={locked ? LOCKED_LEVEL_REASON : l.text}>
               <div className={cn("relative grid justify-items-center gap-1.5 rounded-[11px] py-2 text-center text-xs", locked && "opacity-40")}>
-                <DockAvatar name="" glyph=" " level={l.n} size={40} />
+                <DockAvatar name="" level={l.n} size={40} />
                 <span className="font-medium">{l.title}</span>
                 {locked && <LockIcon className="absolute top-1 right-2 size-3 text-muted-foreground" />}
               </div>

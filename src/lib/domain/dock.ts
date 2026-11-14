@@ -25,20 +25,31 @@ export const LOCKED_LEVEL_REASON = "Chega com a área isolada do Windows (decis�
 export type AvatarStyle = "constelacao" | "saturno" | "halo"
 export type AvatarColor = "grafite" | "aco" | "musgo" | "areia" | "vinho" | "lilas"
 export const AVATAR_STYLES: { id: AvatarStyle; label: string }[] = [
-  { id: "constelacao", label: "Constelação" },
-  { id: "saturno", label: "Saturno" },
-  { id: "halo", label: "Halo" },
+  { id: "constelacao", label: "Astro" },
+  { id: "saturno", label: "Módulo" },
+  { id: "halo", label: "Visor" },
 ]
 /** Paleta curta, sem laranja: o laranja é só para "precisa de você" (nota 34). */
 export const AVATAR_COLORS: { id: AvatarColor; label: string; hex: string }[] = [
-  { id: "grafite", label: "Grafite", hex: "#2b3445" },
-  { id: "aco", label: "Aço", hex: "#3d5a80" },
-  { id: "musgo", label: "Musgo", hex: "#4f6b4a" },
-  { id: "areia", label: "Areia", hex: "#8f7a55" },
-  { id: "vinho", label: "Vinho", hex: "#7a3b48" },
-  { id: "lilas", label: "Lilás", hex: "#62557f" },
+  { id: "grafite", label: "Grafite", hex: "#34405a" },
+  { id: "aco", label: "Azul", hex: "#3b7cf2" },
+  { id: "musgo", label: "Verde", hex: "#27a06a" },
+  { id: "areia", label: "Âmbar", hex: "#c8a02a" },
+  { id: "vinho", label: "Framboesa", hex: "#d8476c" },
+  { id: "lilas", label: "Violeta", hex: "#7a62ea" },
 ]
 export const AVATAR_ICONS = ["lupa", "codigo", "barras"] as const
+/**
+ * Formato dos olhos do avatar com rosto. Fica no mesmo campo do banco que guardava a letra ou o ícone
+ * (avatar_glyph aceita nomes assim); letra e ícone antigos caem na cápsula.
+ */
+export const AVATAR_EYES = [
+  { id: "capsula", label: "Cápsula" },
+  { id: "ponto", label: "Ponto" },
+  { id: "largo", label: "Largo" },
+] as const
+export type AvatarEyesId = (typeof AVATAR_EYES)[number]["id"]
+export const avatarEyes = (glyph: string): AvatarEyesId => (AVATAR_EYES.some((e) => e.id === glyph) ? (glyph as AvatarEyesId) : "capsula")
 /** Glifo do avatar: '' = primeira letra do nome; 1 caractere = letra; senão, ícone. */
 export function avatarGlyph(name: string, glyph: string) {
   if (glyph && glyph.length > 1) return glyph

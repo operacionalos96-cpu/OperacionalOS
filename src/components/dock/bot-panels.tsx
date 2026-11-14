@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   AVATAR_COLORS,
-  AVATAR_ICONS,
+  AVATAR_EYES,
   AVATAR_STYLES,
   LEVELS,
   LOCKED_LEVEL_REASON,
+  avatarEyes,
   connectorBlock,
   effectiveVersion,
   grantAllowed,
@@ -68,8 +69,13 @@ export function BotSettings({ d, a }: { d: DockData; a: DockAgent }) {
               style={{ background: c.hex }} onClick={() => run((api) => api.setAvatar(a.id, null, c.id, null))} />
           ))}
           <span className="mx-1 h-5 w-px bg-border" />
-          {[{ id: "", label: "Letra" }, ...AVATAR_ICONS.map((i) => ({ id: i, label: i === "lupa" ? "Lupa" : i === "codigo" ? "Código" : "Gráfico" }))].map((g) => (
-            <button key={g.id || "letra"} className={chip(a.avatarGlyph === g.id || (!g.id && a.avatarGlyph.length <= 1))} onClick={() => run((api) => api.setAvatar(a.id, null, null, g.id))}>{g.label}</button>
+          {AVATAR_EYES.map((e) => (
+            <Hint key={e.id} text={`Olhos: ${e.label.toLowerCase()}`}>
+              <button aria-label={`Olhos: ${e.label}`} aria-pressed={avatarEyes(a.avatarGlyph) === e.id} onClick={() => run((api) => api.setAvatar(a.id, null, null, e.id))}
+                className={cn("rounded-[11px] p-0.5", avatarEyes(a.avatarGlyph) === e.id ? "ring-[1.5px] ring-foreground" : "opacity-70 hover:opacity-100")}>
+                <DockAvatar name="" style={a.avatarStyle} color={a.avatarColor} glyph={e.id} level={0} size={30} />
+              </button>
+            </Hint>
           ))}
         </div>
       </div>
@@ -84,7 +90,7 @@ export function BotSettings({ d, a }: { d: DockData; a: DockAgent }) {
                 <button aria-disabled={locked} aria-pressed={a.accessLevel === l.n} onClick={() => !locked && setLevel(l.n)}
                   className={cn("relative grid justify-items-center gap-1 rounded-[11px] px-1 py-2.5 text-center text-xs transition-colors",
                     locked ? "cursor-not-allowed opacity-40" : a.accessLevel === l.n ? "bg-card font-semibold ring-[1.5px] ring-foreground" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-                  <DockAvatar name="" style={a.avatarStyle} color={a.avatarColor} glyph=" " level={l.n} size={34} />
+                  <DockAvatar name="" style={a.avatarStyle} color={a.avatarColor} glyph={a.avatarGlyph} level={l.n} size={34} />
                   {l.title}
                   {locked && <LockIcon className="absolute top-1.5 right-1.5 size-3 text-muted-foreground" />}
                 </button>

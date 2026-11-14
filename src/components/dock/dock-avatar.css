@@ -1,83 +1,35 @@
-/* Avatar dos bots do HZK Dock (F3 aprovada: Constelação padrão; Saturno e Halo como opção).
- * Mesmo desenho do protótipo docs/prototipos/dock-v3-avatar.html, com os tokens do app (Órbita, PR #43).
- * Os anéis contam o nível de acesso; o movimento conta o estado; laranja só para "precisa de você". */
+/* Avatar com rosto dos bots do HZK Dock (Astro padrão; Módulo e Visor como opção).
+ * Mesmo desenho de docs/prototipos/dock-avatar-rostos.html, com os tokens do app.
+ * Os olhos contam o estado; as luas em órbita contam o nível; laranja só para "precisa de você". */
 .dock-av {
-  --fg: var(--foreground);
   --fg-3: var(--muted-foreground);
   --hot: var(--highlight);
   --surface: var(--card);
-  --surface-2: var(--muted);
-  --ring: color-mix(in oklch, var(--foreground) 55%, transparent);
-  --ring-soft: color-mix(in oklch, var(--foreground) 22%, transparent);
-  --ring-back: color-mix(in oklch, var(--foreground) 22%, transparent);
-  --ativo: #2f6fae;
-  --badge: var(--foreground);
-  --badge-fg: var(--background);
-  --rim: transparent;
+  --orbit: var(--foreground);
   display: block;
   flex: none;
   overflow: visible;
 }
-.dark .dock-av { --ativo: #7cb3ea; --rim: rgb(255 255 255 / 30%); }
-/* ---------- o avatar ---------- */
-.dock-av .ring, .dock-av .ghost, .dock-av .maint { transform-box: fill-box; transform-origin: center; transform: rotate(var(--a, 0deg)); transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1), stroke 240ms, opacity 240ms; }
-.dock-av .rs { stroke: var(--ring); fill: none; transition: stroke 240ms, opacity 240ms; }
-.dock-av .rb { stroke: var(--ring-back); fill: none; }
-.dock-av .nd { fill: var(--ring); transition: fill 240ms; }
-.dock-av .ghost, .dock-av .maint, .dock-av .qnode, .dock-av .badge, .dock-av .zline { opacity: 0; }
-.dock-av:not([data-level="0"]) .ghost { display: none; }
-.dock-av .sphere { transition: filter 300ms, opacity 300ms; }
-.dock-av .zline { stroke: var(--hot); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 60; stroke-dashoffset: 60; }
-@keyframes spin { to { transform: rotate(calc(var(--a, 0deg) + 360deg)); } }
-@keyframes spinr { to { transform: rotate(calc(var(--a, 0deg) - 360deg)); } }
-@keyframes pulse { 50% { opacity: .35; } }
-@keyframes qpulse { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
-@keyframes drawz { 0% { stroke-dashoffset: 60; opacity: 1; } 45% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+.dock-av .orbit { fill: none; stroke: var(--orbit); opacity: 0.28; }
+.dock-av .moon { fill: var(--orbit); }
+.dock-av .qdot { fill: var(--orbit); opacity: 0.7; }
+.dock-av .spin { transform-box: view-box; transform-origin: 0 0; }
+.dock-av .eyes, .dock-av .eye { transform-box: fill-box; transform-origin: center; }
+.dock-av.done .eyes { transform: translateY(-1.5px); transition: transform 300ms; }
 
-/* trabalhando: todos no mesmo sentido; conversando: anéis alternam o sentido */
-.dock-av[data-state="trabalhando"] .ring.k1, .dock-av[data-state="conversando"] .ring.k1 { animation: spin 6s linear infinite; }
-.dock-av[data-state="trabalhando"] .ring.k2 { animation: spin 9s linear infinite; }
-.dock-av[data-state="trabalhando"] .ring.k3 { animation: spin 18s linear infinite; }
-.dock-av[data-state="conversando"] .ring.k2 { animation: spinr 7s linear infinite; }
-.dock-av[data-state="conversando"] .ring.k3 { animation: spin 11s linear infinite; }
-.dock-av[data-state="trabalhando"] .ghost, .dock-av[data-state="conversando"] .ghost { opacity: 1; animation: spin 6s linear infinite; }
-/* na fila: nó pequeno pulsando na borda */
-.dock-av[data-state="na_fila"] .qnode { animation: qpulse 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-/* precisa de você: o anel de fora acende laranja */
-.dock-av[data-state="bloqueado"] .outer .rs, .dock-av[data-state="aguardando_aprovacao"] .outer .rs,
-.dock-av[data-state="bloqueado"] .ghost .rs, .dock-av[data-state="aguardando_aprovacao"] .ghost .rs { stroke: var(--hot); }
-.dock-av[data-state="bloqueado"] .outer .nd, .dock-av[data-state="aguardando_aprovacao"] .outer .nd { fill: var(--hot); }
-.dock-av[data-state="bloqueado"] .ghost, .dock-av[data-state="aguardando_aprovacao"] .ghost { opacity: 1; }
-.dock-av[data-state="aguardando_aprovacao"] .outer, .dock-av[data-state="aguardando_aprovacao"] .ghost { animation: pulse 2.4s ease-in-out infinite; }
-.dock-av[data-state="bloqueado"] .outer, .dock-av[data-state="bloqueado"] .ghost { animation: pulse 1.2s ease-in-out infinite; }
-.dock-av[data-state="bloqueado"] .outer .rs, .dock-av[data-state="aguardando_aprovacao"] .outer .rs { opacity: 1 !important; stroke-width: 2.6; }
-.dock-av.micro[data-state="bloqueado"] .ghost, .dock-av.micro[data-state="aguardando_aprovacao"] .ghost { display: inline; }
-.dock-av.micro[data-state="bloqueado"] .ghost .rs, .dock-av.micro[data-state="aguardando_aprovacao"] .ghost .rs { stroke-dasharray: none; stroke-width: 9; }
-/* pausado: esfera acinzentada, anéis parados */
-.dock-av[data-state="pausado"] .sphere { filter: grayscale(1); opacity: .55; }
-.dock-av[data-state="pausado"] .ring { opacity: .4; }
-/* sem cota, sem conexão, Ponte desligada: anel tracejado + ícone do motivo */
-.dock-av[data-state="sem_cota"] .outer .rs, .dock-av[data-state="sem_conexao"] .outer .rs, .dock-av[data-state="ponte_desligada"] .outer .rs,
-.dock-av[data-state="sem_cota"] .ghost .rs, .dock-av[data-state="sem_conexao"] .ghost .rs, .dock-av[data-state="ponte_desligada"] .ghost .rs { stroke-dasharray: var(--dash, 3 4) !important; }
-.dock-av[data-state="sem_cota"] .ghost, .dock-av[data-state="sem_conexao"] .ghost, .dock-av[data-state="ponte_desligada"] .ghost { opacity: 1; }
-.dock-av[data-state="sem_cota"] .b-cota, .dock-av[data-state="sem_conexao"] .b-conexao, .dock-av[data-state="ponte_desligada"] .b-ponte { opacity: 1; }
-.dock-av[data-state="sem_cota"] .sphere, .dock-av[data-state="sem_conexao"] .sphere, .dock-av[data-state="ponte_desligada"] .sphere { opacity: .8; }
-.dock-av.micro[data-state="sem_cota"] .ring .rs, .dock-av.micro[data-state="sem_conexao"] .ring .rs, .dock-av.micro[data-state="ponte_desligada"] .ring .rs { stroke-dasharray: none !important; stroke: var(--fg-3); }
-.dock-av.micro[data-state="sem_cota"] .ring .nd, .dock-av.micro[data-state="sem_conexao"] .ring .nd, .dock-av.micro[data-state="ponte_desligada"] .ring .nd { fill: var(--fg-3); }
-.dock-av.micro[data-state="sem_cota"] .sphere, .dock-av.micro[data-state="sem_conexao"] .sphere, .dock-av.micro[data-state="ponte_desligada"] .sphere { opacity: .45; }
-/* manutenção: anel fino, sem cor, girando bem devagar */
-.dock-av[data-state="manutencao"] .maint { opacity: 1; animation: spin 24s linear infinite; }
-/* concluiu: os anéis se alinham na diagonal do Z por um instante */
-.dock-av.done .ring { animation: none !important; transform: rotate(var(--z, 0deg)); }
-.dock-av.done .zline { animation: drawz 1.2s ease-out both; }
-
-/* reduzir movimento: sem giro, só a cor muda */
-
-/* reduzir movimento: nada gira; trabalhando e conversando mudam a cor dos anéis */
-@media (prefers-reduced-motion: reduce) {
-  .dock-av * { animation: none !important; transition: none !important; }
-  .dock-av[data-state="trabalhando"] .rs, .dock-av[data-state="conversando"] .rs { stroke: var(--ativo); }
-  .dock-av[data-state="trabalhando"] .nd, .dock-av[data-state="conversando"] .nd { fill: var(--ativo); }
-  .dock-av[data-state="na_fila"] .qnode { opacity: 1; }
-  .dock-av.done .zline { opacity: 1; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .dock-av[data-face="livre"] .eye, .dock-av[data-face="fila"] .eye { animation: dock-av-blink 5.2s infinite; }
+  .dock-av[data-face="trabalhando"] .eyes { animation: dock-av-scan 1.8s ease-in-out infinite; }
+  .dock-av[data-face="trabalhando"] .spin { animation: dock-av-spin 9s linear infinite; }
+  .dock-av[data-face="trabalhando"] .spin.r2 { animation-duration: 13s; animation-direction: reverse; }
+  .dock-av[data-face="trabalhando"] .spin.r3 { animation-duration: 17s; }
+  .dock-av[data-face="voce"] .ask { animation: dock-av-pulse 1.4s ease-in-out infinite; }
+  .dock-av[data-face="voce"] .eyes { animation: dock-av-nod 1.4s ease-in-out infinite; }
+  .dock-av[data-face="pausado"] .zz { animation: dock-av-float 2.6s ease-in-out infinite; }
 }
+@keyframes dock-av-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@keyframes dock-av-scan { 0%, 100% { transform: translateX(-2.6px); } 50% { transform: translateX(2.6px); } }
+@keyframes dock-av-spin { to { transform: rotate(360deg); } }
+@keyframes dock-av-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes dock-av-nod { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+@keyframes dock-av-float { 0%, 100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(-3px); opacity: 0.5; } }
