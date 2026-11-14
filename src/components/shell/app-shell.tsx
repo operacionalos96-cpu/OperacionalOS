@@ -7,7 +7,6 @@ import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import {
   CheckSquareIcon,
-  ChevronDownIcon,
   InboxIcon,
   LogOutIcon,
   MenuIcon,
@@ -55,6 +54,8 @@ import { CommandPalette } from "./command-palette"
 import { QuickCapture } from "@/components/hzk/quick-capture"
 import { DayGuide } from "@/components/hzk/day-guide"
 import { DoingRail } from "@/components/hzk/doing-now"
+import { HzkMark } from "@/components/hzk/hzk-mark"
+import { OrbitField } from "@/components/hzk/orbit-field"
 import { PresenceDot } from "@/components/hzk/presence-badge"
 import { startPresence } from "@/lib/presence"
 import { startPresenceAlerts } from "@/lib/presence-alerts"
@@ -106,8 +107,9 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
+      {!focusMode && <OrbitField />}
       {!focusMode && <Sidebar />}
-      <main className={cn("flex min-w-0 flex-1 flex-col overflow-y-auto", !focusMode && "pb-16 md:pb-0")}>
+      <main className={cn("relative z-[1] flex min-w-0 flex-1 flex-col overflow-y-auto", !focusMode && "pb-16 md:pb-0")}>
         {/* key por rota: cada página entra com um fade curto. */}
         {hydrated ? (
           <div key={pathname} className="page-enter flex min-h-0 flex-1 flex-col">
@@ -250,7 +252,8 @@ function Sidebar() {
         className={cn(
           "group/nav relative flex h-9 shrink-0 items-center overflow-hidden rounded-full text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
           row,
-          active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+          // Selecionado: quadrado de cantos arredondados (o resto da barra é redondo: a variação é proposital).
+          active && "hzk-rail-pick rounded-[11px] bg-sidebar-primary font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
         )}
       >
         <span className="flex size-9 shrink-0 items-center justify-center">
@@ -260,7 +263,7 @@ function Sidebar() {
         {badge > 0 && (
           <span
             className={cn(
-              "tabular absolute flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar transition-[top,right] duration-(--dur-4) ease-(--ease-std)",
+              "tabular absolute flex h-4 min-w-4 items-center justify-center rounded-full bg-highlight px-1 text-[10px] font-semibold text-white ring-2 ring-sidebar transition-[top,right] duration-(--dur-4) ease-(--ease-std)",
               open ? "top-2.5 right-2.5" : "top-0 right-0",
             )}
           >
@@ -287,7 +290,7 @@ function Sidebar() {
   )
 
   return (
-    <aside className={cn("relative hidden shrink-0 transition-[width] duration-(--dur-4) ease-(--ease-std) md:block", pinned ? "w-[244px]" : "w-[76px]")}>
+    <aside className={cn("relative hidden shrink-0 transition-[width] duration-(--dur-4) ease-(--ease-std) md:block", pinned ? "w-[252px]" : "w-[90px]")}>
       <div
         onPointerEnter={(e) => {
           // Só o mouse espera: passar por cima a caminho de outra coisa não abre a barra.
@@ -308,15 +311,17 @@ function Sidebar() {
         // num link (a navegação tira o foco) não pode fechá-la com o mouse ainda ali.
         onBlur={(e) => !pointerInside.current && !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
         className={cn(
-          "absolute inset-y-3 left-3 z-40 overflow-hidden rounded-[28px] bg-sidebar text-sidebar-foreground shadow-lift transition-[width] duration-(--dur-4) ease-(--ease-std) will-change-[width]",
+          "hzk-glass-rail absolute inset-y-4 left-4 z-40 overflow-hidden rounded-[34px] text-sidebar-foreground transition-[width] duration-(--dur-4) ease-(--ease-std) will-change-[width]",
           open ? "w-[220px]" : "w-16",
         )}
       >
         {/* Conteúdo com largura fixa: a pílula só revela mais ou menos dele. */}
         <div className="flex h-full w-[220px] flex-col gap-2.5 py-3.5">
           <div className="flex items-center gap-2 pl-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- símbolo oficial em SVG, estático */}
-            <img src="/hzk-simbolo.svg" alt="HZK Company" title="Operacional OS · HZK Company" className="size-10 shrink-0 rounded-full ring-2 ring-sidebar-border" />
+            {/* Símbolo clean, redondo, em vidro: o Z e os três pontos da marca não mudam. */}
+            <span title="Operacional OS · HZK Company" className="flex size-10 shrink-0 rounded-full shadow-[0_8px_18px_-10px_rgb(27_36_50/0.55)]">
+              <HzkMark className="size-10" />
+            </span>
             <span className={cn("flex-1 truncate text-sm font-semibold", fade)}>Operacional OS</span>
             <button
               type="button"
@@ -359,8 +364,16 @@ function Sidebar() {
 
           {/* Sistema: rodapé fixo, fora da rolagem. */}
           {system && (
-            <div className="mx-3 border-t border-sidebar-foreground/10 pt-2">
-              <div className="-mx-3">{group({ ...system, title: null }, 0)}</div>
+            <div className="pt-1">
+              {/* Divisor: curto e centrado no ícone com a barra fechada; cresce quando ela abre. */}
+              <span
+                aria-hidden
+                className={cn(
+                  "mb-2 block h-px bg-sidebar-foreground/12 transition-[width,margin] duration-(--dur-4) ease-(--ease-std)",
+                  open ? "ml-5 w-[180px]" : "ml-5 w-6",
+                )}
+              />
+              {group({ ...system, title: null }, 0)}
             </div>
           )}
           <div className="flex flex-col gap-2 pl-3">
@@ -378,7 +391,7 @@ function NewMenu({ compact = false }: { compact?: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {compact ? (
-          <Button variant="brand" size="icon" className="size-10 rounded-full shadow-lg" aria-label="Novo" title="Novo">
+          <Button variant="brand" size="icon" className="hzk-plus size-10 rounded-full" aria-label="Novo" title="Novo">
             <PlusIcon className="size-5" />
           </Button>
         ) : (
@@ -534,12 +547,20 @@ function ScrollHint({ children, open, pathname }: { children: React.ReactNode; o
   }, [])
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
-      <nav ref={ref} className="relative flex min-h-0 w-full flex-1 flex-col items-start gap-0.5 overflow-y-auto [scrollbar-width:none]">
+      <nav
+        ref={ref}
+        className={cn(
+          "relative flex min-h-0 w-full flex-1 flex-col items-start gap-0.5 overflow-y-auto [scrollbar-width:none]",
+          // Sem faixa escura por cima: a lista some suavemente no fim (máscara), sobre o vidro.
+          more && "[mask-image:linear-gradient(to_bottom,#000_calc(100%-44px),transparent)]",
+        )}
+      >
+        {/* Nó laranja da marca ao lado da tela atual (o quadrado selecionado já mostra onde você está). */}
         {mark !== null && (
           <span
             aria-hidden
-            className="pointer-events-none absolute left-0 h-4 w-1 rounded-r-full bg-highlight transition-[top] duration-(--dur-3) ease-(--ease-std)"
-            style={{ top: mark }}
+            className="pointer-events-none absolute left-[5px] size-[5px] rounded-full bg-highlight transition-[top] duration-(--dur-3) ease-(--ease-std)"
+            style={{ top: mark + 5.5 }}
           />
         )}
         {children}
@@ -549,9 +570,18 @@ function ScrollHint({ children, open, pathname }: { children: React.ReactNode; o
           type="button"
           onClick={() => ref.current?.scrollBy({ top: 160, behavior: "smooth" })}
           aria-label="Mais áreas abaixo"
-          className="absolute inset-x-0 bottom-0 flex h-10 items-end justify-center bg-gradient-to-t from-sidebar to-transparent pb-1 text-sidebar-foreground/70"
+          title="Mais áreas abaixo"
+          // Três nós da marca que descem: na coluna dos ícones com a barra fechada; no centro quando ela abre.
+          className={cn(
+            "absolute bottom-0 flex h-7 w-9 items-center justify-center rounded-[10px] transition-[left] duration-(--dur-4) ease-(--ease-std) hover:bg-sidebar-accent",
+            open ? "left-[92px]" : "left-3.5",
+          )}
         >
-          <ChevronDownIcon className="size-4 animate-bounce" />
+          <span aria-hidden className="hzk-scroll-cue">
+            <i />
+            <i />
+            <i />
+          </span>
         </button>
       )}
     </div>
