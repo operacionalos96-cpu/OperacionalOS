@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { ShieldCheckIcon } from "lucide-react"
+import { EyeOffIcon, KeyRoundIcon, MessageCircleIcon, ShieldCheckIcon } from "lucide-react"
 import { PageHeader } from "@/components/shared/layout"
 import { Button } from "@/components/ui/button"
 import { DockNav } from "@/components/dock/ui"
@@ -24,27 +24,32 @@ export default function DockLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 md:px-8">
-      <PageHeader page="/dock">
+      <PageHeader page="/dock" description="">
         <DockNav badges={{ "/dock": pend?.approvals ?? 0, "/dock/skills": pend?.proposals ?? 0, "/dock/apps": pend?.requests ?? 0 }} />
       </PageHeader>
       {error && <p className="rounded-[15px] bg-danger-soft p-3 text-sm text-danger">{error}</p>}
       {loading && !data ? (
-        <p className="t-desc">Abrindo o seu Dock…</p>
+        <div aria-busy className="h-40 animate-pulse rounded-[20px] bg-card/60" />
       ) : data && !data.consent ? (
-        <section className="mx-auto grid max-w-xl gap-4 rounded-[20px] bg-card p-6">
-          <ShieldCheckIcon className="size-8 text-highlight" />
-          <h2 className="t-title text-lg">Antes de começar</h2>
-          <ul className="t-desc grid list-disc gap-1.5 pl-5">
-            <li>O Dock é seu: só você vê os seus bots e as suas conversas. Nem os founders leem.</li>
-            <li>As chaves das IAs ficam no seu PC, no cofre do Windows. Nunca vão para o servidor.</li>
-            <li>Bot novo nasce no nível 0 (só conversa). Nesta primeira leva, o máximo é o nível 1 (pastas que você liberar).</li>
-            <li>Tudo o que um bot fizer na empresa passa pelo porteiro: ler segue, executar pede você, o sensível sempre pede uma pessoa.</li>
+        <section className="mx-auto grid w-full max-w-md gap-5 rounded-[20px] bg-card p-6">
+          <h2 className="t-title text-lg">Seu Dock</h2>
+          <ul className="grid gap-3 text-sm">
+            {[
+              [EyeOffIcon, "Só você vê seus bots e conversas"],
+              [KeyRoundIcon, "As chaves das IAs ficam no seu PC"],
+              [MessageCircleIcon, "Bot novo só conversa, até você liberar mais"],
+              [ShieldCheckIcon, "Ações na empresa pedem a sua aprovação"],
+            ].map(([Icon, text]) => {
+              const I = Icon as typeof EyeOffIcon
+              return (
+                <li key={text as string} className="flex items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-foreground/[0.06]"><I className="size-4" /></span>
+                  {text as string}
+                </li>
+              )
+            })}
           </ul>
-          <div>
-            <Button variant="brand" onClick={() => run((api) => api.acceptConsent(), "Pronto. Bem-vindo ao seu Dock.")}>
-              Entendi, começar
-            </Button>
-          </div>
+          <Button variant="brand" onClick={() => run((api) => api.acceptConsent())}>Começar</Button>
         </section>
       ) : (
         data && children

@@ -31,14 +31,13 @@ export default function DockUsagePage() {
 
   return (
     <div className="grid gap-4">
-      <p className="t-desc">Só você vê. Custo é estimativa; assinatura e IA local não geram cobrança extra.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[["Pedidos (7 dias)", String(total)], ["Grátis ou no plano", `${freePct}%`], ["Gasto estimado", `US$ ${cost.toFixed(2).replace(".", ",")}`], ["Trocas para a reserva", String(swaps)]].map(([l, v]) => (
+        {[["Pedidos · 7 dias", String(total)], ["Grátis", `${freePct}%`], ["Gasto estimado", `US$ ${cost.toFixed(2).replace(".", ",")}`], ["Reservas usadas", String(swaps)]].map(([l, v]) => (
           <Card key={l} className="grid gap-1"><div className="t-label">{l}</div><div className="t-value">{v}</div></Card>
         ))}
       </div>
       <Card>
-        <h3 className="t-title">Pedidos por dia, por IA</h3>
+        <h3 className="t-title">Por dia</h3>
         <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full" role="img" aria-label="Pedidos por dia, empilhados por IA">
           {[0, top / 2, top].map((v) => <g key={v}><line x1={pl} x2={W - 4} y1={y(v)} y2={y(v)} stroke="var(--border)" /><text x={pl - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="var(--muted-foreground)">{v}</text></g>)}
           {days.map((x, i) => {

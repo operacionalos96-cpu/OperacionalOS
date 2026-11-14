@@ -1,25 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { BellIcon, DownloadIcon, PlusIcon } from "lucide-react"
+import { BotIcon, CheckIcon, ChevronDownIcon, GraduationCapIcon, PlusIcon, SendIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, Label, Tag } from "@/components/dock/ui"
+import { Card, Empty, Hint, Label, Tag, pick } from "@/components/dock/ui"
 import { DockAvatar } from "@/components/dock/dock-avatar"
 import { areaLabel, versionOf } from "@/lib/domain/dock"
 import { useDock } from "@/lib/dock/store"
 import { useAreas } from "@/lib/modules"
-import { useAccess } from "@/lib/use-access"
-import { cn } from "@/lib/utils"
 
-/** Skills: biblioteca por área, Kit da área, as pessoais e as propostas de versão nova para o responsável. */
+/** Skills: biblioteca da empresa por área, kit da área, as pessoais e as propostas de versão nova. */
 export default function DockSkillsPage() {
   const d = useDock((s) => s.data)!
   const run = useDock((s) => s.run)
   const areas = useAreas((s) => s.items)
-  const founder = useAccess().hasMinimum("owner")
   const [tab, setTab] = useState<"biblioteca" | "kit" | "minhas">("biblioteca")
   const [area, setArea] = useState<string | null>(null)
   const [newSkill, setNewSkill] = useState(false)
@@ -29,53 +26,48 @@ export default function DockSkillsPage() {
   const kitArea = area ?? libAreas[0] ?? null
   const props = d.proposals.filter((p) => p.status === "aberta")
   const bots = (skillId: string) => d.agentSkills.filter((i) => i.skillId === skillId).length
+  const shown = d.skills.filter((s) => (tab === "minhas" ? s.scope === "pessoal" : s.scope === "area") && !s.archived)
 
   return (
     <div className="grid gap-4">
-      {props.length > 0 && (
-        <Card className="grid gap-3 shadow-[0_0_0_1.5px_var(--highlight-soft)]">
-          <div className="flex items-center gap-2"><Tag className="bg-highlight-soft text-highlight"><BellIcon />Precisa de você</Tag><b className="text-sm">Propostas de versão nova</b></div>
-          {props.map((p) => (
-            <div key={p.id} className="grid gap-1.5 text-sm">
-              <b>{p.name}{p.baseVersion ? ` · v${versionOf(d, p.skillId!, p.baseVersion)?.label} → v${p.label}` : ` · nova (v${p.label})`}</b>
-              <p className="t-desc"><b className="text-foreground">O que muda:</b> {p.whatChanged}{p.why && <><br /><b className="text-foreground">Por quê:</b> {p.why}</>}{p.signalCount > 0 && ` (${p.signalCount} sinais de quem usa)`}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="brand" onClick={() => run((api) => api.decideProposal(p.id, true), `v${p.label} publicada. Os bots recebem com aviso.`)}>Aprovar a v{p.label}</Button>
-                <Button size="sm" variant="ghost" onClick={() => run((api) => api.decideProposal(p.id, false), "Proposta recusada.")}>Agora não</Button>
-                <span className="text-xs text-muted-foreground">Responsável por {areaName(p.areaId)}{founder ? " (você é founder)" : ""}.</span>
-              </div>
-            </div>
-          ))}
+      {props.map((p) => (
+        <Card key={p.id} className="flex flex-wrap items-center gap-3 shadow-[0_0_0_1.5px_var(--highlight-soft)]">
+          <Tag className="bg-highlight-soft text-highlight">proposta</Tag>
+          <span className="min-w-0 flex-1 text-sm">
+            <b>{p.name}</b> <Tag>{p.baseVersion ? `v${versionOf(d, p.skillId!, p.baseVersion)?.label} → v${p.label}` : `nova · v${p.label}`}</Tag>
+            <span className="block truncate text-xs text-muted-foreground">{p.whatChanged}</span>
+          </span>
+          {p.signalCount > 0 && <Tag title="Sinais de quem usa">{p.signalCount}</Tag>}
+          <Hint text={p.why || "Publicar esta versão"}><Button size="sm" variant="brand" onClick={() => run((api) => api.decideProposal(p.id, true), `v${p.label} publicada.`)}><CheckIcon />Aprovar</Button></Hint>
+          <Hint text="Agora não"><Button size="icon-sm" variant="ghost" aria-label="Recusar" onClick={() => run((api) => api.decideProposal(p.id, false), "Recusada.")}><XIcon /></Button></Hint>
         </Card>
-      )}
+      ))}
 
       <div className="flex flex-wrap items-center gap-1.5">
         {(["biblioteca", "kit", "minhas"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn("rounded-[11px] px-3 py-1.5 text-sm", tab === t ? "bg-foreground text-background" : "bg-foreground/[0.06] text-muted-foreground hover:text-foreground")}>
-            {t === "biblioteca" ? "Biblioteca da empresa" : t === "kit" ? "Kit da área" : "Minhas skills"}
-          </button>
+          <button key={t} onClick={() => setTab(t)} className={pick(tab === t)}>{t === "biblioteca" ? "Empresa" : t === "kit" ? "Kit da área" : "Minhas"}</button>
         ))}
         <span className="flex-1" />
-        <Button variant="outline" onClick={() => setNewSkill(true)}><PlusIcon />Nova skill pessoal</Button>
+        <Button variant="outline" onClick={() => setNewSkill(true)}><PlusIcon />Nova skill</Button>
       </div>
 
       {tab === "kit" ? (
         <>
-          <p className="t-desc">Quem entra numa área instala o kit e já trabalha no mesmo padrão dos colegas, sem treinar nada.</p>
-          <div className="flex flex-wrap gap-1.5">{libAreas.map((a) => <button key={a} onClick={() => setArea(a)} className={cn("rounded-[11px] px-3 py-1.5 text-sm", kitArea === a ? "bg-foreground text-background" : "bg-foreground/[0.06] text-muted-foreground")}>{areaName(a)}</button>)}</div>
+          <div className="flex flex-wrap gap-1.5">{libAreas.map((a) => <button key={a} onClick={() => setArea(a)} className={pick(kitArea === a)}>{areaName(a)}</button>)}</div>
+          {!kitArea && <Empty icon={GraduationCapIcon} text="Nenhuma área montou um kit ainda" />}
           {kitArea && (
-            <Card className="grid gap-4 md:grid-cols-2">
+            <Card className="grid gap-5 md:grid-cols-2">
               <div className="grid content-start gap-2">
-                <Label>Skills do kit</Label>
-                {d.skills.filter((s) => s.areaId === kitArea && s.inKit).map((s) => <div key={s.id} className="rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm">{s.name} <Tag>v{versionOf(d, s.id, s.currentVersion)?.label}</Tag></div>)}
+                <Label>Skills</Label>
+                {d.skills.filter((s) => s.areaId === kitArea && s.inKit).map((s) => <div key={s.id} className="flex items-center gap-2 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm"><span className="flex-1">{s.name}</span><Tag>v{versionOf(d, s.id, s.currentVersion)?.label}</Tag></div>)}
               </div>
               <div className="grid content-start gap-2">
-                <Label>Bots modelo</Label>
+                <Label>Bots prontos</Label>
                 {d.kitBots.filter((k) => k.areaId === kitArea).map((k) => (
                   <div key={k.id} className="flex items-center gap-3 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm">
                     <DockAvatar name={k.name} color={k.avatarColor} glyph={k.avatarGlyph} level={0} size={28} />
                     <span className="flex-1">{k.name}</span>
-                    <Button size="sm" onClick={() => run((api) => api.createAgentFromKit(k.id), `${k.name} criado no nível 0, com as skills do kit.`)}><DownloadIcon />Criar</Button>
+                    <Button size="sm" variant="outline" onClick={() => run((api) => api.createAgentFromKit(k.id), `${k.name} criado.`)}><PlusIcon />Criar</Button>
                   </div>
                 ))}
               </div>
@@ -83,41 +75,51 @@ export default function DockSkillsPage() {
           )}
         </>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {d.skills.filter((s) => (tab === "minhas" ? s.scope === "pessoal" : s.scope === "area") && !s.archived).map((s) => {
-            const v = versionOf(d, s.id, s.currentVersion)
-            return (
-              <Card key={s.id} className="grid content-start gap-2">
-                <div className="flex items-center gap-2"><h3 className="t-title flex-1">{s.name}</h3><Tag>v{v?.label}</Tag></div>
-                <p className="t-desc">{s.description}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <Tag>{areaName(s.areaId)}</Tag>
-                  {(v?.minLevel ?? 0) > 0 && <Tag>nível {v?.minLevel}+</Tag>}
-                  {v?.requiredConnectors.map((c) => <Tag key={c}>usa {c}</Tag>)}
-                  <Tag>{bots(s.id)} {bots(s.id) === 1 ? "bot" : "bots"}</Tag>
-                </div>
-                <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">O que mudou</summary>
-                  <ul className="mt-2 grid gap-1">{d.versions.filter((x) => x.skillId === s.id).sort((a, b) => b.version - a.version).map((x) => <li key={x.version}><b>v{x.label}</b> · {x.whatChanged}</li>)}</ul>
-                </details>
-                {s.scope === "pessoal" && libAreas.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={() => run((api) => api.proposeSkill({ areaId: libAreas[0], skillId: null, sourceSkillId: s.id, name: s.name, description: s.description, label: "1.0", whatChanged: "Skill pessoal proposta para a área.", why: "", body: s.description || s.name, minLevel: 0 }), "Proposta enviada ao responsável da área. Sobe o padrão, nunca as suas conversas.")}>Propor para a área</Button>
-                )}
-              </Card>
-            )
-          })}
-        </div>
+        <>
+          {shown.length === 0 && <Empty icon={GraduationCapIcon} text={tab === "minhas" ? "Nenhuma skill sua ainda" : "Nenhuma skill ainda"} />}
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {shown.map((s) => {
+              const v = versionOf(d, s.id, s.currentVersion)
+              return (
+                <Card key={s.id}>
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-[11px] bg-foreground/[0.06]"><GraduationCapIcon className="size-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{s.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{s.description || areaName(s.areaId)}</span>
+                      </span>
+                      <Tag title="Bots usando"><BotIcon />{bots(s.id)}</Tag>
+                      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-3 grid gap-2 border-t border-border pt-3 text-sm">
+                      <div className="flex flex-wrap gap-1.5">
+                        {s.areaId && <Tag>{areaName(s.areaId)}</Tag>}
+                        {(v?.minLevel ?? 0) > 0 && <Tag title="Nível mínimo do bot">nível {v?.minLevel}</Tag>}
+                        {v?.requiredConnectors.map((c) => <Tag key={c} title="App que ela usa">{c}</Tag>)}
+                      </div>
+                      <ul className="grid gap-1">{d.versions.filter((x) => x.skillId === s.id).sort((a, b) => b.version - a.version).map((x) => <li key={x.version} className="flex gap-2"><Tag>v{x.label}</Tag><span className="min-w-0 flex-1 text-muted-foreground">{x.whatChanged}</span></li>)}</ul>
+                      {s.scope === "pessoal" && libAreas.length > 0 && (
+                        <div><Button size="sm" variant="outline" onClick={() => run((api) => api.proposeSkill({ areaId: libAreas[0], skillId: null, sourceSkillId: s.id, name: s.name, description: s.description, label: "1.0", whatChanged: "Skill pessoal proposta para a área.", why: "", body: s.description || s.name, minLevel: 0 }), "Proposta enviada.")}><SendIcon />Propor para a área</Button></div>
+                      )}
+                    </div>
+                  </details>
+                </Card>
+              )
+            })}
+          </div>
+        </>
       )}
-      <p className="t-desc"><b className="text-foreground">Como uma skill melhora:</b> o uso gera aprendizados; o que se repete vira proposta; o responsável da área aprova. Os bots recebem a versão nova com aviso, e quem quiser fica na anterior. Instale numa skill pelo painel do bot, em Conversas.</p>
 
       <Dialog open={newSkill} onOpenChange={setNewSkill}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nova skill pessoal</DialogTitle></DialogHeader>
-          <Label>Nome</Label><Input value={form.name} maxLength={80} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Meu tom de e-mail" />
-          <Label>Para que serve</Label><Input value={form.description} maxLength={400} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Label>Instruções</Label><Textarea rows={6} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Como fazer, passo a passo, e exemplos." />
+          <DialogHeader><DialogTitle>Nova skill</DialogTitle></DialogHeader>
+          <Input aria-label="Nome" value={form.name} maxLength={80} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome. Ex.: Meu tom de e-mail" />
+          <Input aria-label="Para que serve" value={form.description} maxLength={400} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Para que serve" />
+          <Textarea aria-label="Instruções" rows={6} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Como fazer, passo a passo, com exemplos" />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setNewSkill(false)}>Cancelar</Button>
-            <Button variant="brand" disabled={!form.name.trim() || !form.body.trim()} onClick={async () => { const id = await run((api) => api.savePersonalSkill(form), "Skill criada. Só você vê."); if (id) { setNewSkill(false); setForm({ name: "", description: "", body: "" }); setTab("minhas") } }}>Criar</Button>
+            <Button variant="brand" disabled={!form.name.trim() || !form.body.trim()} onClick={async () => { const id = await run((api) => api.savePersonalSkill(form), "Skill criada."); if (id) { setNewSkill(false); setForm({ name: "", description: "", body: "" }); setTab("minhas") } }}>Criar</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -3,10 +3,25 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BlocksIcon, BotIcon, ChartColumnIcon, CpuIcon, GraduationCapIcon, MessageSquareIcon, MonitorCogIcon, RepeatIcon, ShieldIcon } from "lucide-react"
-import { CLASS_TEXT, LEVELS, type ActionClass, type DockAgent, type DockData } from "@/lib/domain/dock"
+import { CLASS_RULE, CLASS_TEXT, LEVELS, type ActionClass, type DockAgent, type DockData } from "@/lib/domain/dock"
 import type { AgentState } from "@/lib/domain/office"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { DockAvatar } from "./dock-avatar"
+
+/**
+ * Regra de texto do Dock: a tela não se explica com frases. O que precisa de explicação aparece
+ * ao passar o mouse (Hint), no próprio controle, ou no "Como usar" do cabeçalho.
+ */
+export function Hint({ text, children }: { text?: string | null; children: React.ReactElement }) {
+  if (!text) return children
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent className="max-w-64 text-pretty">{text}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export const STATE_TEXT: Record<AgentState, string> = {
   ocioso: "Livre", trabalhando: "Trabalhando", conversando: "Conversando", na_fila: "Na fila",
@@ -22,21 +37,25 @@ const STATE_TONE: Partial<Record<AgentState, string>> = {
 /** Etiqueta de dado: canto quase reto (regra de cantos da Órbita). */
 export function Tag({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center gap-1 rounded-[5px] bg-foreground/[0.06] px-2 py-0.5 text-xs font-medium whitespace-nowrap text-muted-foreground [&_svg]:size-3", className)}>
-      {children}
-    </span>
+    <Hint text={title}>
+      <span className={cn("inline-flex items-center gap-1 rounded-[5px] bg-foreground/[0.06] px-2 py-0.5 text-xs font-medium whitespace-nowrap text-muted-foreground [&_svg]:size-3", className)}>
+        {children}
+      </span>
+    </Hint>
   )
 }
-export const StateTag = ({ state }: { state: AgentState }) => <Tag className={STATE_TONE[state]}>{STATE_TEXT[state]}</Tag>
+/** Estado do bot. "Livre" não aparece: o silêncio é o estado normal. */
+export const StateTag = ({ state }: { state: AgentState }) => (state === "ocioso" ? null : <Tag className={STATE_TONE[state]}>{STATE_TEXT[state]}</Tag>)
+/** Os anéis do avatar já contam o nível; a etiqueta só confirma, e a explicação fica na dica. */
 export const LevelTag = ({ level }: { level: number }) => (
-  <Tag title={LEVELS[level]?.text}>
+  <Tag title={`${LEVELS[level]?.title}: ${LEVELS[level]?.text}`}>
     <ShieldIcon />
-    Nível {level} · {LEVELS[level]?.title}
+    {level}
   </Tag>
 )
 export function ClassTag({ k }: { k: ActionClass }) {
   const tone = k === "D" ? "bg-danger-soft text-danger" : k === "C" ? "bg-highlight-soft text-highlight" : k === "B" ? "bg-info-soft text-foreground" : ""
-  return <Tag className={tone}>{k} · {CLASS_TEXT[k]}</Tag>
+  return <Tag className={tone} title={CLASS_RULE[k]}>{CLASS_TEXT[k]}</Tag>
 }
 
 export function agentState(d: DockData, a: DockAgent): AgentState {
@@ -51,9 +70,9 @@ export function BotAvatar({ d, a, size = 40, done }: { d: DockData; a: DockAgent
 const NAV = [
   { href: "/dock", label: "Conversas", icon: MessageSquareIcon },
   { href: "/dock/bots", label: "Bots", icon: BotIcon },
-  { href: "/dock/apps", label: "Apps e conectores", icon: BlocksIcon },
+  { href: "/dock/apps", label: "Apps", icon: BlocksIcon },
   { href: "/dock/skills", label: "Skills", icon: GraduationCapIcon },
-  { href: "/dock/provedores", label: "Provedores", icon: CpuIcon },
+  { href: "/dock/provedores", label: "IAs", icon: CpuIcon },
   { href: "/dock/uso", label: "Uso", icon: ChartColumnIcon },
   { href: "/dock/rotinas", label: "Rotinas", icon: RepeatIcon },
   { href: "/dock/pc", label: "PC", icon: MonitorCogIcon },
@@ -91,3 +110,18 @@ export function Card({ children, className }: { children: React.ReactNode; class
   return <section className={cn("rounded-[15px] bg-card p-4", className)}>{children}</section>
 }
 export const Label = ({ children }: { children: React.ReactNode }) => <div className="t-label">{children}</div>
+
+/** Botões de filtro e de aba (um selecionado por vez). */
+export const pick = (on: boolean) =>
+  cn("rounded-[11px] px-3 py-1.5 text-sm transition-colors", on ? "bg-foreground font-medium text-background" : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10 hover:text-foreground")
+
+/** Estado vazio: um ícone, uma linha e, se couber, uma ação. */
+export function Empty({ icon: Icon, text, children }: { icon: React.ComponentType<{ className?: string }>; text: string; children?: React.ReactNode }) {
+  return (
+    <div className="grid justify-items-center gap-3 py-12 text-center">
+      <Icon className="size-7 text-muted-foreground/60" />
+      <p className="text-sm text-muted-foreground">{text}</p>
+      {children}
+    </div>
+  )
+}
