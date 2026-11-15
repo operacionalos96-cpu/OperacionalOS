@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Vitrine OperacionalOS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Geist+Mono:wght@500&display=swap">
+<style>
+/* Deck autoexplicativo (mesmo modelo de apresentacao-interface.html): uma ideia por slide, a tela real prova.
+   Palco 1600x900 escalado. Fundo mineral, grafite, laranja só no que aponta. */
+:root{
+  color-scheme:light;
+  --bg:#f5f5f2; --ink:#1b2432; --ink-2:#5a5c60; --ink-3:#8b8d90; --card:#ffffff; --tone:#ecece7;
+  --or:#ea5b25; --or-soft:rgb(234 91 37 / 10%); --ok:#2f8f63; --ok-soft:rgb(47 143 99 / 11%); --warn:#b7791f; --warn-soft:rgb(214 158 46 / 14%);
+  --f:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+  --ease:cubic-bezier(.05,.7,.1,1);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);overflow:hidden;-webkit-font-smoothing:antialiased}
+#wrap{position:fixed;inset:0;background:radial-gradient(50rem 40rem at 100% 0%,rgb(234 91 37 / 7%),transparent 70%),var(--bg)}
+#stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0}
+.slide{position:absolute;inset:0;padding:64px 88px 100px;opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .7s var(--ease);pointer-events:none;display:flex;flex-direction:column;gap:26px}
+.slide.on{opacity:1;transform:none;pointer-events:auto}
+.eb{display:flex;align-items:center;gap:12px;font:600 14px var(--f);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.eb::before{content:"";width:28px;height:2.5px;border-radius:2px;background:var(--or)}
+h1{margin:0;font-size:56px;line-height:1.04;font-weight:700;letter-spacing:-.035em;max-width:28ch;text-wrap:balance}
+h1 em{font-style:normal;color:var(--or)}
+.head{display:grid;gap:14px}
+.sub{margin:0;font-size:22px;line-height:1.45;color:var(--ink-2);max-width:60ch}
+.row{display:flex;gap:40px;align-items:stretch;flex:1;min-height:0}
+.shot{border-radius:18px;overflow:hidden;box-shadow:0 1px 0 rgb(27 36 50 / 4%),0 30px 60px -30px rgb(27 36 50 / 40%);background:#fff;position:relative}
+.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:left top}
+.shot.fit img{height:auto}
+
+/* cortina */
+.wipe{position:relative;flex:1;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px rgb(27 36 50 / 40%);cursor:ew-resize;touch-action:none;user-select:none}
+.wipe img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none}
+.wipe .top{clip-path:inset(0 0 0 var(--x,100%))}
+.wipe .bar{position:absolute;top:0;bottom:0;left:var(--x,100%);width:3px;margin-left:-1.5px;background:var(--or);box-shadow:0 0 0 6px rgb(234 91 37 / 15%)}
+.wipe .knob{position:absolute;top:50%;left:var(--x,100%);width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--or);color:#fff;display:grid;place-items:center;font:700 16px var(--f);box-shadow:0 8px 20px -8px rgb(234 91 37 / 70%)}
+.tag{position:absolute;top:18px;font:700 13px var(--f);letter-spacing:.14em;text-transform:uppercase;padding:7px 12px;border-radius:8px;z-index:2}
+.tag.a{left:18px;background:rgb(27 36 50 / 75%);color:#fff}
+.tag.d{right:18px;background:var(--or);color:#fff}
+.wipe .tag.a{background:var(--or)}
+.wipe .tag.d{background:rgb(27 36 50 / 80%)}
+
+/* marcadores numerados */
+.pin{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:var(--or);color:#fff;font:800 16px var(--f);display:grid;place-items:center;box-shadow:0 0 0 6px rgb(234 91 37 / 22%);transform:scale(0);transition:transform .5s cubic-bezier(.34,1.56,.64,1);z-index:3}
+.on .pin{transform:scale(1)}
+.legend{display:grid;gap:22px;align-content:center;width:430px;flex:none}
+.legend.h{grid-template-columns:repeat(4,1fr);width:auto;gap:28px;align-content:start}
+.li{display:grid;grid-template-columns:40px 1fr;gap:16px;align-items:start;opacity:0;transform:translateX(12px);transition:opacity .5s ease,transform .6s var(--ease)}
+.legend.h .li{transform:translateY(10px)}
+.on .li{opacity:1;transform:none}
+.li b{width:40px;height:40px;border-radius:50%;background:var(--or);color:#fff;display:grid;place-items:center;font:800 18px var(--f)}
+.li b.ic{background:var(--ink)}
+.li div{font-size:20px;line-height:1.38;color:var(--ink-2)}
+.li div strong{display:block;color:var(--ink);font-size:22px;font-weight:700;margin-bottom:2px}
+.d1{transition-delay:.3s!important}.d2{transition-delay:.5s!important}.d3{transition-delay:.7s!important}.d4{transition-delay:.9s!important}
+
+/* capa */
+.capa-icone{width:120px;height:120px;filter:drop-shadow(0 18px 30px rgb(27 36 50 / 35%))}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{font:600 16px var(--f);padding:8px 14px;border-radius:999px;background:var(--card);color:var(--ink-2);box-shadow:0 10px 24px -16px rgb(27 36 50 / 40%)}
+
+/* abertura ao vivo */
+.ab{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px rgb(18 20 24 / 70%);background:#121418;flex:none}
+.ab iframe{position:absolute;left:0;top:0;width:480px;height:300px;border:0;transform-origin:0 0;pointer-events:none}
+.ab.big{width:680px;height:425px}.ab.big iframe{transform:scale(1.41667)}
+.ab.sm{width:384px;height:240px}.ab.sm iframe{transform:scale(.8)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:680px}
+.step{display:grid;gap:8px;font:600 17px var(--f);color:var(--ink-3);transition:color .3s}
+.step i{display:block;height:5px;border-radius:9px;background:#deded8;overflow:hidden;position:relative}
+.step i::after{content:"";position:absolute;inset:0;background:var(--or);transform:scaleX(0);transform-origin:left;transition:transform .5s var(--ease)}
+.step.feito{color:var(--ink)}.step.feito i::after{transform:none}
+.step.agora{color:var(--or)}.step.agora i::after{transform:scaleX(.5)}
+.cases{display:grid;gap:22px;align-content:start}
+.case{display:grid;grid-template-columns:384px 1fr;gap:24px;align-items:center}
+.case p{margin:0;font-size:20px;line-height:1.4;color:var(--ink-2)}
+.case p strong{color:var(--ink)}
+
+/* mosaico de telas */
+.mos{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;flex:1;min-height:0}
+.mos .shot{min-height:0}
+.mos .tag{top:auto;bottom:12px;right:12px;left:auto}
+.tag.cl{background:rgb(255 255 255 / 92%);color:var(--ink);box-shadow:0 4px 12px -6px rgb(27 36 50 / 40%)}
+.tag.es{background:#1b2432;color:#fff}
+
+/* abas do Dock */
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;flex:1;align-content:start}
+.tab{display:grid;gap:10px;align-content:start;opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .6s var(--ease)}
+.on .tab{opacity:1;transform:none}
+.tab .shot{aspect-ratio:702/320;border-radius:14px}
+.tab strong{font-size:22px;letter-spacing:-.01em}
+.tab span{font-size:18px;line-height:1.35;color:var(--ink-2);margin-top:-6px}
+.tab.conv{background:var(--card);border-radius:14px;padding:22px;box-shadow:0 24px 50px -34px rgb(27 36 50 / 35%);align-content:center}
+
+/* bolinha */
+.boli{display:grid;grid-template-columns:450px 1fr;gap:48px;flex:1;align-items:start}
+.colb{display:grid;gap:16px;align-content:start}
+.colb h3{margin:0;font-size:24px;letter-spacing:-.015em}
+.colb p{margin:0;font-size:19px;line-height:1.4;color:var(--ink-2)}
+.estados{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px rgb(27 36 50 / 45%);width:648px}
+.estados img{display:block;width:100%}
+.elab{display:grid;grid-template-columns:repeat(4,1fr);width:648px;text-align:center;font:600 16px var(--f);color:var(--ink-2)}
+.elab span b{display:block;color:var(--ink);font-size:17px}
+.drag{position:absolute;inset:0;pointer-events:none}
+.drag path{fill:none;stroke:var(--or);stroke-width:3;stroke-dasharray:8 9;stroke-linecap:round;animation:mv 1.2s linear infinite}
+@keyframes mv{to{stroke-dashoffset:-34}}
+.opt{display:inline-flex;align-items:center;gap:10px;font:600 17px var(--f);color:var(--ink-2);background:var(--card);padding:10px 16px;border-radius:999px;box-shadow:0 10px 24px -16px rgb(27 36 50 / 40%);width:max-content}
+.sw{width:36px;height:20px;border-radius:99px;background:var(--ok);position:relative}.sw::after{content:"";position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+
+/* quadro honesto */
+.board{display:grid;grid-template-columns:1.15fr 1.15fr .95fr .9fr;gap:18px;align-items:start}
+.colq{background:var(--card);border-radius:20px;padding:26px 26px 26px;display:grid;gap:12px;align-content:start;box-shadow:0 24px 50px -34px rgb(27 36 50 / 35%);border-top:6px solid var(--c)}
+.colq h3{margin:0 0 4px;font-size:22px;letter-spacing:-.015em;display:flex;align-items:center;gap:10px}
+.colq h3 i{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.colq ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.colq li{font-size:20px;line-height:1.35;color:var(--ink-2);padding-left:18px;position:relative}
+.colq li::before{content:"";position:absolute;left:0;top:.6em;width:7px;height:7px;border-radius:50%;background:var(--c)}
+.colq li strong{color:var(--ink)}
+.q-ok{--c:var(--ok)}.q-meio{--c:#d69e2e}.q-nao{--c:#9aa0a8}.q-fora{--c:var(--ink)}
+
+/* como abrir */
+.passos{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.passo{background:var(--card);border-radius:24px;padding:40px 36px 40px;min-height:330px;display:grid;gap:22px;align-content:start;box-shadow:0 30px 60px -36px rgb(27 36 50 / 35%);position:relative}
+.passo .n{position:absolute;top:26px;right:32px;font:800 80px var(--f);color:var(--tone);letter-spacing:-.04em;line-height:1}
+.passo .ico{width:88px;height:88px;border-radius:20px;background:var(--or-soft);display:grid;place-items:center;color:var(--or)}
+.passo strong{font-size:30px;line-height:1.2;letter-spacing:-.02em;max-width:15ch}
+.passo p{margin:0;font-size:21px;line-height:1.4;color:var(--ink-2)}
+.link{display:inline-flex;align-items:center;gap:8px;font:600 17px var(--mono);padding:9px 14px;border-radius:10px;border:2px dashed var(--or);color:var(--or);background:var(--or-soft);word-break:break-all;text-decoration:none;width:max-content;max-width:100%}
+a.link{border-style:solid}
+.cmd{font:600 18px var(--mono);background:#1b2432;color:#fff;padding:8px 12px;border-radius:8px;width:max-content}
+.req{display:flex;gap:16px;flex-wrap:wrap}
+.req span{display:inline-flex;align-items:center;gap:10px;font-size:21px;color:var(--ink-2);background:var(--card);padding:12px 18px;border-radius:14px;box-shadow:0 10px 24px -18px rgb(27 36 50 / 40%)}
+.req span strong{color:var(--ink)}
+
+/* perguntas */
+.qs{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;flex:1;align-content:start}
+.q{background:var(--card);border-radius:18px;padding:18px 22px;display:grid;grid-template-columns:42px 1fr;gap:16px;box-shadow:0 24px 50px -34px rgb(27 36 50 / 35%)}
+.q b{width:42px;height:42px;border-radius:12px;background:var(--ink);color:#fff;display:grid;place-items:center;font:800 18px var(--f)}
+.q.new b{background:var(--or)}
+.q strong{display:block;font-size:21px;line-height:1.25;letter-spacing:-.015em}
+.q span{display:block;margin-top:5px;font-size:17px;line-height:1.38;color:var(--ink-2)}
+.q ul{margin:8px 0 0;padding:0 0 0 18px;font-size:16.5px;line-height:1.38;color:var(--ink-2);display:grid;gap:3px}
+.q.wide{grid-column:span 2}
+.qs.big{gap:20px}.qs.big .q{padding:26px 28px;grid-template-columns:50px 1fr;gap:20px}.qs.big .q b{width:50px;height:50px;font-size:21px}.qs.big .q strong{font-size:25px}.qs.big .q span{font-size:19.5px;margin-top:8px}
+.src{font:500 14px var(--f);color:var(--ink-3)}
+
+/* navegação */
+.hud{position:absolute;left:88px;right:88px;bottom:28px;display:flex;align-items:center;gap:16px}
+.hud .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;color:var(--ink-2)}
+.dots{display:flex;gap:7px;margin-left:auto}
+.dots button{all:unset;cursor:pointer;width:9px;height:9px;border-radius:99px;background:#d6d6cf;transition:width .3s var(--ease),background-color .3s}
+.dots button[aria-current="true"]{width:30px;background:var(--or)}
+.nb{all:unset;cursor:pointer;width:44px;height:44px;border-radius:999px;background:#fff;display:grid;place-items:center;box-shadow:0 8px 18px -10px rgb(27 36 50 / 40%)}
+.nb:focus-visible,.dots button:focus-visible{outline:3px solid var(--or);outline-offset:3px}
+.cnt{font:500 14px var(--mono);color:var(--ink-3);min-width:64px;text-align:right}
+@media (prefers-reduced-motion:reduce){.slide,.pin,.li,.tab{transition:none!important}.drag path{animation:none}}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+
+<!-- 1 capa -->
+<section class="slide" data-name="Capa">
+  <div class="row" style="align-items:center;gap:60px">
+    <div style="display:grid;gap:26px;width:610px;flex:none">
+      <img class="capa-icone" src="__icone__" alt="Ícone novo do OperacionalOS">
+      <span class="eb">OperacionalOS · vitrine</span>
+      <h1 style="font-size:74px">O OperacionalOS virou <em>um app só</em>.</h1>
+      <p class="sub">Tudo o que foi lapidado, junto num lugar. O que você vai ver é o app rodando de verdade, com dados de exemplo.</p>
+      <div class="chips"><span class="chip">Abertura</span><span class="chip">Telas</span><span class="chip">HZK Dock</span><span class="chip">Sede 3D</span><span class="chip">App para PC</span></div>
+    </div>
+    <div class="shot" style="flex:1;height:540px;transform:perspective(1600px) rotateY(-10deg) rotateX(3deg)"><img src="__capa__" alt="Início do OperacionalOS no tema escuro"></div>
+  </div>
+</section>
+
+<!-- 2 abertura -->
+<section class="slide" data-name="Abertura">
+  <div class="head"><span class="eb">App para PC · tela de abertura</span>
+  <h1>Abre como um <em>app de verdade</em>.</h1></div>
+  <div class="row" style="gap:40px">
+    <div style="display:grid;gap:18px;align-content:start">
+      <div class="ab big" data-ab="loop"><iframe title="Tela de abertura ao vivo" tabindex="-1"></iframe></div>
+      <div class="steps" id="steps">
+        <span class="step"><i></i>1 · Atualização</span>
+        <span class="step"><i></i>2 · Este PC</span>
+        <span class="step"><i></i>3 · Seus bots</span>
+        <span class="step"><i></i>Pronto</span>
+      </div>
+    </div>
+    <div class="cases">
+      <div class="case"><div class="ab sm" data-ab="aguardando"><iframe title="PC aguardando liberação" tabindex="-1"></iframe></div>
+        <p><strong>PC novo?</strong> Espera um founder liberar. O código curto confere que é o PC certo.</p></div>
+      <div class="case"><div class="ab sm" data-ab="desligado"><iframe title="PC desligado" tabindex="-1"></iframe></div>
+        <p><strong>PC desligado?</strong> O app não abre. Dá para pedir a liberação de novo.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 identidade -->
+<section class="slide" data-name="Identidade">
+  <div class="head"><span class="eb">Identidade Órbita · telas reais</span>
+  <h1>Uma <em>cara só</em> em todas as telas.</h1></div>
+  <div class="mos">
+    <div class="shot"><img src="__inicio__" alt="Início, tema claro"><span class="tag cl">Início · claro</span></div>
+    <div class="shot"><img src="__pipeline-escuro__" alt="Pipeline, tema escuro"><span class="tag es">Pipeline · escuro</span></div>
+    <div class="shot"><img src="__financeiro__" alt="Financeiro, tema claro"><span class="tag cl">Financeiro · claro</span></div>
+    <div class="shot"><img src="__tarefas-escuro__" alt="Tarefas, tema escuro"><span class="tag es">Tarefas · escuro</span></div>
+  </div>
+</section>
+
+<!-- 4 dock conversa -->
+<section class="slide" data-name="HZK Dock">
+  <div class="head"><span class="eb">HZK Dock · conversa com um bot</span>
+  <h1>Cada pessoa tem seus bots: o <em>HZK Dock</em>.</h1></div>
+  <div class="shot fit" style="flex:none">
+    <img src="__dock-conversa__" alt="Conversa com a bot Pesquisadora no Dock">
+    <span class="pin d1" style="left:13.6%;top:40%">1</span>
+    <span class="pin d2" style="left:62.4%;top:27.6%">2</span>
+    <span class="pin d3" style="left:40.6%;top:51%">3</span>
+    <span class="pin d4" style="left:34.8%;top:69%">4</span>
+  </div>
+  <div class="legend h">
+    <div class="li d1"><b>1</b><div><strong>Bots com rosto</strong>Cada um tem nome, função e cor.</div></div>
+    <div class="li d2"><b>2</b><div><strong>Você pede</strong>Em português, como para um colega.</div></div>
+    <div class="li d3"><b>3</b><div><strong>Qual IA respondeu</strong>Se a cota acaba, troca para a reserva sozinha.</div></div>
+    <div class="li d4"><b>4</b><div><strong>Relatório no fim</strong>Resultado, prova e próximo passo.</div></div>
+  </div>
+</section>
+
+<!-- 5 abas do dock -->
+<section class="slide" data-name="Abas do Dock">
+  <div class="head"><span class="eb">HZK Dock · as abas</span>
+  <h1>O que tem <em>no Dock</em>.</h1></div>
+  <div class="tabs">
+    <div class="tab" style="transition-delay:.15s"><div class="shot"><img src="__t-bots__" alt="Aba Bots"></div><strong>Bots</strong><span>Crie e ajuste cada bot.</span></div>
+    <div class="tab" style="transition-delay:.25s"><div class="shot"><img src="__t-apps__" alt="Aba Apps"></div><strong>Apps</strong><span>O que o bot pode usar: pastas, GitHub, Figma.</span></div>
+    <div class="tab" style="transition-delay:.35s"><div class="shot"><img src="__t-skills__" alt="Aba Skills"></div><strong>Skills</strong><span>O jeito HZK de fazer, igual para todos.</span></div>
+    <div class="tab" style="transition-delay:.45s"><div class="shot"><img src="__t-ias__" alt="Aba IAs"></div><strong>IAs</strong><span>Quais IAs cada pessoa liga, grátis primeiro.</span></div>
+    <div class="tab" style="transition-delay:.55s"><div class="shot"><img src="__t-uso__" alt="Aba Uso"></div><strong>Uso</strong><span>Quanto foi pedido e quanto custou.</span></div>
+    <div class="tab" style="transition-delay:.65s"><div class="shot"><img src="__t-rotinas__" alt="Aba Rotinas"></div><strong>Rotinas</strong><span>Tarefas que o bot faz sozinho, no horário.</span></div>
+    <div class="tab" style="transition-delay:.75s"><div class="shot"><img src="__t-pc__" alt="Aba PC"></div><strong>PC</strong><span>O que o bot pode fazer neste PC.</span></div>
+    <div class="tab conv" style="transition-delay:.85s"><strong>+ Conversas</strong><span style="margin:0">A aba do slide anterior. É onde você fala com os bots.</span></div>
+  </div>
+</section>
+
+<!-- 6 segurança no PC -->
+<section class="slide" data-name="Segurança">
+  <div class="head"><span class="eb">HZK Dock › PC</span>
+  <h1>O bot só faz o que <em>você deixa</em>.</h1></div>
+  <div class="shot fit" style="flex:none">
+    <img src="__dock-pc__" alt="Aba PC do Dock com as proteções abertas">
+    <span class="pin d1" style="left:38.8%;top:16%">1</span>
+    <span class="pin d2" style="left:63.3%;top:12.7%">2</span>
+    <span class="pin d3" style="left:86.6%;top:12.7%">3</span>
+    <span class="pin d4" style="left:31.2%;top:39.4%">4</span>
+  </div>
+  <div class="legend h">
+    <div class="li d1"><b>1</b><div><strong>Parar tudo</strong>Um clique e todos os bots param na hora.</div></div>
+    <div class="li d2"><b>2</b><div><strong>Só conversa ou pastas</strong>Na primeira leva, só esses dois níveis.</div></div>
+    <div class="li d3"><b>3</b><div><strong>O resto, trancado</strong>Programas e PC inteiro ficam para depois.</div></div>
+    <div class="li d4"><b>4</b><div><strong>8 proteções</strong>Sempre ligadas, em palavras simples.</div></div>
+  </div>
+</section>
+
+<!-- 7 bolinha -->
+<section class="slide" data-name="Bolinha">
+  <div class="head"><span class="eb">HZK Dock · sempre por perto</span>
+  <h1>O Dock <em>te acompanha</em>.</h1></div>
+  <div class="boli">
+    <div class="colb">
+      <div class="shot" style="width:450px;height:300px"><img src="__orbe-app__" alt="Bolinha HZK no canto do app">
+        <svg class="drag" viewBox="0 0 450 300" aria-hidden="true"><path d="M392 246 C 300 230, 200 150, 90 70"/><circle cx="90" cy="70" r="26" fill="none" stroke="#ea5b25" stroke-width="2.5" stroke-dasharray="5 6"/></svg>
+      </div>
+      <h3>No app: arraste para onde quiser</h3>
+      <p>A bolinha HZK abre o Dock. Ela lembra o lugar onde você deixou.</p>
+    </div>
+    <div class="colb">
+      <div class="estados"><img src="__bolinha-estados__" alt="Bolinha na área de trabalho em quatro estados, fundo claro e escuro"></div>
+      <div class="elab"><span><b>Parado</b>quieta</span><span><b>Esperando</b>gira devagar</span><span><b>Trabalhando</b>gira</span><span><b>Precisa de você</b>acende</span></div>
+      <h3 style="margin-top:6px">Minimizou o app? A bolinha fica na tela.</h3>
+      <div style="display:flex;gap:24px;align-items:center">
+        <div class="shot" style="width:200px;height:160px;flex:none;background:#111"><img src="__bolinha-menu__" alt="Menu da bolinha: Abrir e Esconder a bolinha"></div>
+        <div style="display:grid;gap:12px">
+          <p>Clique e o app volta. Botão direito: <strong>Abrir</strong> ou <strong>Esconder a bolinha</strong>.</p>
+          <span class="opt"><span class="sw"></span>Opcional: liga e desliga em Dock › PC</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 sede -->
+<section class="slide" data-name="Sede 3D">
+  <div class="head"><span class="eb">AI Office · Sede 3D</span>
+  <h1>A empresa viva: a <em>Sede 3D</em>.</h1></div>
+  <div class="row">
+    <div class="wipe" data-wipe><img src="__sede-dia__" alt="Sede de dia"><img class="top" src="__sede-noite__" alt="Sede de noite"><span class="tag a">Dia</span><span class="tag d">Noite</span><span class="bar"></span><span class="knob">⇆</span></div>
+    <div class="legend">
+      <div class="li d1"><b class="ic">▦</b><div><strong>Cada andar é uma área</strong>Comercial, Financeiro, Conteúdos… Hoje, 10 andares ocupados.</div></div>
+      <div class="li d2"><b class="ic">☾</b><div><strong>À noite, quem trabalha acende</strong>Os 4 andares do alto estão livres e ficam apagados. O prédio cresce com a empresa.</div></div>
+      <div class="li d3"><b class="ic">⇆</b><div><strong>Dia e noite</strong>Segue a hora de verdade. Arraste a linha para comparar.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 andar -->
+<section class="slide" data-name="Dentro do andar">
+  <div class="head"><span class="eb">Sede 3D · dentro do andar 03</span>
+  <h1>Cada andar é <em>uma área</em>.</h1></div>
+  <div class="row" style="align-items:flex-start">
+    <div class="shot fit" style="width:1060px;flex:none">
+      <img src="__sede-andar__" alt="Dentro do andar Comercial, com o registro Ao vivo no prédio">
+      <span class="pin d1" style="left:14.1%;top:77.3%">1</span>
+      <span class="pin d2" style="left:32.7%;top:45.5%">2</span>
+      <span class="pin d3" style="left:96%;top:4%">3</span>
+      <span class="pin d4" style="left:94.5%;top:78.2%">4</span>
+    </div>
+    <div class="legend" style="width:auto;flex:1;align-content:start;gap:20px">
+      <div class="li d1"><b>1</b><div><strong>O andar e a área</strong>03 é o Comercial: a sala do funil.</div></div>
+      <div class="li d2"><b>2</b><div><strong>Os robôs trabalhando</strong>Um lead que anda no funil anda aqui também.</div></div>
+      <div class="li d3"><b>3</b><div><strong>Ao vivo no prédio</strong>Cada evento real vira uma linha aqui e um movimento lá.</div></div>
+      <div class="li d4"><b>4</b><div><strong>Entrar num andar</strong>Escolha a área e a câmera desce até ela.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 quadro honesto -->
+<section class="slide" data-name="Verdade e demonstração">
+  <div class="head"><span class="eb">Sem enfeite</span>
+  <h1>O que já é <em>de verdade</em> e o que é demonstração.</h1></div>
+  <div class="board">
+    <div class="colq q-ok"><h3><i></i>Pronto e testado</h3><ul>
+      <li><strong>Identidade Órbita</strong> em todas as telas</li>
+      <li><strong>HZK Dock</strong>: as 8 abas</li>
+      <li><strong>Sede 3D</strong>: andares, dia e noite, demonstração</li>
+      <li><strong>Abertura</strong>: os 8 casos, claro e escuro</li>
+      <li><strong>Bolinha</strong> na área de trabalho, vista ao vivo</li>
+      <li>677 testes automáticos passando</li></ul></div>
+    <div class="colq q-meio"><h3><i></i>Pronto, falta teste real</h3><ul>
+      <li><strong>Bandeja do Windows</strong> com o motor ligado</li>
+      <li><strong>PC aguardando e PC desligado</strong>: precisa de um PC pareado e um founder</li>
+      <li><strong>Celular</strong> de verdade</li>
+      <li><strong>Eventos reais</strong> chegando na Sede</li>
+      <li><strong>IA e banco de verdade</strong>: testado com IA falsa e banco de teste</li></ul></div>
+    <div class="colq q-nao"><h3><i></i>Ainda não existe</h3><ul>
+      <li>A fila única <strong>"Precisa de você"</strong></li>
+      <li>A <strong>biblioteca de entregas</strong></li>
+      <li>Alguns eventos (tarefa concluída, entrada lançada) ainda não são gravados. A Sede já sabe mostrar.</li></ul></div>
+    <div class="colq q-fora"><h3><i></i>Fora, de propósito</h3><ul>
+      <li>O <strong>funil do WhatsApp</strong></li>
+      <li>O <strong>agente do WhatsApp</strong></li>
+      <li>Os dois são seus, Igor. Entram quando você decidir.</li></ul></div>
+  </div>
+</section>
+
+<!-- 11 como abrir -->
+<section class="slide" data-name="Como abrir">
+  <div class="head"><span class="eb">Para você testar</span>
+  <h1>Como abrir a vitrine <em>no seu PC</em>.</h1></div>
+  <div style="flex:1;display:grid;align-content:center;gap:28px"><div class="passos">
+    <div class="passo"><span class="n">1</span>
+      <span class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+      <strong>Baixe a pasta da vitrine</strong>
+      <span class="link" id="link-vitrine">link a confirmar</span>
+    </div>
+    <div class="passo"><span class="n">2</span>
+      <span class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9h.01"/><path d="M4 4l7 17 2.5-7.5L21 11z"/></svg></span>
+      <strong>Dois cliques em</strong>
+      <span class="cmd">Abrir vitrine.cmd</span>
+    </div>
+    <div class="passo"><span class="n">3</span>
+      <span class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+      <strong>Espere uns 2 minutos</strong>
+      <p>Só na primeira vez. Ele prepara as telas e abre o app sozinho.</p>
+    </div>
+  </div>
+  <div class="req">
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b2432" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Precisa de <strong>Windows</strong> com <strong>Node.js 20</strong> ou mais novo</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2f8f63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Dados de exemplo: <strong>nada toca o banco real</strong></span>
+  </div></div>
+</section>
+
+<!-- 12 pendentes -->
+<section class="slide" data-name="Pendentes">
+  <div class="head"><span class="eb">Das apresentações anteriores · ainda sem resposta</span>
+  <h1>O que ficou para <em>você responder</em>.</h1></div>
+  <div class="qs" style="grid-template-columns:1fr 1fr 1.25fr">
+    <div style="display:grid;gap:16px;align-content:start">
+      <div class="q"><b>1</b><div><strong>Só app no PC, ou app e navegador?</strong><span>Navegador ajuda quem não pode instalar.</span></div></div>
+      <div class="q"><b>2</b><div><strong>Como o código entra no app?</strong><span>Hoje, só com a sua revisão. Uma apresentação aprovada já vale?</span></div></div>
+      <div class="q"><b>3</b><div><strong>Depois do "Ganho", o pós-venda vira a próxima área?</strong><span>Hoje é manual e fora do sistema.</span></div></div>
+    </div>
+    <div style="display:grid;gap:16px;align-content:start">
+      <div class="q"><b>4</b><div><strong>Compramos a licença das fontes da marca?</strong><span>Milliard: família inteira US$ 199. Sem ela, o app usa uma parecida.</span></div></div>
+      <div class="q"><b>5</b><div><strong>Agente do WhatsApp que envia sozinho: fecha?</strong><span>Está parado. No desenho atual, todo envio para fora passa por uma pessoa.</span></div></div>
+      <div class="q"><b>6</b><div><strong>App para PC antes de ir para a equipe</strong><ul><li>Compramos o certificado que assina o app?</li><li>Atualizações: pasta pública ou privada?</li><li>Todas as IAs sem cota: esperar a hora em que a cota volta?</li></ul></div></div>
+    </div>
+    <div class="q" style="align-content:start"><b>7</b><div><strong>As regras do porteiro dos bots</strong><span>Da entrega do Dock. Nossa sugestão entre parênteses.</span><ul>
+      <li>Aprovar um app no catálogo: outra pessoa, não quem editou? (sim)</li>
+      <li>IA ainda sem classificação: bloqueia para dado da empresa? (só a que treina com os dados)</li>
+      <li>"Sempre permitir" vale para a ação inteira? (sim, e medimos)</li>
+      <li>Rotina sem "sempre permitir"? (manter)</li>
+      <li>Dinheiro: o dono e um founder aprovam? (sim)</li>
+      <li>Skills com script desligadas na primeira leva? (sim)</li>
+      <li>Quem aprova skill da área: founder, quem gere a área ou o dono?</li>
+      <li>Limites iniciais: 60 ações por minuto; 5 recusas pausam o bot. De acordo?</li></ul></div></div>
+  </div>
+</section>
+
+<!-- 13 novas -->
+<section class="slide" data-name="Novas">
+  <div class="head"><span class="eb">Novas · desta apresentação</span>
+  <h1>E cinco decisões <em>da vitrine</em>.</h1></div>
+  <div class="qs big">
+    <div class="q new"><b>A</b><div><strong>A vitrine pode virar o app em uso?</strong><span>É o mesmo código. Depois da sua revisão, ele só passa a usar o banco de verdade. Inclui a interface nova.</span></div></div>
+    <div class="q new"><b>B</b><div><strong>Em que ordem os pedidos de revisão entram?</strong><span>Sugestão: escritório pessoal, identidade, banco do Dock, telas do Dock, app para PC. Sede e abertura por último.</span></div></div>
+    <div class="q new"><b>C</b><div><strong>Primeira leva só com os níveis 0 e 1?</strong><span>Só conversa e pastas liberadas. O Gabriel já decidiu assim. Você concorda?</span></div></div>
+    <div class="q new"><b>D</b><div><strong>Pedido de aprovação vence em 48 h ou em 7 dias?</strong><span>A decisão anterior era 48 h. A especificação do Dock usou 7 dias. Qual fica?</span></div></div>
+    <div class="q new"><b>E</b><div><strong>Apagamos a cena antiga da Sede?</strong><span>A Sede nova já substitui. A antiga está guardada, sem uso.</span></div></div>
+  </div>
+</section>
+
+<div class="hud">
+  <span class="brand"><svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#1b2432"/><g transform="translate(50 50) scale(.8) translate(-50 -50)"><polygon points="18.57,9.05 82.02,9.05 82.02,26.19 42.74,73.21 82.02,73.21 82.02,89.88 15.0,89.88 15.0,75.36 57.26,26.19 18.57,26.19" fill="#eef1f5"/><line x1="21.79" y1="83.45" x2="75.6" y2="15.48" stroke="#EA5B25" stroke-width="2.62"/><circle cx="21.79" cy="83.45" r="6.55" fill="#EA5B25"/><circle cx="48.21" cy="51.07" r="6.55" fill="#EA5B25"/><circle cx="75.6" cy="15.48" r="6.55" fill="#EA5B25"/></g></svg>HZK Company · OperacionalOS</span>
+  <nav class="dots" id="dots" aria-label="Slides"></nav>
+  <span class="cnt" id="cnt"></span>
+  <button class="nb" id="prev" aria-label="Anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+  <button class="nb" id="next" aria-label="Próximo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+</div>
+</div></div>
+
+<!-- Tela de abertura do app (desktop/abertura), copiada como está para rodar ao vivo dentro do slide 2. -->
+<script type="text/plain" id="ab-css">__AB_CSS__</script>
+<script type="text/plain" id="ab-body">__AB_BODY__</script>
+<script type="text/plain" id="ab-js">__AB_JS__</script>
+
+<script>
+/* ====== O LÍDER PREENCHE AQUI: endereço para baixar a pasta da vitrine (slide 11) ====== */
+const LINK_DA_VITRINE = "https://github.com/operacionalos96-cpu/OperacionalOS/archive/refs/heads/vitrine/app-completo.zip";
+/* ====================================================================================== */
+(function(){
+"use strict";
+const W=1600,H=900,stage=document.getElementById("stage");
+function fit(){const s=Math.min(innerWidth/W,innerHeight/H);stage.style.transform=`translate(${(innerWidth-W*s)/2}px,${(innerHeight-H*s)/2}px) scale(${s})`}
+addEventListener("resize",fit);fit();
+const slides=[...document.querySelectorAll(".slide")];let cur=-1,raf=0;
+const dots=document.getElementById("dots");
+dots.innerHTML=slides.map((s,i)=>`<button aria-label="Slide ${i+1}: ${s.dataset.name}"></button>`).join("");
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* link da vitrine */
+(function(){const el=document.getElementById("link-vitrine");const v=String(LINK_DA_VITRINE||"").trim();
+  if(/^https?:\/\//i.test(v)){const a=document.createElement("a");a.className="link";a.id="link-vitrine";a.href=v;a.target="_blank";a.rel="noopener";a.textContent=v.replace(/^https?:\/\//i,"");el.replaceWith(a)}
+  else el.textContent=v||"link a confirmar"})();
+
+/* abertura ao vivo: a tela real do app num iframe; o estado vem por uma ponte falsa, igual à do app */
+const AB={css:document.getElementById("ab-css").textContent,body:document.getElementById("ab-body").textContent,js:document.getElementById("ab-js").textContent};
+const S="scr"+"ipt";
+const PONTE={
+  loop:"",
+  aguardando:`window.oposAbertura={escolher(){},aoMudar(cb){setTimeout(()=>cb({fase:"pc"}),500);setTimeout(()=>cb({fase:"pc-aguardando",pcNome:"PC do Igor",pcCodigo:"K7Q2"}),1300)}};`,
+  desligado:`window.oposAbertura={escolher(){},aoMudar(cb){setTimeout(()=>cb({fase:"pc-desligado"}),900)}};`,
+};
+function abrirAb(box){const k=box.dataset.ab;const f=box.querySelector("iframe");
+  f.srcdoc=`<!doctype html><html lang="pt-BR" data-tema="escuro"><head><meta charset="utf-8"><style>${AB.css}</style></head><body>${AB.body}<${S}>${PONTE[k]}</${S}><${S}>${AB.js}</${S}><${S}>document.documentElement.dataset.tema="escuro"</${S}></body></html>`}
+let abTimer=0;
+function passos(){const f=document.querySelector('[data-ab="loop"] iframe');let fase=null;
+  try{fase=f.contentDocument.getElementById("abertura").dataset.fase}catch(e){}
+  const i={conferindo:0,baixando:0,pc:1,motor:2,pronto:3}[fase];
+  document.querySelectorAll("#steps .step").forEach((s,n)=>{s.classList.toggle("feito",i!==undefined&&(n<i||i===3));s.classList.toggle("agora",n===i&&i<3)})}
+
+/* cortina */
+function setX(w,p){w.style.setProperty("--x",(p*100).toFixed(2)+"%")}
+function play(w){cancelAnimationFrame(raf);if(reduce){setX(w,.5);return}
+  setX(w,1);const t0=performance.now()+700,dur=2200;
+  const step=t=>{const k=Math.min(1,Math.max(0,(t-t0)/dur));const e=1-Math.pow(1-k,3);setX(w,1-e*0.5);if(k<1&&!w._drag)raf=requestAnimationFrame(step)};raf=requestAnimationFrame(step)}
+document.querySelectorAll("[data-wipe]").forEach(w=>{
+  const move=e=>{const r=w.getBoundingClientRect();setX(w,Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)))};
+  w.addEventListener("pointerdown",e=>{w._drag=true;cancelAnimationFrame(raf);w.setPointerCapture(e.pointerId);move(e);e.stopPropagation()});
+  w.addEventListener("pointermove",e=>{if(w._drag)move(e)});
+  w.addEventListener("pointerup",()=>{w._drag=false});
+  w.addEventListener("click",e=>e.stopPropagation());
+});
+
+function show(n){n=Math.max(0,Math.min(slides.length-1,n));if(n===cur)return;cur=n;
+  slides.forEach((s,i)=>s.classList.toggle("on",i===n));
+  [...dots.children].forEach((b,i)=>b.setAttribute("aria-current",String(i===n)));
+  document.getElementById("cnt").textContent=String(n+1).padStart(2,"0")+" / "+String(slides.length).padStart(2,"0");
+  const w=slides[n].querySelector("[data-wipe]");if(w){w._drag=false;play(w)}
+  clearInterval(abTimer);
+  const abs=slides[n].querySelectorAll("[data-ab]");
+  if(abs.length){abs.forEach(abrirAb);abTimer=setInterval(passos,150)}
+  else document.querySelectorAll("[data-ab] iframe").forEach(f=>{if(f.srcdoc)f.srcdoc=""});
+  try{history.replaceState(null,"","#s"+(n+1))}catch(e){}
+}
+[...dots.children].forEach((b,i)=>b.addEventListener("click",e=>{e.stopPropagation();show(i)}));
+document.getElementById("prev").addEventListener("click",e=>{e.stopPropagation();show(cur-1)});
+document.getElementById("next").addEventListener("click",e=>{e.stopPropagation();show(cur+1)});
+addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," "].includes(e.key)){e.preventDefault();show(cur+1)}
+  else if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();show(cur-1)}
+  else if(e.key==="Home")show(0);else if(e.key==="End")show(slides.length-1);
+  else if(e.key==="f"||e.key==="F"){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{})}catch(err){}}
+});
+stage.addEventListener("click",e=>{if(e.target.closest("a,button,[data-wipe]"))return;const r=stage.getBoundingClientRect();show(e.clientX<r.left+r.width*.3?cur-1:cur+1)});
+let sx=null;addEventListener("touchstart",e=>{if(e.target.closest("[data-wipe]"))return;sx=e.touches[0].clientX},{passive:true});
+addEventListener("touchend",e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>50)show(cur+(dx<0?1:-1));sx=null},{passive:true});
+let start=0;try{const m=/^#s(\d+)$/.exec(location.hash);if(m)start=+m[1]-1}catch(e){}
+show(start);
+})();
+</script>
+</body>
+</html>
