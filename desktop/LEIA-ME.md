@@ -6,6 +6,9 @@ Fatias 3, 4 e 5 da nota 32 do vault ("Encaixe do Dock v3"). Desenho: notas 26, 2
 desktop/
 ├── src/main.ts       janela travada, ponte window.opos, motor, tema, atualização, autoteste
 ├── src/preload.ts    a ponte (contextBridge), só funções; nenhum segredo sai por ela
+├── src/preload-abertura.ts  ponte mínima da abertura (window.oposAbertura): só recebe o estado
+├── src/abertura-estado.ts   regras da abertura sem Electron (PC aguardando x desligado, mínimo na tela)
+├── abertura/         tela de abertura (index.html, abertura.css, abertura.js), modo limitado (offline.*) e ícone da bandeja
 ├── src/settings.ts   configuração local: tema, pastas e nível confirmado por bot, endereço confirmado
 └── src/engine/       o motor (sem Electron: roda nos testes da raiz)
     ├── client.ts     /api/workers/<ferramenta> com o token oos_ do PC (401 = PC desligado: para)
@@ -28,8 +31,46 @@ Testes: na raiz, `npx vitest run` roda também os do motor (`desktop/src/**/*.te
 (`src/lib/server/dock-pc.e2e.test.ts`).
 
 Autoteste do app empacotado: `release/win-unpacked/OperacionalOS.exe --autoteste [--autoteste-atualizacao]`
-grava `%APPDATA%/OperacionalOS/autoteste.json` (travas vistas de dentro da página, tema, atualização) e
-`autoteste.png` (retrato da janela) e fecha.
+grava `%APPDATA%/OperacionalOS/autoteste.json` (travas vistas de dentro da página, tema, atualização e as fases
+da abertura em `abertura.fases`), `autoteste.png` (retrato da janela) e `autoteste-abertura.png` (retrato da
+abertura no "Pronto") e fecha. Fora do pacote também roda: `OPOS_URL=http://localhost:3040 npx electron . --autoteste`.
+
+## Tela de abertura (nota 39, Parte A)
+
+Janela sem moldura de 480 × 300, centralizada, aberta antes da principal. Arquivos locais em `abertura/`
+(sem CDN, sem fonte remota, CSP só `'self'`). Visual Órbita: fundo grafite fosco (ou mineral no tema claro, pelo
+tema salvo em Configurações ou o do Windows), esfera navy com o símbolo, três nós em órbitas finas. Cada etapa
+concluída encaixa um nó na diagonal do Z; no fim a linha se desenha atrás da esfera e o laranja acende uma vez.
+"Reduzir movimento" do Windows: nós já alinhados, só texto e cor mudam. Sem som.
+
+| Fase | Quando | O que faz |
+|---|---|---|
+| `conferindo` / `baixando` | etapa 1 | electron-updater (só no pacote): conferir até 8 s; se houver versão nova, barra de progresso por até 20 s, depois continua baixando por trás e instala ao reiniciar. Falhou: segue |
+| `pc` | etapa 2 | lê `get_worker_config` com o token do PC (6 s). Sem token: abre para parear |
+| `pc-aguardando` | 401 e o PC nunca foi aceito | mostra o nome do PC e o código curto (a mesma dica de 4 caracteres que o founder vê), abre o app depois de ~3 s e confere a cada minuto; quando aprovar, liga o motor |
+| `pc-desligado` | 401 depois de já ter sido aceito | **não abre o app**. "Fechar" sai; "Pedir liberação de novo" pede confirmação nativa, apaga a credencial e abre o app para novo pedido |
+| `motor` | etapa 3 | liga o motor (se o PC está liberado) e avisa as IAs locais que responderem (Ollama 11434, LM Studio 1234) |
+| `pronto` / `offline` | etapa 4 | espera o site carregar (até 12 s), cumpre o mínimo de 1,2 s, alinha no Z e mostra a principal com esmaecer de ~220 ms |
+
+O servidor responde 401 igual para "pedido" e "desligado"; a diferença fica neste PC (`pcSeenApproved` em
+`configuracao.json`, marcado quando o servidor aceita o PC e zerado ao esquecer o PC).
+Sem internet: aviso "modo limitado" e, se o site não carregar, a janela principal mostra `abertura/offline.html`
+("Tentar de novo" volta ao endereço do OperacionalOS; tenta sozinha a cada 30 s).
+
+Ponte da abertura (`src/preload-abertura.ts`): `oposAbertura.aoMudar(cb)` recebe o estado; `oposAbertura.escolher(v)`
+só aceita `"fechar"` ou `"pedir-de-novo"` e o processo principal só ouve a própria janela da abertura.
+
+**Prévia no navegador** (sem Electron): sirva `desktop/abertura/` (no OperacionalOS: `preview_start` "abertura",
+porta 3041) e abra `index.html?estado=conferindo|baixando|pc|pc-aguardando|pc-desligado|motor|pronto|offline&tema=claro|escuro`.
+Extras: `&progresso=42`, `&pc=Nome`, `&codigo=K7q2`, `&ias=Ollama,LM%20Studio`, `&versao=0.1.0`, `&movimento=reduzido`.
+Sem `?estado`, a sequência real roda em laço.
+
+## Bandeja do Windows
+
+Fechar a janela principal com o motor ligado (esperando ou trabalhando) não fecha o app: a janela some e o ícone
+fica na bandeja (aviso uma vez só). Menu: **Abrir**, **Parar tudo** (devolve a entrega à fila; com a janela
+escondida, o app fecha de vez) e **Sair**. Clique no ícone abre a janela. Se o motor parar ou o PC for desligado
+com a janela escondida, o app fecha. Sem motor ligado, fechar a janela fecha o app como antes.
 
 ## Ponte `window.opos` (para a tela "Configurações do PC", fatia 2c)
 

@@ -9,12 +9,15 @@
  *  - a ponte (window.opos) só responde ao quadro principal da janela, na origem do OperacionalOS;
  *  - fusíveis do Electron no empacotamento (sem RunAsNode, sem NODE_OPTIONS, asar conferido).
  * Motor: roda aqui no processo principal (desktop/src/engine), com o cofre cifrado pelo Windows (DPAPI).
+ * Abertura (nota 39): janela pequena antes da principal, com as etapas reais (atualização, este PC, motor).
+ * Bandeja: fechar a janela com o motor ligado deixa o app na bandeja, com "Abrir" e "Parar tudo".
  */
-import { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, safeStorage, session, shell, type IpcMainInvokeEvent } from "electron"
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, nativeTheme, net, safeStorage, session, shell, type IpcMainInvokeEvent } from "electron"
 import { createHash, randomBytes } from "node:crypto"
 import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from "node:fs"
 import nodePath from "node:path"
-import { serverClient } from "./engine/client"
+import { classificarPc, codigoCurto, faltaParaMinimo, type EstadoPc } from "./abertura-estado"
+import { StopError, serverClient } from "./engine/client"
 import { LEVEL_CEILING, createEngine, type Engine, type EngineLog } from "./engine/engine"
 import { createFolderGuard } from "./engine/folders"
 import { PROVIDERS, safeEndpoint } from "./engine/providers"
@@ -33,6 +36,9 @@ app.enableSandbox()
 
 let win: BrowserWindow | null = null
 let engine: Engine | null = null
+let splash: BrowserWindow | null = null
+let tray: Tray | null = null
+let quitting = false
 const dataDir = () => app.getPath("userData")
 const settings = () => (store ??= settingsStore(nodePath.join(dataDir(), "configuracao.json")))
 let store: ReturnType<typeof settingsStore> | undefined
@@ -110,7 +116,12 @@ async function startEngine() {
     confirmedLevel: (agentId) => s.get().levels[agentId] ?? 0,
     confirmedEndpoint: (connectionId) => s.get().endpoints[connectionId] ?? null,
     log: logLocal,
-    onState: (state, info) => win?.webContents.send("opos:engine-state", { state, ...info }),
+    onState: (state, info) => {
+      win?.webContents.send("opos:engine-state", { state, ...info })
+      // o servidor aceitou o PC: daqui em diante, um 401 quer dizer "desligado" (e não "aguardando")
+      if ((state === "esperando" || state === "trabalhando") && !settings().get().pcSeenApproved) settings().update((s) => void (s.pcSeenApproved = true))
+      updateTray(state)
+    },
   })
   void engine.run()
   return { ok: true }
@@ -145,6 +156,7 @@ function registerBridge() {
     if (!(await confirm("Esquecer este PC", "Apagar a credencial deste PC?", "O motor para. Para usar de novo, o PC pede liberação outra vez."))) return false
     await engine?.stopAll()
     await vault().delete("pc/token")
+    settings().update((s) => void (s.pcSeenApproved = false))
     return true
   })
   handle("opos:folders:list", (agentId: unknown) => (typeof agentId === "string" && AGENT.test(agentId) ? settings().get().folders[agentId] ?? [] : []))
@@ -270,10 +282,19 @@ function createWindow() {
       devTools: !app.isPackaged,
     },
   })
-  win.once("ready-to-show", () => {
-    if (!SELFTEST) win?.show()
+  win.on("close", (e) => {
+    // motor ligado: a janela some, o app fica na bandeja e os bots seguem respondendo
+    if (quitting || SELFTEST || !engine || engine.stopped) return
+    e.preventDefault()
+    win?.hide()
+    showTrayHint()
   })
   win.on("closed", () => (win = null))
+  // sem internet (ou site fora do ar): mostra a página local do modo limitado no lugar do erro do Chromium
+  win.webContents.on("did-fail-load", (_e, code, _desc, url, isMainFrame) => {
+    if (!isMainFrame || code === -3 || !isInternal(url)) return
+    void win?.loadFile(nodePath.join(ABERTURA_DIR, "offline.html"), { query: { volta: APP_URL, tema: currentTheme() } })
+  })
   void win.loadURL(APP_URL)
   return win
 }
@@ -298,19 +319,313 @@ function buildMenu() {
   )
 }
 
-async function checkUpdates() {
-  if (!app.isPackaged || SELFTEST) return
+// ---------- abertura (nota 39, Parte A) ----------
+const ABERTURA_DIR = nodePath.join(__dirname, "..", "abertura")
+const currentTheme = (): "claro" | "escuro" => (nativeTheme.shouldUseDarkColors ? "escuro" : "claro")
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+type FaseAbertura = "conferindo" | "baixando" | "pc" | "pc-aguardando" | "pc-desligado" | "motor" | "pronto" | "offline"
+interface EstadoAbertura {
+  fase: FaseAbertura
+  progresso?: number
+  baixado?: number
+  total?: number
+  pcNome?: string
+  pcCodigo?: string
+  ias?: string[]
+  semMotor?: boolean
+}
+let bootStart = 0
+const bootLog: { fase: FaseAbertura; ms: number }[] = []
+let escolhaAbertura: ((v: "fechar" | "pedir-de-novo") => void) | null = null
+
+function sendSplash(d: EstadoAbertura) {
+  bootLog.push({ fase: d.fase, ms: Date.now() - bootStart })
+  if (splash && !splash.isDestroyed()) splash.webContents.send("abertura:estado", d)
+}
+
+function createSplash() {
+  const dark = nativeTheme.shouldUseDarkColors
+  splash = new BrowserWindow({
+    width: 480,
+    height: 300,
+    useContentSize: true,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    center: true,
+    show: false,
+    title: "OperacionalOS",
+    backgroundColor: dark ? "#121418" : "#f1f1ed",
+    webPreferences: {
+      preload: nodePath.join(__dirname, "preload-abertura.js"),
+      partition: "abertura", // sessão própria, só em memória: não toca no login do site
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      webviewTag: false,
+      spellcheck: false,
+      devTools: !app.isPackaged,
+    },
+  })
+  const s = splash
+  s.on("closed", () => {
+    splash = null
+    escolhaAbertura?.("fechar")
+  })
+  const pronta = new Promise<void>((ok) => {
+    s.webContents.once("did-finish-load", () => ok())
+    setTimeout(ok, 3000) // nunca trava a abertura por causa da própria tela
+  })
+  s.once("ready-to-show", () => s.show())
+  void s.loadFile(nodePath.join(ABERTURA_DIR, "index.html"), { query: { tema: currentTheme(), versao: app.getVersion() } })
+  return pronta
+}
+
+/** Some a abertura e mostra a principal com um esmaecer curto (~220 ms). */
+async function revealMain(w: BrowserWindow) {
+  const s = splash
+  if (SELFTEST) {
+    if (s && !s.isDestroyed()) s.destroy()
+    return
+  }
+  w.setOpacity(0)
+  w.show()
+  const passos = 12
+  for (let i = 1; i <= passos; i++) {
+    await sleep(18)
+    if (w.isDestroyed()) break
+    w.setOpacity(i / passos)
+    if (s && !s.isDestroyed()) s.setOpacity(1 - i / passos)
+  }
+  if (!w.isDestroyed()) w.setOpacity(1)
+  if (s && !s.isDestroyed()) s.destroy()
+}
+
+/** Há conexão com o OperacionalOS? Qualquer resposta HTTP conta. */
+async function isOnline() {
   try {
-    const { autoUpdater } = await import("electron-updater")
-    autoUpdater.autoDownload = true
-    autoUpdater.autoInstallOnAppQuit = true // instala ao reiniciar o app
-    autoUpdater.on("update-downloaded", (i) => logLocal({ event: "atualizacao_baixada", detail: i.version }))
-    autoUpdater.on("error", (e) => logLocal({ event: "atualizacao_falhou", detail: String(e?.message ?? e).slice(0, 200) }))
-    await autoUpdater.checkForUpdates()
-  } catch (e) {
-    logLocal({ event: "atualizacao_falhou", detail: String((e as Error).message).slice(0, 200) })
+    await net.fetch(ORIGIN, { method: "HEAD", signal: AbortSignal.timeout(5000) })
+    return true
+  } catch {
+    return false
   }
 }
+
+/** IAs locais conhecidas, só para avisar na abertura (nada é lido além de "respondeu"). */
+async function findLocalAI() {
+  const alvos: [string, string][] = [
+    ["Ollama", "http://127.0.0.1:11434/api/tags"],
+    ["LM Studio", "http://127.0.0.1:1234/v1/models"],
+  ]
+  const r = await Promise.all(
+    alvos.map(async ([nome, url]) => {
+      try {
+        const res = await net.fetch(url, { signal: AbortSignal.timeout(700) })
+        return res.ok ? nome : null
+      } catch {
+        return null
+      }
+    }),
+  )
+  return r.filter((x): x is string => !!x)
+}
+
+/** Etapa 1: versão nova. Conferir leva no máximo 8 s; baixar mostra a barra e segura no máximo 20 s
+ *  (depois continua baixando por trás e instala ao reiniciar). Falhou: segue com a versão atual. */
+async function stepUpdate() {
+  if (!app.isPackaged || SELFTEST) return "fora do pacote"
+  let autoUpdater: typeof import("electron-updater").autoUpdater
+  try {
+    autoUpdater = (await import("electron-updater")).autoUpdater
+  } catch (e) {
+    logLocal({ event: "atualizacao_falhou", detail: String((e as Error).message).slice(0, 200) })
+    return "falhou"
+  }
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true // instala ao reiniciar o app
+  autoUpdater.on("update-downloaded", (i) => logLocal({ event: "atualizacao_baixada", detail: i.version }))
+  autoUpdater.on("error", (e) => logLocal({ event: "atualizacao_falhou", detail: String(e?.message ?? e).slice(0, 200) }))
+  return new Promise<string>((ok) => {
+    let feito = false
+    let limite = setTimeout(() => fim("tempo esgotado"), 8000)
+    const progresso = (p: { percent: number; transferred: number; total: number }) =>
+      sendSplash({ fase: "baixando", progresso: p.percent, baixado: p.transferred, total: p.total })
+    const disponivel = () => {
+      clearTimeout(limite)
+      limite = setTimeout(() => fim("baixando por trás"), 20_000)
+      sendSplash({ fase: "baixando", progresso: 0 })
+    }
+    const nada = () => fim("sem versão nova")
+    const baixada = () => fim("baixada")
+    const erro = () => fim("falhou")
+    function fim(r: string) {
+      if (feito) return
+      feito = true
+      clearTimeout(limite)
+      autoUpdater.removeListener("download-progress", progresso)
+      autoUpdater.removeListener("update-available", disponivel)
+      autoUpdater.removeListener("update-not-available", nada)
+      autoUpdater.removeListener("update-downloaded", baixada)
+      autoUpdater.removeListener("error", erro)
+      ok(r)
+    }
+    autoUpdater.on("download-progress", progresso)
+    autoUpdater.on("update-available", disponivel)
+    autoUpdater.on("update-not-available", nada)
+    autoUpdater.on("update-downloaded", baixada)
+    autoUpdater.on("error", erro)
+    autoUpdater.checkForUpdates().catch(() => fim("falhou"))
+  })
+}
+
+/** Etapa 2: este PC. Uma leitura simples (get_worker_config) com o token do PC diz se ele está liberado. */
+async function checkPc(online: boolean): Promise<{ estado: EstadoPc; token: string | null }> {
+  const token = await vault()
+    .get("pc/token")
+    .catch(() => null)
+  if (!token || !online) return { estado: classificarPc({ temToken: !!token, online, jaAprovado: settings().get().pcSeenApproved }), token }
+  let sonda: "ok" | "401" | "falha" = "falha"
+  try {
+    await serverClient({ baseUrl: ORIGIN, token, timeoutMs: 6000 }).call("get_worker_config")
+    sonda = "ok"
+  } catch (e) {
+    sonda = e instanceof StopError ? "401" : "falha"
+  }
+  const estado = classificarPc({ temToken: true, online, sonda, jaAprovado: settings().get().pcSeenApproved })
+  if (estado === "aprovado" && !settings().get().pcSeenApproved) settings().update((s) => void (s.pcSeenApproved = true))
+  return { estado, token }
+}
+
+/** PC aguardando liberação: confere de novo a cada minuto e liga o motor quando um founder aprovar. */
+function watchApproval() {
+  const t = setInterval(async () => {
+    const r = await checkPc(true).catch(() => null)
+    if (r?.estado === "aprovado") {
+      clearInterval(t)
+      logLocal({ event: "pc_liberado" })
+      void startEngine()
+    } else if (!r?.token) clearInterval(t)
+  }, 60_000)
+}
+
+/** A sequência real da abertura. */
+async function boot() {
+  bootStart = Date.now()
+  await createSplash()
+  sendSplash({ fase: "conferindo" })
+  const onlineP = isOnline()
+  const w = createWindow() // o site já começa a carregar escondido, enquanto as etapas rodam
+  const update = await stepUpdate()
+  logLocal({ event: "abertura_atualizacao", detail: update })
+  const online = await onlineP
+
+  sendSplash({ fase: "pc" })
+  let pc = await checkPc(online)
+  if (pc.estado === "desligado") {
+    sendSplash({ fase: "pc-desligado" })
+    logLocal({ event: "abertura_pc_desligado" })
+    const escolha = await new Promise<"fechar" | "pedir-de-novo">((ok) => (escolhaAbertura = ok))
+    escolhaAbertura = null
+    const pai = splash && !splash.isDestroyed() ? splash : undefined
+    const pedir =
+      escolha === "pedir-de-novo" &&
+      (
+        await (pai
+          ? dialog.showMessageBox(pai, { type: "question", title: "Pedir liberação de novo", message: "Apagar a credencial deste PC e pedir a liberação outra vez?", detail: "O app abre e você faz o pedido em Dock › PCs. Um founder precisa aprovar.", buttons: ["Apagar e abrir", "Cancelar"], defaultId: 1, cancelId: 1, noLink: true })
+          : Promise.resolve({ response: 1 }))
+      ).response === 0
+    if (!pedir) {
+      quitting = true
+      w.destroy()
+      app.quit()
+      return
+    }
+    await vault().delete("pc/token")
+    settings().update((s) => void (s.pcSeenApproved = false))
+    logLocal({ event: "pc_credencial_apagada" })
+    pc = { estado: "sem-pc", token: null }
+  }
+  if (pc.estado === "aguardando" && pc.token) {
+    sendSplash({ fase: "pc-aguardando", pcNome: settings().get().pcName || "Este PC", pcCodigo: codigoCurto(pc.token) })
+    await sleep(3200) // tempo de ler o nome e o código; depois o app abre e o motor espera a aprovação
+    watchApproval()
+  }
+
+  sendSplash({ fase: "motor" })
+  const iasP = findLocalAI()
+  let semMotor = true
+  // aprovado, sem internet ou resposta incerta: o motor liga e tenta sozinho (o servidor recusa se não puder)
+  if (!SELFTEST && pc.token && (pc.estado === "aprovado" || pc.estado === "offline" || pc.estado === "incerto")) semMotor = !(await startEngine()).ok
+  const ias = await iasP
+  if (ias.length) sendSplash({ fase: "motor", ias })
+  // espera o site ficar pronto (no máximo 12 s) e cumpre o mínimo de 1,2 s na tela
+  await Promise.race([new Promise<void>((ok) => (w.webContents.isLoading() ? w.webContents.once("did-stop-loading", () => ok()) : ok())), sleep(12_000)])
+  await sleep(faltaParaMinimo(bootStart, Date.now()))
+
+  sendSplash(online ? { fase: "pronto", semMotor: semMotor && pc.estado !== "aguardando" && pc.estado !== "sem-pc" } : { fase: "offline" })
+  await sleep(online ? 1250 : 1600) // os nós se alinham no Z e o laranja acende uma vez
+  if (SELFTEST) await captureSplash()
+  await revealMain(w)
+  if (SELFTEST) return void selfTest(w)
+}
+
+async function captureSplash() {
+  const s = splash
+  if (!s || s.isDestroyed()) return
+  const shot = await Promise.race([s.webContents.capturePage().then((i) => i.toPNG()), sleep(3000).then(() => null)]).catch(() => null)
+  if (shot?.length) writeFileSync(nodePath.join(dataDir(), "autoteste-abertura.png"), shot)
+}
+
+// ---------- bandeja do Windows ----------
+let trayHinted = false
+function ensureTray() {
+  if (tray) return tray
+  const icon = nativeImage.createFromPath(nodePath.join(ABERTURA_DIR, "icone.png")).resize({ width: 16, height: 16 })
+  tray = new Tray(icon)
+  tray.setToolTip("OperacionalOS")
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Abrir", click: showMain },
+      {
+        label: "Parar tudo",
+        click: async () => {
+          await engine?.stopAll()
+          // com a janela escondida e o motor parado, não há mais motivo para ficar na bandeja
+          if (!win?.isVisible()) app.quit()
+        },
+      },
+      { type: "separator" },
+      { label: "Sair", click: () => app.quit() },
+    ]),
+  )
+  tray.on("click", showMain)
+  tray.on("double-click", showMain)
+  return tray
+}
+function showMain() {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+function showTrayHint() {
+  const t = ensureTray()
+  updateTray(engine?.state ?? "parado")
+  if (trayHinted) return
+  trayHinted = true
+  t.displayBalloon({ title: "O OperacionalOS continua na bandeja", content: "Seus bots seguem respondendo por este PC. Para parar, use Parar tudo.", iconType: "info", noSound: true })
+}
+const TRAY_TEXT: Record<string, string> = { esperando: "motor ligado, esperando trabalho", trabalhando: "motor trabalhando", erro: "motor tentando de novo", parado: "motor parado", desligado: "PC desligado" }
+function updateTray(state: string) {
+  if (!tray) return
+  tray.setToolTip(`OperacionalOS: ${TRAY_TEXT[state] ?? state}`)
+  // escondido e sem motor (parou ou o PC foi desligado): fecha de vez
+  if ((state === "parado" || state === "desligado") && win && !win.isVisible() && !quitting) app.quit()
+}
+
 
 /** --autoteste: abre a janela escondida, confere as travas de dentro da página e grava um relatório. */
 async function selfTest(w: BrowserWindow) {
@@ -364,6 +679,8 @@ async function selfTest(w: BrowserWindow) {
     theme: { mode: settings().get().theme, source: nativeTheme.themeSource, pageSawDark: pageDark, pageSawLight: pageLight },
     update,
     vaultEncryption: safeStorage.isEncryptionAvailable(),
+    // a abertura passou pelas etapas (fase e milissegundos desde o início); retrato em autoteste-abertura.png
+    abertura: { fases: bootLog, minimoCumprido: (bootLog.find((f) => f.fase === "pronto" || f.fase === "offline")?.ms ?? 0) >= 1200 },
   }
   writeFileSync(nodePath.join(dataDir(), "autoteste.json"), JSON.stringify(report, null, 2))
   // retrato da janela (prova visual); nunca deixa o teste pendurado
@@ -373,13 +690,14 @@ async function selfTest(w: BrowserWindow) {
 }
 
 app.on("second-instance", () => {
-  if (win) {
-    if (win.isMinimized()) win.restore()
-    win.focus()
-  }
+  if (win && !splash) showMain()
+  else splash?.focus()
 })
 app.on("window-all-closed", () => app.quit())
-app.on("before-quit", () => void engine?.stopAll())
+app.on("before-quit", () => {
+  quitting = true
+  void engine?.stopAll()
+})
 
 void app.whenReady().then(async () => {
   lockSession()
@@ -387,9 +705,11 @@ void app.whenReady().then(async () => {
   buildMenu()
   applyTheme(settings().get().theme)
   nativeTheme.on("updated", () => win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0e0f12" : "#f6f5f2"))
-  const w = createWindow()
-  if (SELFTEST) return void selfTest(w)
-  void checkUpdates()
-  // PC já pareado: o motor começa sozinho (o servidor recusa se o PC não foi aprovado ou foi desligado)
-  if (await vault().has("pc/token").catch(() => false)) void startEngine()
+  ipcMain.on("abertura:escolha", (e, v) => {
+    // só a própria tela de abertura, e só um dos dois valores fixos
+    if (!splash || e.sender !== splash.webContents || (v !== "fechar" && v !== "pedir-de-novo")) return
+    escolhaAbertura?.(v)
+  })
+  // abertura: atualização, este PC e motor, nesta ordem; depois abre a janela principal
+  await boot()
 })
