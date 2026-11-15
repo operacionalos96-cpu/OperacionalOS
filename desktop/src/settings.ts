@@ -15,17 +15,22 @@ export interface Settings {
   pcName: string
   /** este PC já foi aceito pelo servidor alguma vez: um 401 depois disso quer dizer "desligado", antes quer dizer "aguardando liberação" */
   pcSeenApproved: boolean
+  /** bolinha na área de trabalho quando o app é minimizado (ligada por padrão) e onde ela ficou da última vez */
+  float: { enabled: boolean; x: number | null; y: number | null }
 }
 
 const AGENT = /^agt_[0-9A-HJKMNP-TV-Z]{26}$/
 const CONN = /^con_[0-9A-HJKMNP-TV-Z]{26}$/
 
 export function sanitize(raw: unknown, ceiling = 1): Settings {
-  const o = (raw && typeof raw === "object" ? raw : {}) as { theme?: unknown; pcName?: unknown; pcSeenApproved?: unknown; folders?: Record<string, unknown>; levels?: Record<string, unknown>; endpoints?: Record<string, unknown> }
-  const s: Settings = { theme: "sistema", folders: {}, levels: {}, endpoints: {}, pcName: "", pcSeenApproved: false }
+  const o = (raw && typeof raw === "object" ? raw : {}) as { theme?: unknown; pcName?: unknown; pcSeenApproved?: unknown; float?: { enabled?: unknown; x?: unknown; y?: unknown }; folders?: Record<string, unknown>; levels?: Record<string, unknown>; endpoints?: Record<string, unknown> }
+  const s: Settings = { theme: "sistema", folders: {}, levels: {}, endpoints: {}, pcName: "", pcSeenApproved: false, float: { enabled: true, x: null, y: null } }
   if (o.theme === "claro" || o.theme === "escuro" || o.theme === "sistema") s.theme = o.theme
   if (typeof o.pcName === "string") s.pcName = o.pcName.slice(0, 80)
   s.pcSeenApproved = o.pcSeenApproved === true
+  const f = o.float && typeof o.float === "object" ? o.float : {}
+  const coord = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 100_000 ? Math.round(v) : null)
+  s.float = { enabled: f.enabled !== false, x: coord(f.x), y: coord(f.y) }
   for (const [k, v] of Object.entries(o.folders ?? {}))
     if (AGENT.test(k) && Array.isArray(v)) s.folders[k] = v.filter((p): p is string => typeof p === "string" && p.length < 1000).slice(0, 20)
   for (const [k, v] of Object.entries(o.levels ?? {})) if (AGENT.test(k) && (v === 0 || v === 1) && v <= ceiling) s.levels[k] = v

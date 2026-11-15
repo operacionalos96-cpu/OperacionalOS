@@ -11,12 +11,15 @@
  * Motor: roda aqui no processo principal (desktop/src/engine), com o cofre cifrado pelo Windows (DPAPI).
  * Abertura (nota 39): janela pequena antes da principal, com as etapas reais (atualização, este PC, motor).
  * Bandeja: fechar a janela com o motor ligado deixa o app na bandeja, com "Abrir" e "Parar tudo".
+ * Bolinha (opcional, ligada por padrão): com a janela minimizada ou na bandeja, a esfera da Órbita fica
+ * na área de trabalho mostrando o estado do motor; clique abre, arraste move, botão direito dá o menu.
  */
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, nativeTheme, net, safeStorage, session, shell, type IpcMainInvokeEvent } from "electron"
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, nativeTheme, net, safeStorage, screen, session, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from "electron"
 import { createHash, randomBytes } from "node:crypto"
 import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from "node:fs"
 import nodePath from "node:path"
 import { classificarPc, codigoCurto, faltaParaMinimo, type EstadoPc } from "./abertura-estado"
+import { BOLINHA_LADO, deveMostrarBolinha, foiArraste, posicaoBolinha, textoBolinha, visualDoMotor, type Ponto, type VisualBolinha } from "./bolinha-regras"
 import { StopError, serverClient } from "./engine/client"
 import { LEVEL_CEILING, createEngine, type Engine, type EngineLog } from "./engine/engine"
 import { createFolderGuard } from "./engine/folders"
@@ -121,6 +124,7 @@ async function startEngine() {
       // o servidor aceitou o PC: daqui em diante, um 401 quer dizer "desligado" (e não "aguardando")
       if ((state === "esperando" || state === "trabalhando") && !settings().get().pcSeenApproved) settings().update((s) => void (s.pcSeenApproved = true))
       updateTray(state)
+      enviarEstadoBolinha()
     },
   })
   void engine.run()
@@ -212,6 +216,12 @@ function registerBridge() {
     return true
   })
   handle("opos:log:open", () => shell.openPath(nodePath.join(dataDir(), "registro")))
+  // bolinha na área de trabalho (interruptor em Dock › PC)
+  handle("opos:float:get", () => ({ enabled: settings().get().float.enabled }))
+  handle("opos:float:set", (enabled: unknown) => {
+    if (typeof enabled !== "boolean") throw new Error("valor inválido")
+    return definirBolinha(enabled)
+  })
 }
 
 // ---------- janela travada ----------
@@ -263,6 +273,7 @@ function createWindow() {
     minWidth: 380,
     minHeight: 560,
     title: "OperacionalOS",
+    icon: ICONE,
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#0e0f12" : "#f6f5f2",
     autoHideMenuBar: true,
@@ -289,7 +300,16 @@ function createWindow() {
     win?.hide()
     showTrayHint()
   })
-  win.on("closed", () => (win = null))
+  win.on("closed", () => {
+    win = null
+    fecharBolinha()
+  })
+  // minimizou ou foi para a bandeja: a bolinha aparece (se ligada); voltou por qualquer caminho: ela some
+  win.on("minimize", atualizarBolinha)
+  win.on("hide", atualizarBolinha)
+  win.on("restore", atualizarBolinha)
+  win.on("show", atualizarBolinha)
+  win.on("focus", atualizarBolinha)
   // sem internet (ou site fora do ar): mostra a página local do modo limitado no lugar do erro do Chromium
   win.webContents.on("did-fail-load", (_e, code, _desc, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || !isInternal(url)) return
@@ -321,6 +341,8 @@ function buildMenu() {
 
 // ---------- abertura (nota 39, Parte A) ----------
 const ABERTURA_DIR = nodePath.join(__dirname, "..", "abertura")
+// ícone multi-tamanho (16 a 256): a barra de tarefas e a bandeja escolhem o tamanho certo para o DPI
+const ICONE = nodePath.join(__dirname, "..", "abertura", "icone.ico")
 const currentTheme = (): "claro" | "escuro" => (nativeTheme.shouldUseDarkColors ? "escuro" : "claro")
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 type FaseAbertura = "conferindo" | "baixando" | "pc" | "pc-aguardando" | "pc-desligado" | "motor" | "pronto" | "offline"
@@ -357,6 +379,7 @@ function createSplash() {
     center: true,
     show: false,
     title: "OperacionalOS",
+    icon: ICONE,
     backgroundColor: dark ? "#121418" : "#f1f1ed",
     webPreferences: {
       preload: nodePath.join(__dirname, "preload-abertura.js"),
@@ -583,33 +606,35 @@ async function captureSplash() {
 let trayHinted = false
 function ensureTray() {
   if (tray) return tray
-  const icon = nativeImage.createFromPath(nodePath.join(ABERTURA_DIR, "icone.png")).resize({ width: 16, height: 16 })
-  tray = new Tray(icon)
+  tray = new Tray(nativeImage.createFromPath(ICONE))
   tray.setToolTip("OperacionalOS")
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "Abrir", click: showMain },
-      {
-        label: "Parar tudo",
-        click: async () => {
-          await engine?.stopAll()
-          // com a janela escondida e o motor parado, não há mais motivo para ficar na bandeja
-          if (!win?.isVisible()) app.quit()
-        },
-      },
-      { type: "separator" },
-      { label: "Sair", click: () => app.quit() },
-    ]),
-  )
+  tray.setContextMenu(trayMenu())
   tray.on("click", showMain)
   tray.on("double-click", showMain)
   return tray
+}
+async function pararTudo() {
+  await engine?.stopAll()
+  // com a janela escondida e o motor parado, não há mais motivo para ficar na bandeja
+  if (!win?.isVisible()) app.quit()
+}
+function trayMenu() {
+  return Menu.buildFromTemplate([
+    { label: "Abrir", click: showMain },
+    { label: "Parar tudo", click: () => void pararTudo() },
+    { type: "separator" },
+    { label: "Bolinha na área de trabalho", type: "checkbox", checked: settings().get().float.enabled, click: (item) => void definirBolinha(item.checked) },
+    { type: "separator" },
+    { label: "Sair", click: () => app.quit() },
+  ])
 }
 function showMain() {
   if (!win) return
   if (win.isMinimized()) win.restore()
   win.show()
+  win.moveTop()
   win.focus()
+  atualizarBolinha()
 }
 function showTrayHint() {
   const t = ensureTray()
@@ -626,6 +651,222 @@ function updateTray(state: string) {
   if ((state === "parado" || state === "desligado") && win && !win.isVisible() && !quitting) app.quit()
 }
 
+// ---------- bolinha na área de trabalho ----------
+const BOLINHA_DIR = nodePath.join(__dirname, "..", "bolinha")
+let bolinha: BrowserWindow | null = null
+let bolinhaPronta = false
+let arraste: { cursor: Ponto; janela: Ponto; moveu: boolean } | null = null
+/** só no autoteste: força um visual para retratar cada estado */
+let visualForcado: VisualBolinha | null = null
+
+const areasDeTrabalho = () => screen.getAllDisplays().map((d) => d.workArea)
+
+function estadoBolinha() {
+  const visual = visualForcado ?? visualDoMotor(engine?.state ?? "parado")
+  return { visual, tema: currentTheme(), texto: textoBolinha(visual) }
+}
+function enviarEstadoBolinha() {
+  if (bolinha && !bolinha.isDestroyed() && bolinhaPronta) bolinha.webContents.send("bolinha:estado", estadoBolinha())
+}
+
+function criarBolinha() {
+  bolinhaPronta = false
+  const b = new BrowserWindow({
+    width: BOLINHA_LADO,
+    height: BOLINHA_LADO,
+    useContentSize: true,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    hasShadow: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true, // fora da barra de tarefas
+    alwaysOnTop: true,
+    focusable: false, // não rouba o foco de quem está trabalhando
+    show: false,
+    title: "OperacionalOS",
+    icon: ICONE,
+    webPreferences: {
+      preload: nodePath.join(__dirname, "preload-bolinha.js"),
+      partition: "bolinha", // sessão própria, só em memória
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      webviewTag: false,
+      spellcheck: false,
+      devTools: !app.isPackaged,
+    },
+  })
+  b.setAlwaysOnTop(true, "floating")
+  b.on("closed", () => {
+    if (bolinha === b) bolinha = null
+    arraste = null
+  })
+  b.webContents.once("did-finish-load", () => {
+    bolinhaPronta = true
+    enviarEstadoBolinha()
+    atualizarBolinha() // pode ter sido pedida enquanto carregava
+  })
+  void b.loadFile(nodePath.join(BOLINHA_DIR, "index.html"), { query: { tema: currentTheme() } })
+  return b
+}
+
+function posicionarBolinha(b: BrowserWindow) {
+  const f = settings().get().float
+  const p = posicaoBolinha(f.x === null || f.y === null ? null : { x: f.x, y: f.y }, areasDeTrabalho(), screen.getPrimaryDisplay().workArea)
+  b.setBounds({ x: p.x, y: p.y, width: BOLINHA_LADO, height: BOLINHA_LADO })
+}
+
+/** Mostra ou esconde a bolinha conforme a opção e o estado da janela principal. */
+function atualizarBolinha() {
+  const vivo = !!win && !win.isDestroyed()
+  const mostrar = deveMostrarBolinha({ ligada: settings().get().float.enabled, janelaExiste: vivo, minimizada: vivo && win!.isMinimized(), visivel: vivo && win!.isVisible(), saindo: quitting })
+  if (!mostrar) {
+    arraste = null
+    if (bolinha && !bolinha.isDestroyed() && bolinha.isVisible()) bolinha.hide()
+    return
+  }
+  const b = bolinha && !bolinha.isDestroyed() ? bolinha : (bolinha = criarBolinha())
+  if (!bolinhaPronta) return // o did-finish-load chama de novo
+  if (!b.isVisible()) {
+    posicionarBolinha(b)
+    b.showInactive()
+    b.setAlwaysOnTop(true, "floating")
+  }
+  enviarEstadoBolinha()
+}
+
+function fecharBolinha() {
+  arraste = null
+  if (bolinha && !bolinha.isDestroyed()) bolinha.destroy()
+  bolinha = null
+}
+
+function definirBolinha(enabled: boolean) {
+  settings().update((s) => void (s.float.enabled = enabled))
+  logLocal({ event: "bolinha", detail: enabled ? "ligada" : "desligada" })
+  if (!enabled) fecharBolinha()
+  else atualizarBolinha()
+  tray?.setContextMenu(trayMenu())
+  return { enabled }
+}
+
+function menuDaBolinha(b: BrowserWindow) {
+  const itens: MenuItemConstructorOptions[] = [{ label: "Abrir", click: showMain }]
+  if (engine && !engine.stopped) itens.push({ label: "Parar tudo", click: () => void pararTudo() })
+  itens.push({ type: "separator" }, { label: "Esconder a bolinha", click: () => void definirBolinha(false) })
+  // o Windows só fecha o menu com clique fora se a janela dona estiver em primeiro plano:
+  // a bolinha fica focável só enquanto o menu está aberto e volta a não roubar foco ao fechar
+  b.setFocusable(true)
+  b.focus()
+  Menu.buildFromTemplate(itens).popup({
+    window: b,
+    callback: () => {
+      if (!b.isDestroyed()) {
+        b.setFocusable(false)
+        b.setAlwaysOnTop(true, "floating")
+      }
+    },
+  })
+}
+
+/** Avisos da bolinha: só o aviso, sem dados. A posição vem do mouse, lida aqui. */
+function ouvirBolinha() {
+  ipcMain.on("bolinha:aviso", (e, aviso: unknown) => {
+    const b = bolinha
+    if (!b || b.isDestroyed() || e.sender !== b.webContents) return
+    const guardarPosicao = () => {
+      const [x, y] = b.getPosition()
+      const p = posicaoBolinha({ x, y }, areasDeTrabalho(), screen.getPrimaryDisplay().workArea)
+      b.setBounds({ x: p.x, y: p.y, width: BOLINHA_LADO, height: BOLINHA_LADO })
+      settings().update((s) => void ((s.float.x = p.x), (s.float.y = p.y)))
+    }
+    if (aviso === "apertou") {
+      const [x, y] = b.getPosition()
+      arraste = { cursor: screen.getCursorScreenPoint(), janela: { x, y }, moveu: false }
+    } else if (aviso === "moveu" && arraste) {
+      const c = screen.getCursorScreenPoint()
+      if (!arraste.moveu && !foiArraste(arraste.cursor, c)) return
+      arraste.moveu = true
+      b.setBounds({ x: arraste.janela.x + c.x - arraste.cursor.x, y: arraste.janela.y + c.y - arraste.cursor.y, width: BOLINHA_LADO, height: BOLINHA_LADO })
+    } else if (aviso === "soltou" && arraste) {
+      const a = arraste
+      arraste = null
+      if (!a.moveu && !foiArraste(a.cursor, screen.getCursorScreenPoint())) return showMain()
+      guardarPosicao()
+    } else if (aviso === "cancelou") {
+      // o soltar se perdeu (menu, outra janela): para de seguir o mouse e nunca abre a janela
+      const moveu = arraste?.moveu
+      arraste = null
+      if (moveu) guardarPosicao()
+    } else if (aviso === "menu") {
+      arraste = null
+      menuDaBolinha(b)
+    }
+  })
+  // monitor tirado ou resolução trocada: confere a posição de novo
+  const conferir = () => {
+    if (bolinha && !bolinha.isDestroyed() && bolinha.isVisible()) posicionarBolinha(bolinha)
+  }
+  screen.on("display-removed", conferir)
+  screen.on("display-added", conferir)
+  screen.on("display-metrics-changed", conferir)
+  nativeTheme.on("updated", enviarEstadoBolinha)
+}
+
+/** --autoteste-bolinha: liga pela ponte, minimiza, retrata cada estado, clica, desliga pela ponte e confere. */
+async function testarBolinha(w: BrowserWindow) {
+  const wc = w.webContents
+  const r: Record<string, unknown> = {}
+  const antes = settings().get().float.enabled
+  const ver = () => ({ existe: !!bolinha && !bolinha.isDestroyed(), visivel: !!bolinha && !bolinha.isDestroyed() && bolinha.isVisible(), principalMinimizada: w.isMinimized(), principalVisivel: w.isVisible() })
+  r.pontePegou = await wc.executeJavaScript("window.opos.float.get()").catch((e) => String(e))
+  r.ponteLigou = await wc.executeJavaScript("window.opos.float.set(true)").catch((e) => String(e))
+  r.ponteRecusaLixo = await wc.executeJavaScript(`window.opos.float.set("sim").then(() => "aceitou", () => "recusou")`).catch((e) => String(e))
+  w.show()
+  await sleep(500)
+  r.comJanelaAberta = ver()
+  w.minimize()
+  await sleep(1500)
+  r.minimizada = { ...ver(), bounds: bolinha?.getBounds(), sempreNoTopo: bolinha?.isAlwaysOnTop(), focavel: bolinha?.isFocusable(), areaPrincipal: screen.getPrimaryDisplay().workArea }
+  const prefs = (bolinha?.webContents as unknown as { getLastWebPreferences?: () => Record<string, unknown> } | undefined)?.getLastWebPreferences?.() ?? {}
+  const pagina = await bolinha?.webContents.executeJavaScript(`({ require: typeof require, process: typeof process, ponte: Object.keys(window.oposBolinha || {}), protocolo: location.protocol })`).catch((e) => String(e))
+  r.travas = { contextIsolation: prefs.contextIsolation, sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, pagina }
+  const retratos: string[] = []
+  for (const v of ["quieta", "lenta", "girando", "alerta"] as const) {
+    visualForcado = v
+    enviarEstadoBolinha()
+    await sleep(700)
+    const png = await bolinha?.webContents.capturePage().then((i) => i.toPNG()).catch(() => null)
+    if (png?.length) {
+      const f = nodePath.join(dataDir(), `autoteste-bolinha-${v}.png`)
+      writeFileSync(f, png)
+      retratos.push(f)
+    }
+  }
+  visualForcado = null
+  enviarEstadoBolinha()
+  r.retratos = retratos
+  // clique de verdade dentro da página da bolinha (pointerdown e pointerup), sem mexer o mouse da pessoa
+  bolinha?.webContents.sendInputEvent({ type: "mouseDown", x: 36, y: 36, button: "left", clickCount: 1 })
+  await sleep(60)
+  bolinha?.webContents.sendInputEvent({ type: "mouseUp", x: 36, y: 36, button: "left", clickCount: 1 })
+  await sleep(1200)
+  r.depoisDoClique = ver()
+  // desliga pela ponte: minimizar não mostra mais nada
+  r.ponteDesligou = await wc.executeJavaScript("window.opos.float.set(false)").catch((e) => String(e))
+  w.minimize()
+  await sleep(1200)
+  r.desligadaEMinimizada = ver()
+  w.restore()
+  definirBolinha(antes)
+  r.voltouPara = settings().get().float.enabled
+  return r
+}
 
 /** --autoteste: abre a janela escondida, confere as travas de dentro da página e grava um relatório. */
 async function selfTest(w: BrowserWindow) {
@@ -681,6 +922,7 @@ async function selfTest(w: BrowserWindow) {
     vaultEncryption: safeStorage.isEncryptionAvailable(),
     // a abertura passou pelas etapas (fase e milissegundos desde o início); retrato em autoteste-abertura.png
     abertura: { fases: bootLog, minimoCumprido: (bootLog.find((f) => f.fase === "pronto" || f.fase === "offline")?.ms ?? 0) >= 1200 },
+    bolinha: process.argv.includes("--autoteste-bolinha") ? await testarBolinha(w) : null,
   }
   writeFileSync(nodePath.join(dataDir(), "autoteste.json"), JSON.stringify(report, null, 2))
   // retrato da janela (prova visual); nunca deixa o teste pendurado
@@ -696,12 +938,14 @@ app.on("second-instance", () => {
 app.on("window-all-closed", () => app.quit())
 app.on("before-quit", () => {
   quitting = true
+  fecharBolinha()
   void engine?.stopAll()
 })
 
 void app.whenReady().then(async () => {
   lockSession()
   registerBridge()
+  ouvirBolinha()
   buildMenu()
   applyTheme(settings().get().theme)
   nativeTheme.on("updated", () => win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0e0f12" : "#f6f5f2"))

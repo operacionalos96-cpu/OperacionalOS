@@ -13,4 +13,9 @@ describe("configuração local", () => {
   it("aceita os valores válidos", () => {
     expect(sanitize({ theme: "escuro", levels: { [A]: 1 } })).toMatchObject({ theme: "escuro", levels: { [A]: 1 } })
   })
+  it("bolinha: ligada na primeira vez, desligável, posição só com números", () => {
+    expect(sanitize({}).float).toEqual({ enabled: true, x: null, y: null })
+    expect(sanitize({ float: { enabled: false, x: 120.4, y: "9" } }).float).toEqual({ enabled: false, x: 120, y: null })
+    expect(sanitize({ float: { enabled: "não", x: 1e9 } }).float).toEqual({ enabled: true, x: null, y: null })
+  })
 })

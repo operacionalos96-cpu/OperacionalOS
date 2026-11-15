@@ -8,7 +8,11 @@ desktop/
 ├── src/preload.ts    a ponte (contextBridge), só funções; nenhum segredo sai por ela
 ├── src/preload-abertura.ts  ponte mínima da abertura (window.oposAbertura): só recebe o estado
 ├── src/abertura-estado.ts   regras da abertura sem Electron (PC aguardando x desligado, mínimo na tela)
-├── abertura/         tela de abertura (index.html, abertura.css, abertura.js), modo limitado (offline.*) e ícone da bandeja
+├── abertura/         tela de abertura (index.html, abertura.css, abertura.js), modo limitado (offline.*) e ícones (icone.png, icone.ico)
+├── bolinha/          a bolinha da área de trabalho (index.html, bolinha.css, bolinha.js)
+├── src/preload-bolinha.ts   ponte mínima da bolinha (window.oposBolinha): recebe o estado, envia só avisos sem dados
+├── src/bolinha-regras.ts    regras da bolinha sem Electron (posição dentro do monitor, quando mostrar, clique x arraste)
+├── build/            ícone: icon.svg (fonte), icon-24.svg e icon-16.svg (tamanhos pequenos), gerar-icone.mjs e as saídas
 ├── src/settings.ts   configuração local: tema, pastas e nível confirmado por bot, endereço confirmado
 └── src/engine/       o motor (sem Electron: roda nos testes da raiz)
     ├── client.ts     /api/workers/<ferramenta> com o token oos_ do PC (401 = PC desligado: para)
@@ -34,6 +38,8 @@ Autoteste do app empacotado: `release/win-unpacked/OperacionalOS.exe --autoteste
 grava `%APPDATA%/OperacionalOS/autoteste.json` (travas vistas de dentro da página, tema, atualização e as fases
 da abertura em `abertura.fases`), `autoteste.png` (retrato da janela) e `autoteste-abertura.png` (retrato da
 abertura no "Pronto") e fecha. Fora do pacote também roda: `OPOS_URL=http://localhost:3040 npx electron . --autoteste`.
+Com `--autoteste-bolinha`, o relatório ganha `bolinha` (liga pela ponte, minimiza, confere que ela aparece, retrata
+os quatro estados em `autoteste-bolinha-<estado>.png`, clica nela, desliga pela ponte e confere que não aparece mais).
 
 ## Tela de abertura (nota 39, Parte A)
 
@@ -69,7 +75,7 @@ Sem `?estado`, a sequência real roda em laço.
 
 Fechar a janela principal com o motor ligado (esperando ou trabalhando) não fecha o app: a janela some e o ícone
 fica na bandeja (aviso uma vez só). Menu: **Abrir**, **Parar tudo** (devolve a entrega à fila; com a janela
-escondida, o app fecha de vez) e **Sair**. Clique no ícone abre a janela. Se o motor parar ou o PC for desligado
+escondida, o app fecha de vez), **Bolinha na área de trabalho** (marcável) e **Sair**. Clique no ícone abre a janela. Se o motor parar ou o PC for desligado
 com a janela escondida, o app fecha. Sem motor ligado, fechar a janela fecha o app como antes.
 
 ## Ponte `window.opos` (para a tela "Configurações do PC", fatia 2c)
@@ -88,6 +94,46 @@ O processo principal só responde ao quadro principal da janela, na origem do Op
 | `opos.keys.save(connectionId, provider, chave, endpoint?)` / `has(...)` / `remove(...)` | chave de IA no cofre do Windows, presa ao endereço (confirmação nativa). Nunca volta para a página |
 | `opos.log.open()` | abre a pasta do registro local |
 | `opos.onEngineState(cb)` | `parado`, `esperando`, `trabalhando`, `desligado`, `erro` |
+| `opos.float.get()` / `opos.float.set(enabled: boolean)` | bolinha na área de trabalho: as duas devolvem `{ enabled }`; `set` recusa o que não for booleano. Interruptor em Dock › PC |
+
+## Bolinha na área de trabalho
+
+Com a opção ligada (padrão na primeira vez), minimizar a janela ou mandá-la para a bandeja faz aparecer uma janela
+de 72 × 72 sem moldura, transparente, sempre no topo, fora da barra de tarefas e que não rouba o foco: a esfera da
+Órbita com o símbolo HZK e uma órbita com um nó. Movimento pelo estado do motor: **parado** quieta; **esperando**
+órbita lenta; **trabalhando** órbita girando com o nó laranja; **erro** ou **PC desligado** o ponto laranja acende e
+pulsa. "Reduzir movimento" do Windows: nada gira nem pulsa, só a cor muda. A dica (passar o mouse) diz o estado.
+
+- **Clique** (sem arrastar): restaura e foca a janela principal; a bolinha some. Voltar à janela por qualquer outro
+  caminho (barra de tarefas, bandeja, Alt+Tab) também a esconde.
+- **Arrastar**: leva para qualquer lugar; a posição fica em `configuracao.json` (`float.x`, `float.y`). Ao reaparecer,
+  ela é conferida contra os monitores ligados: se o monitor sumiu, volta ao canto inferior direito do principal;
+  se ficou meio para fora, é empurrada para dentro da área de trabalho.
+- **Botão direito**: **Abrir**, **Parar tudo** (só com o motor ligado) e **Esconder a bolinha** (desliga a opção).
+  Enquanto o menu está aberto a bolinha fica focável (sem isso o Windows não fecha o menu com clique fora).
+- **Onde desligar**: interruptor em Dock › PC (pela ponte `opos.float`), item marcável no menu da bandeja e
+  "Esconder a bolinha" no próprio menu dela.
+- **Segurança**: carrega só `bolinha/index.html` do pacote, CSP `'self'`, sandbox, sem nodeIntegration, sessão própria
+  em memória. A ponte `window.oposBolinha` recebe o estado e envia só avisos fixos sem dados (`apertou`, `moveu`,
+  `soltou`, `cancelou`, `menu`); quem lê o mouse e move a janela é o processo principal, que só ouve a própria bolinha.
+
+Prévia sem Electron: abrir `bolinha/index.html?visual=quieta|lenta|girando|alerta`.
+
+## Ícone
+
+Fonte em `build/icon.svg` (esfera da Órbita com aro claro para a barra de tarefas escura, o Z da HZK, a linha e os
+três nós laranja, traçado igual ao `public/hzk-simbolo.svg`). Nos tamanhos pequenos o desenho é outro, na grade
+inteira: `build/icon-24.svg` (barra de tarefas a 100%) e `build/icon-16.svg` (bandeja; também 20 e 32), só esfera,
+Z grosso e o nó laranja no alto do traço. Para gerar de novo (usa o `sharp` da raiz, sem dependência nova):
+
+```bash
+node desktop/build/gerar-icone.mjs
+```
+
+Saídas: `build/icon.png` (1024), `build/icon.ico` (16 a 256, usado pelo electron-builder), `abertura/icone.png` e
+`abertura/icone.ico` (janela principal, abertura, bandeja e bolinha), e no site `src/app/icon.svg` (o de 16),
+`favicon.ico` (16, 32, 48) e `apple-icon.png` (180, fundo cheio). Folha de prova: `build/prova-icone.png` (todos os
+tamanhos sobre barra clara, barra escura e papel de parede azul, com os pequenos ampliados pixel a pixel).
 
 ## Banco e servidor (já neste branch)
 

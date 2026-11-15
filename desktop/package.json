@@ -30,6 +30,7 @@
     "files": [
       "dist/**/*",
       "abertura/**/*",
+      "bolinha/**/*",
       "package.json",
       "!dist/**/*.test.js"
     ],
@@ -38,7 +39,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,

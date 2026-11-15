@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld(
       remove: (connectionId: string, provider: string, endpoint?: string) => call("opos:keys:remove", connectionId, provider, endpoint ?? null),
     }),
     log: Object.freeze({ open: () => call("opos:log:open") }),
+    /** Bolinha na área de trabalho quando o app é minimizado: { enabled }. */
+    float: Object.freeze({
+      get: () => call("opos:float:get"),
+      set: (enabled: boolean) => call("opos:float:set", enabled),
+    }),
     onEngineState: (cb: (s: { state: string; job?: string; agent?: string; reason?: string }) => void) => {
       const h = (_e: unknown, s: { state: string }) => cb(s)
       ipcRenderer.on("opos:engine-state", h)
