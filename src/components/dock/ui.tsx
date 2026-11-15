@@ -1,5 +1,6 @@
 "use client"
 
+import { useLayoutEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BlocksIcon, BotIcon, ChartColumnIcon, CpuIcon, GraduationCapIcon, MessageSquareIcon, MonitorCogIcon, RepeatIcon, ShieldIcon } from "lucide-react"
@@ -78,13 +79,39 @@ const NAV = [
   { href: "/dock/pc", label: "PC", icon: MonitorCogIcon },
 ]
 
-/** Navegação interna do Dock: selecionado = quadrado arredondado de 11 px; o resto, pílula (cantos por papel). */
+/**
+ * Navegação interna do Dock. O destaque é uma peça só, que desliza até a aba escolhida
+ * (duração e curva de "indicador de aba" do sistema); com "reduzir movimento", ele só troca de lugar.
+ */
 export function DockNav({ badges }: { badges: Record<string, number> }) {
   const path = usePathname()
+  const nav = useRef<HTMLElement>(null)
+  const [pill, setPill] = useState<{ left: number; width: number; ready: boolean }>({ left: 0, width: 0, ready: false })
+  const current = NAV.find((n) => (n.href === "/dock" ? path === "/dock" : path.startsWith(n.href)))?.href
+
+  useLayoutEffect(() => {
+    const root = nav.current
+    if (!root) return
+    const place = () => {
+      const el = root.querySelector<HTMLElement>('[aria-current="page"]')
+      if (el) setPill((p) => ({ left: el.offsetLeft, width: el.offsetWidth, ready: p.ready || p.width > 0 }))
+      else setPill((p) => ({ ...p, width: 0 }))
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(root)
+    return () => ro.disconnect()
+  }, [current, badges])
+
   return (
-    <nav aria-label="HZK Dock" className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none]">
+    <nav ref={nav} aria-label="HZK Dock" className="relative flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none]">
+      <span
+        aria-hidden
+        className={cn("hzk-rail-pick pointer-events-none absolute top-0 h-[calc(100%-0.25rem)] rounded-[11px] bg-card", pill.ready && "transition-[left,width] duration-(--dur-3) ease-(--ease-std)")}
+        style={{ left: pill.left, width: pill.width, opacity: pill.width ? 1 : 0 }}
+      />
       {NAV.map((n) => {
-        const active = n.href === "/dock" ? path === "/dock" : path.startsWith(n.href)
+        const active = n.href === current
         const b = badges[n.href] ?? 0
         return (
           <Link
@@ -92,8 +119,8 @@ export function DockNav({ badges }: { badges: Record<string, number> }) {
             href={n.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground",
-              active && "hzk-rail-pick rounded-[11px] bg-card font-semibold text-foreground",
+              "relative flex shrink-0 items-center gap-2 rounded-[11px] px-3 py-1.5 text-sm text-muted-foreground transition-colors duration-(--dur-2) hover:text-foreground",
+              active ? "font-semibold text-foreground" : "hover:bg-foreground/[0.06]",
             )}
           >
             <n.icon className="size-4" />

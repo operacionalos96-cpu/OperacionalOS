@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { EyeOffIcon, KeyRoundIcon, MessageCircleIcon, ShieldCheckIcon } from "lucide-react"
 import { PageHeader } from "@/components/shared/layout"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,7 @@ export default function DockLayout({ children }: { children: React.ReactNode }) 
   const error = useDock((s) => s.error)
   const run = useDock((s) => s.run)
   const { hasMinimum } = useAccess()
+  const path = usePathname()
   useEffect(() => start(), [start])
 
   const founder = hasMinimum("owner")
@@ -52,7 +54,10 @@ export default function DockLayout({ children }: { children: React.ReactNode }) 
           <Button variant="brand" onClick={() => run((api) => api.acceptConsent())}>Começar</Button>
         </section>
       ) : (
-        data && children
+        data && (
+          // a chave troca a cada tela: o conteúdo novo entra suave em vez de aparecer seco
+          <div key={path} className="animate-enter flex min-h-0 flex-1 flex-col">{children}</div>
+        )
       )}
     </div>
   )

@@ -110,9 +110,11 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
       {!focusMode && <OrbitField />}
       {!focusMode && <Sidebar />}
       <main className={cn("relative z-[1] flex min-w-0 flex-1 flex-col overflow-y-auto", !focusMode && "pb-16 md:pb-0")}>
-        {/* key por rota: cada página entra com um fade curto. */}
+        {/* key por rota: cada página entra com um fade curto. O Dock troca de tela por dentro (abas
+            próprias): para a casca ele é uma página só, senão o cabeçalho e as abas dele seriam
+            recriados a cada clique (a tela piscava). */}
         {hydrated ? (
-          <div key={pathname} className="page-enter flex min-h-0 flex-1 flex-col">
+          <div key={pathname.startsWith("/dock") ? "/dock" : pathname} className="page-enter flex min-h-0 flex-1 flex-col">
             <PageGate pathname={pathname}>{children}</PageGate>
           </div>
         ) : (
