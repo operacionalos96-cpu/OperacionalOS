@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useMemo, useState } from "react"
+import { Suspense, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { addDays, differenceInCalendarDays, endOfMonth, endOfWeek, format as formatDate, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -48,6 +48,7 @@ import { uniqueProjects } from "@/lib/domain/project-names"
 import { dueLabel } from "@/lib/format"
 import { useContentAccounts, useContentItems, useProducts } from "@/lib/modules"
 import { cn } from "@/lib/utils"
+import { useWheelScrollX } from "@/lib/use-wheel-scroll-x"
 import { setContentStage } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { Segmented, SectionTabs } from "@/components/shared/fields"
@@ -134,6 +135,9 @@ function Production({ onNew }: { onNew: () => void }) {
   const [brand, setBrand] = useState<string>("todos")
   const [accountId, setAccountId] = useState<string>("todos")
   const [viewMode, setViewMode] = useState<"etapas" | "calendario">("etapas")
+  // a rodinha do mouse também anda o quadro de etapas para os lados
+  const board = useRef<HTMLDivElement>(null)
+  useWheelScrollX(board, viewMode === "etapas")
   const [calendarMonth, setCalendarMonth] = useState(formatDate(new Date(), "yyyy-MM"))
   const brands = uniqueProjects(["HZK", "Gabriel", ...accounts.map((a) => a.brand), ...items.map((i) => i.brand)])
   const brandOptions = [
@@ -184,7 +188,7 @@ function Production({ onNew }: { onNew: () => void }) {
           ]}
         />
       </div>
-      {viewMode === "etapas" ? <div className="page-container flex min-h-0 flex-1 gap-3 overflow-x-auto pt-4 pb-4">
+      {viewMode === "etapas" ? <div ref={board} className="page-container flex min-h-0 flex-1 gap-3 overflow-x-auto pt-4 pb-4">
         {CONTENT_STAGES.map((stage) => {
           const list = visible.filter((i) => i.stage === stage.id)
           const Icon = STAGE_ICON[stage.id]

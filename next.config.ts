@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Não anuncia a tecnologia do servidor.
   poweredByHeader: false,
+  // Só no desenvolvimento: mantém as telas já montadas na memória por uma hora (o padrão descarta
+  // depois de um minuto parado, e a tela demora de novo no clique seguinte). Não afeta a produção.
+  onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 60 },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }]
   },

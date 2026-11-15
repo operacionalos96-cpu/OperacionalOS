@@ -33,15 +33,16 @@ export function Conversations({ d }: { d: DockData }) {
     )
 
   return (
-    <div className="grid min-h-[70dvh] gap-3 lg:grid-cols-[260px_minmax(0,1fr)_auto]">
-      <aside className="grid content-start gap-1 rounded-[20px] bg-card/80 p-2 backdrop-blur max-lg:max-h-60 max-lg:overflow-auto" aria-label="Conversas">
+    // no PC a conversa ocupa a altura que sobra na janela (cada coluna rola por dentro); no celular, empilha
+    <div className="grid gap-3 max-lg:min-h-[70dvh] lg:min-h-[460px] lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)_auto] lg:grid-rows-[minmax(0,1fr)]">
+      <aside className="grid content-start gap-1 overflow-auto rounded-[20px] bg-card/80 p-2 backdrop-blur max-lg:max-h-60" aria-label="Conversas">
         <div className="flex items-center px-2 pt-1"><Label>Bots</Label><span className="flex-1" /><Button asChild size="icon-xs" variant="ghost" aria-label="Novo bot"><Link href="/dock/bots"><PlusIcon /></Link></Button></div>
         {d.agents.map((a) => {
           const pend = d.approvals.filter((x) => x.agentId === a.id && x.status === "pendente").length
           return (
             <button key={a.id} onClick={() => setSel({ kind: "bot", id: a.id })} aria-current={sel?.kind === "bot" && sel.id === a.id}
               className={cn("flex items-center gap-2.5 rounded-[11px] px-2 py-1.5 text-left text-sm hover:bg-foreground/[0.05]", sel?.kind === "bot" && sel.id === a.id && "bg-card font-semibold shadow-[var(--shadow-lift)]")}>
-              <BotAvatar d={d} a={a} size={28} />
+              <BotAvatar d={d} a={a} size={32} />
               <span className="min-w-0 flex-1 truncate">{a.name}</span>
               {pend === 0 && <StateTag state={agentState(d, a)} />}
               {pend > 0 && <span className="tabular rounded-full bg-highlight px-1.5 text-[11px] font-semibold text-white">{pend}</span>}
@@ -52,7 +53,7 @@ export function Conversations({ d }: { d: DockData }) {
         {[...channels, ...continued].map((t) => (
           <button key={t.id} onClick={() => setSel({ kind: "thread", id: t.id })} aria-current={sel?.kind === "thread" && sel.id === t.id}
             className={cn("flex items-center gap-2.5 rounded-[11px] px-2 py-1.5 text-left text-sm hover:bg-foreground/[0.05]", sel?.kind === "thread" && sel.id === t.id && "bg-card font-semibold shadow-[var(--shadow-lift)]")}>
-            <HashIcon className="size-4 text-muted-foreground" /><span className="truncate">{t.title || d.agents.find((a) => a.id === t.agentIds[0])?.name}</span>
+            <span className="grid size-8 shrink-0 place-items-center"><HashIcon className="size-4 text-muted-foreground" /></span><span className="truncate">{t.title || d.agents.find((a) => a.id === t.agentIds[0])?.name}</span>
           </button>
         ))}
       </aside>
@@ -60,7 +61,7 @@ export function Conversations({ d }: { d: DockData }) {
       <Chat d={d} thread={thread} agent={agent} onPanel={(p) => setPanel(panel === p ? null : p)} panel={panel} onOpen={(t) => setSel({ kind: "thread", id: t })} />
 
       {agent && panel && (
-        <aside className="w-full rounded-[20px] bg-card p-4 lg:w-[380px]" aria-label="Painel do bot">
+        <aside className="w-full rounded-[20px] bg-card p-4 lg:w-[380px] lg:overflow-auto" aria-label="Painel do bot">
           <div className="mb-3 flex items-center gap-1">
             {(["config", "skills", "apps"] as const).map((p) => (
               <button key={p} onClick={() => setPanel(p)} className={cn("rounded-[11px] px-3 py-1.5 text-sm", panel === p ? "bg-foreground/[0.08] font-semibold" : "text-muted-foreground hover:text-foreground")}>
@@ -107,7 +108,7 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
   return (
     <section className="flex min-h-0 min-w-0 flex-col rounded-[20px] bg-card/80 backdrop-blur" aria-label="Conversa">
       <header className="flex flex-wrap items-center gap-3 p-4">
-        {agent ? <BotAvatar d={d} a={agent} size={44} /> : <span className="grid size-11 place-items-center rounded-full bg-muted"><HashIcon className="size-5" /></span>}
+        {agent ? <BotAvatar d={d} a={agent} size={56} /> : <span className="grid size-14 place-items-center rounded-full bg-muted"><HashIcon className="size-6" /></span>}
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold">{agent?.name ?? thread?.title ?? "Canal"}{agent && <StateTag state={agentState(d, agent)} />}</h2>
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -128,13 +129,14 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
         )}
       </header>
 
-      <div ref={stream} className="grid flex-1 content-start gap-4 overflow-auto px-4 pb-4 max-lg:max-h-[60dvh] lg:max-h-[62dvh]">
-        {messages.length === 0 && lead && <div className="grid justify-items-center gap-2 py-16 opacity-80"><BotAvatar d={d} a={lead} size={72} /><b className="text-sm">{lead.name}</b><span className="text-xs text-muted-foreground">{lead.title}</span></div>}
+      <div ref={stream} className="grid min-h-0 flex-1 content-start gap-4 overflow-auto px-4 pb-4 max-lg:max-h-[60dvh]">
+        {messages.length === 0 && lead && <div className="grid justify-items-center gap-2 py-16 opacity-80"><BotAvatar d={d} a={lead} size={96} /><b className="text-sm">{lead.name}</b><span className="text-xs text-muted-foreground">{lead.title}</span></div>}
         {messages.map((m) => <Message key={m.id} d={d} m={m} onHandoff={() => setHandoff(m)} />)}
         {approvals.map((a) => <Approval key={a.id} d={d} a={a} />)}
       </div>
 
-      <form className="m-3 grid gap-2 rounded-[20px] bg-card p-3 shadow-[var(--shadow-lift)]" onSubmit={(e) => { e.preventDefault(); void send() }}>
+      {/* com a bolinha do guia no canto, a caixa deixa a vaga dela: o botão de enviar nunca fica embaixo da bolinha */}
+      <form className={cn("m-3 grid gap-2 rounded-[20px] bg-card p-3 shadow-[var(--shadow-lift)]", !panel && "lg:in-data-[orb=corner]:mr-12")} onSubmit={(e) => { e.preventDefault(); void send() }}>
         <label className="sr-only" htmlFor="dock-msg">Mensagem</label>
         <textarea id="dock-msg" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder={lead ? (members.length > 1 ? "Mensagem · @ chama um bot" : `Mensagem para ${lead.name}`) : ""}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send() } }}
@@ -173,7 +175,7 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
             {d.agents.filter((a) => a.id !== handoff?.authorId).map((a) => (
               <button key={a.id} onClick={async () => { const t = await run((api) => api.continueWith(handoff!.threadId, a.id, newKey("cont"))); setHandoff(null); if (t) onOpen(t) }}
                 className="flex items-center gap-3 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-left text-sm hover:bg-foreground/[0.08]">
-                <BotAvatar d={d} a={a} size={28} /><span className="flex-1"><b>{a.name}</b><span className="block text-xs text-muted-foreground">{a.title}</span></span>
+                <BotAvatar d={d} a={a} size={32} /><span className="flex-1"><b>{a.name}</b><span className="block text-xs text-muted-foreground">{a.title}</span></span>
               </button>
             ))}
           </div>
@@ -195,8 +197,8 @@ function Message({ d, m, onHandoff }: { d: DockData; m: DockMessage; onHandoff: 
   const a = d.agents.find((x) => x.id === m.authorId)
   const conn = d.connections.find((c) => c.id === m.connectionId)
   return (
-    <article className="group grid grid-cols-[34px_minmax(0,1fr)] gap-3">
-      {a ? <BotAvatar d={d} a={{ ...a }} size={34} /> : <span />}
+    <article className="group grid grid-cols-[38px_minmax(0,1fr)] gap-3">
+      {a ? <BotAvatar d={d} a={{ ...a }} size={38} /> : <span />}
       <div className="grid min-w-0 gap-1.5">
         <div className="flex items-baseline gap-2"><b className="text-sm">{a?.name ?? "Bot"}</b><time className="text-xs text-muted-foreground">{hm(m.createdAt)}</time></div>
         {(m.provider || conn) && (

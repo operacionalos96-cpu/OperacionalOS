@@ -22,6 +22,7 @@ import { boardOrder, daysSince, sum } from "@/lib/domain/rules"
 import { moneyCompact } from "@/lib/format"
 import { openLeadForm } from "@/lib/ui-store"
 import { cn } from "@/lib/utils"
+import { useWheelScrollX } from "@/lib/use-wheel-scroll-x"
 import { moveLeadTo } from "@/components/dialogs/lead-flow-dialogs"
 import { LeadCard } from "./lead-card"
 import { useFunnel } from "@/lib/funnel-store"
@@ -45,6 +46,8 @@ export function Kanban({ leads, showOwner = true, focusStage }: { leads: Lead[];
   const maxTotal = Math.max(1, ...STAGES.map((s) => sum(leads.filter((l) => l.stage === s.id).map((l) => l.valueCents))))
   // "?etapa=" (vindo da Início): rola até a coluna e a destaca por um instante.
   const board = useRef<HTMLDivElement>(null)
+  // a rodinha comum do mouse também anda o quadro para os lados (a coluna com rolagem própria rola primeiro)
+  useWheelScrollX(board)
   useEffect(() => {
     if (!focusStage) return
     board.current?.querySelector(`[data-stage="${focusStage}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })

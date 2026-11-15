@@ -32,7 +32,7 @@ export default function DockRoutinesPage() {
           const a = d.agents.find((x) => x.id === r.agentId)
           return (
             <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-[11px] px-3 py-2 text-sm hover:bg-foreground/[0.04]">
-              {a && <BotAvatar d={d} a={a} size={28} />}
+              {a && <BotAvatar d={d} a={a} size={32} />}
               <button className="min-w-0 flex-1 text-left" onClick={() => setEdit({ id: r.id, agentId: r.agentId, title: r.title, prompt: r.prompt, kind: r.kind, time: r.timeLocal, weekday: r.weekday, monthday: r.monthday })}>
                 <b>{r.title}</b><span className="block text-xs text-muted-foreground">{a?.name} · {when(r)}</span>
               </button>

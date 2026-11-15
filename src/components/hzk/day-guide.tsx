@@ -5,7 +5,7 @@ import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
-import { ArrowRightIcon, CalendarClockIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, MoonIcon, ScaleIcon, StickyNoteIcon, SunriseIcon, TriangleAlertIcon, VideoIcon } from "lucide-react"
+import { ArrowRightIcon, CalendarClockIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CornerDownRightIcon, FlameIcon, InboxIcon, LightbulbIcon, MinusIcon, MoonIcon, ScaleIcon, StickyNoteIcon, SunriseIcon, TriangleAlertIcon, VideoIcon } from "lucide-react"
 import { getUser } from "@/config/team"
 import { BECAME_LABEL, checkInStreak, dayPlan, greeting, guideMood, lastDayCaptures, type GuideMood, type GuideStep, type StepKind } from "@/lib/domain/day-guide"
 import { needsCheckIn, planId, type DailyPlan } from "@/lib/domain/presence"
@@ -25,6 +25,7 @@ import { CloseDay } from "./close-day"
 import { DoingButton } from "./doing-now"
 import { FeedbackButton } from "./feedback-dialog"
 import { GuideOrb } from "./guide-orb"
+import { useOrbDrag } from "./use-orb-drag"
 import { WeeklyCheckinCard } from "./weekly-checkin"
 import { usePersonWork } from "./team-overview"
 
@@ -202,6 +203,19 @@ export function DayGuide() {
     const id = setTimeout(() => setHint(false), 6000)
     return () => clearTimeout(id)
   }, [hint])
+
+  // A bolinha flutua: a pessoa arrasta para onde quiser (posição salva neste navegador).
+  const orb = useOrbDrag(launcherRef, () => open())
+  const orbInCorner = !orb.pos && view === "min"
+  // Avisa a página que a bolinha está no canto (o Dock deixa a vaga dela ao lado do botão de enviar).
+  useEffect(() => {
+    const root = document.documentElement
+    if (orbInCorner) root.dataset.orb = "corner"
+    else delete root.dataset.orb
+    return () => {
+      delete root.dataset.orb
+    }
+  }, [orbInCorner])
 
   if (!hydrated || !loaded || view === "closed" || !hello) return null
 
@@ -512,23 +526,45 @@ export function DayGuide() {
         </div>
       )}
 
-      {/* A bolinha no canto: sempre no mesmo lugar (o voo mira nela), escondida com o guia aberto. */}
-      <button
-        ref={launcherRef}
-        type="button"
-        onClick={() => open()}
-        aria-label={steps.length ? `Abrir o guia do dia (${steps.length} na lista)` : "Abrir o guia do dia"}
-        aria-hidden={view === "open"}
-        tabIndex={view === "open" ? -1 : 0}
-        className={cn("fixed right-4 bottom-36 z-40 size-12 rounded-full shadow-lift transition-[opacity,transform] duration-300 hover:scale-105 md:right-6 md:bottom-6 md:size-14", view === "open" || flight ? "pointer-events-none scale-75 opacity-0" : "opacity-100")}
+      {/* A bolinha: começa no canto e a pessoa arrasta para onde quiser (o voo mira nela onde estiver). Escondida com o guia aberto. */}
+      <div
+        className={cn("group/orb fixed z-40", !orb.pos && "right-4 bottom-36 md:right-6 md:bottom-6")}
+        style={orb.pos ? { left: orb.pos.x, top: orb.pos.y } : undefined}
       >
-        <GuideOrb mood={view === "min" && !needs && !steps.length ? "rest" : mood} className="size-full" />
-        {steps.length > 0 && (
-          <span className="tabular absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-highlight text-[10px] font-bold text-white ring-2 ring-background">{steps.length}</span>
+        <button
+          ref={launcherRef}
+          type="button"
+          {...orb.handlers}
+          aria-label={steps.length ? `Abrir o guia do dia (${steps.length} na lista)` : "Abrir o guia do dia"}
+          aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Alt+Home"
+          title="Clique para abrir o guia. Arraste para mudar de lugar."
+          aria-hidden={view === "open"}
+          tabIndex={view === "open" ? -1 : 0}
+          className={cn(
+            "relative block size-12 touch-none rounded-full shadow-lift select-none md:size-14",
+            orb.dragging ? "scale-110 cursor-grabbing" : "transition-[opacity,transform] duration-300 hover:scale-105",
+            view === "open" || flight ? "pointer-events-none scale-75 opacity-0" : "opacity-100",
+          )}
+        >
+          <GuideOrb mood={view === "min" && !needs && !steps.length ? "rest" : mood} className="size-full" />
+          {steps.length > 0 && (
+            <span className="tabular absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-highlight text-[10px] font-bold text-white ring-2 ring-background">{steps.length}</span>
+          )}
+        </button>
+        {orb.pos && view === "min" && !orb.dragging && (
+          <button
+            type="button"
+            onClick={orb.reset}
+            aria-label="Voltar a bolinha ao canto"
+            title="Voltar ao canto"
+            className="absolute -top-1.5 -left-1.5 grid size-6 place-items-center rounded-full border bg-card text-muted-foreground shadow-card opacity-0 transition-opacity duration-200 group-hover/orb:opacity-100 hover:text-foreground focus-visible:opacity-100 pointer-coarse:opacity-80"
+          >
+            <CornerDownRightIcon className="size-3.5" />
+          </button>
         )}
-      </button>
+      </div>
 
-      {hint && view === "min" && (
+      {hint && view === "min" && !orb.pos && (
         <button type="button" onClick={() => open()} className="fixed right-20 bottom-44 z-40 flex animate-enter items-end gap-1 text-left md:right-24 md:bottom-16">
           <span className="max-w-48 rounded-2xl border bg-card px-3 py-2 text-xs shadow-card">
             <span className="block font-semibold">Guia do dia</span>

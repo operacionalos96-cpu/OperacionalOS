@@ -25,10 +25,13 @@ export default function DockLayout({ children }: { children: React.ReactNode }) 
   const pend = data ? pendingCount(data, { lead: founder, founder }) : null
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 md:px-8">
+    // Margem do Dock = a margem lateral (16 px no celular, 32 no PC), também embaixo: os painéis vão até perto
+    // do fim da janela. O --gutter local alinha o cabeçalho e os painéis na mesma borda.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 pb-4 [--gutter:16px] md:pb-8 md:[--gutter:32px]">
       <PageHeader page="/dock" description="">
         <DockNav badges={{ "/dock": pend?.approvals ?? 0, "/dock/skills": pend?.proposals ?? 0, "/dock/apps": pend?.requests ?? 0 }} />
       </PageHeader>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-(--gutter)">
       {error && <p className="rounded-[15px] bg-danger-soft p-3 text-sm text-danger">{error}</p>}
       {loading && !data ? (
         <div aria-busy className="h-40 animate-pulse rounded-[20px] bg-card/60" />
@@ -59,6 +62,7 @@ export default function DockLayout({ children }: { children: React.ReactNode }) 
           <div key={path} className="animate-enter flex min-h-0 flex-1 flex-col">{children}</div>
         )
       )}
+      </div>
     </div>
   )
 }

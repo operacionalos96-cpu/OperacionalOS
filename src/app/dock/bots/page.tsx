@@ -68,7 +68,7 @@ export default function DockBotsPage() {
               {d.kitBots.map((x) => (
                 <button key={x.id} aria-pressed={kit === x.id} onClick={() => setKit(x.id)}
                   className={cn("flex items-center gap-3 rounded-[11px] px-3 py-2 text-left text-sm", kit === x.id ? "bg-card ring-[1.5px] ring-foreground" : "bg-foreground/[0.05]")}>
-                  <DockAvatar name={x.name} color={x.avatarColor} glyph={x.avatarGlyph} level={0} size={30} />
+                  <DockAvatar name={x.name} color={x.avatarColor} glyph={x.avatarGlyph} level={0} size={32} />
                   <span className="min-w-0 flex-1"><b>{x.name}</b><span className="block truncate text-xs text-muted-foreground">{areaName(x.areaId)} · {x.title}</span></span>
                   <Tag title="Skills que já vêm"><GraduationCapIcon />{x.skillIds.length}</Tag>
                 </button>

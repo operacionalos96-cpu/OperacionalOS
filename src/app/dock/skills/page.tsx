@@ -65,7 +65,7 @@ export default function DockSkillsPage() {
                 <Label>Bots prontos</Label>
                 {d.kitBots.filter((k) => k.areaId === kitArea).map((k) => (
                   <div key={k.id} className="flex items-center gap-3 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm">
-                    <DockAvatar name={k.name} color={k.avatarColor} glyph={k.avatarGlyph} level={0} size={28} />
+                    <DockAvatar name={k.name} color={k.avatarColor} glyph={k.avatarGlyph} level={0} size={32} />
                     <span className="flex-1">{k.name}</span>
                     <Button size="sm" variant="outline" onClick={() => run((api) => api.createAgentFromKit(k.id), `${k.name} criado.`)}><PlusIcon />Criar</Button>
                   </div>

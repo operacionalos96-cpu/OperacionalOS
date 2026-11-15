@@ -19,7 +19,7 @@ export const LEVELS: { n: AccessLevel; title: string; text: string }[] = [
   { n: 3, title: "PC inteiro", text: "mouse, teclado e o seu navegador" },
 ]
 export const levelReleased = (n: number) => n >= 0 && n <= DOCK_RELEASE.maxLevel
-export const LOCKED_LEVEL_REASON = "Chega com a área isolada do Windows (decisão de 14/11/2026)."
+export const LOCKED_LEVEL_REASON = "Ainda não disponível: chega quando o app tiver uma área separada e protegida no Windows só para o bot trabalhar."
 
 /* ---------- avatar ---------- */
 export type AvatarStyle = "constelacao" | "saturno" | "halo"
