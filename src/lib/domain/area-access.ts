@@ -85,6 +85,11 @@ export function canGrant(granter: { level: RoleLevel }, granterAreaLevel: AreaLe
   return granterAreaLevel === "gerir" && rank(level) <= rank("operar")
 }
 
+/** Níveis que a pessoa pode conceder nesta área (vitrine não se concede: é o que sobra sem acesso). */
+export function grantableLevels(granter: { level: RoleLevel }, granterAreaLevel: AreaLevel): AreaLevel[] {
+  return AREA_LEVELS.filter((l) => l !== "vitrine" && canGrant(granter, granterAreaLevel, l))
+}
+
 /**
  * Uma tarefa: vale a área do item. Sem área, segue a regra geral (todos os membros).
  * Responsável e colaboradores sempre veem a própria tarefa.
