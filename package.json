@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vitrine": "node scripts/vitrine.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.5.0",
