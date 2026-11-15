@@ -1,2 +1,4 @@
 # Normaliza quebras de linha entre Windows e Mac/Linux
 * text=auto
+# Atalhos do Windows precisam de fim de linha CRLF mesmo no zip baixado do GitHub.
+*.cmd -text
