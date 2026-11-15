@@ -82,8 +82,8 @@
 <script>
 /* Cores: mesmos seis nomes do banco (nada muda lá), com tons mais vivos. O laranja continua só para "precisa de você". */
 const COLORS = [
-  { id:"grafite", hex:"#34405a" }, { id:"aco", hex:"#3b7cf2" }, { id:"musgo", hex:"#27a06a" },
-  { id:"areia", hex:"#c8a02a" }, { id:"vinho", hex:"#d8476c" }, { id:"lilas", hex:"#7a62ea" },
+  { id:"grafite", hex:"#0fb5e0" }, { id:"aco", hex:"#2f6bff" }, { id:"musgo", hex:"#12c97a" },
+  { id:"areia", hex:"#ffc21a" }, { id:"vinho", hex:"#ff4d8d" }, { id:"lilas", hex:"#8b5cf6" },
 ]
 const STATES = [["livre","Livre"],["trabalhando","Trabalhando"],["voce","Precisa de você"],["fila","Na fila"],["pausado","Pausado"],["cota","Sem cota"],["offline","Sem conexão"],["feito","Concluiu"]]
 const EYES = [["capsula","Cápsula"],["ponto","Ponto"],["largo","Largo"]]
@@ -92,7 +92,7 @@ const DIRS = [
   { id:"modulo", name:"B · Módulo", idea:"Bloco de cantos redondos, o mais próximo do OpenBot. Órbitas em volta." },
   { id:"visor", name:"C · Visor", idea:"Corpo escuro com um visor aceso na cor do bot. Mais robô." },
 ]
-let cur = { color:"#3b7cf2", eyes:"capsula", state:"livre", pick:null }
+let cur = { color:"#2f6bff", eyes:"capsula", state:"livre", pick:null }
 
 const hx = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16))
 const mix = (a,b,t) => { const A=hx(a),B=hx(b); return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("") }
@@ -132,7 +132,7 @@ function orbits(level, size, square) {
   return s
 }
 
-function avatar({ dir = "astro", color = "#3b7cf2", level = 1, state = "livre", eyeKind = "capsula", size = 64 }) {
+function avatar({ dir = "astro", color = "#2f6bff", level = 1, state = "livre", eyeKind = "capsula", size = 64 }) {
   const id = "g" + (++uid), micro = size <= 20
   const dim = state === "pausado" || state === "offline", tired = state === "cota"
   const base = dim ? mix(color, "#8a93a3", .72) : tired ? mix(color, "#8a93a3", .35) : color
@@ -171,7 +171,7 @@ function old(color, level, size) {
 
 const $ = (id) => document.getElementById(id)
 const cell = (svg, label) => `<span class="cell">${svg}${label ? `<span>${label}</span>` : ""}</span>`
-const NAMES = [["Pesquisadora","#3b7cf2",1,"livre"],["Dev do site","#27a06a",1,"voce"],["Coordenadora","#34405a",0,"trabalhando"],["Analista","#d8476c",1,"cota"],["Organizadora","#c8a02a",0,"pausado"]]
+const NAMES = [["Pesquisadora","#2f6bff",1,"livre"],["Dev do site","#12c97a",1,"voce"],["Coordenadora","#0fb5e0",0,"trabalhando"],["Analista","#ff4d8d",1,"cota"],["Organizadora","#ffc21a",0,"pausado"]]
 
 function render() {
   $("colors").innerHTML = COLORS.map(c => `<button class="sw" style="background:${c.hex}" aria-label="${c.id}" aria-pressed="${cur.color===c.hex}" data-c="${c.hex}"></button>`).join("")

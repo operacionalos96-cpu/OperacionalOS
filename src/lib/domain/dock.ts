@@ -31,12 +31,12 @@ export const AVATAR_STYLES: { id: AvatarStyle; label: string }[] = [
 ]
 /** Paleta curta, sem laranja: o laranja é só para "precisa de você" (nota 34). */
 export const AVATAR_COLORS: { id: AvatarColor; label: string; hex: string }[] = [
-  { id: "grafite", label: "Grafite", hex: "#34405a" },
-  { id: "aco", label: "Azul", hex: "#3b7cf2" },
-  { id: "musgo", label: "Verde", hex: "#27a06a" },
-  { id: "areia", label: "Âmbar", hex: "#c8a02a" },
-  { id: "vinho", label: "Framboesa", hex: "#d8476c" },
-  { id: "lilas", label: "Violeta", hex: "#7a62ea" },
+  { id: "grafite", label: "Ciano", hex: "#0fb5e0" },
+  { id: "aco", label: "Azul", hex: "#2f6bff" },
+  { id: "musgo", label: "Verde", hex: "#12c97a" },
+  { id: "areia", label: "Amarelo", hex: "#ffc21a" },
+  { id: "vinho", label: "Rosa", hex: "#ff4d8d" },
+  { id: "lilas", label: "Violeta", hex: "#8b5cf6" },
 ]
 export const AVATAR_ICONS = ["lupa", "codigo", "barras"] as const
 /**

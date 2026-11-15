@@ -70,27 +70,27 @@ export function avatarSvg(
   // só números e nomes conhecidos chegam ao markup: nada de fora é escrito no SVG
   const level = Math.max(0, Math.min(3, Math.trunc(Number(o.level) || 0)))
   const size = Math.max(8, Math.min(512, Math.trunc(Number(o.size) || 40)))
-  const color = /^#[0-9a-fA-F]{6}$/.test(o.color ?? "") ? (o.color as string) : "#3b7cf2"
+  const color = /^#[0-9a-fA-F]{6}$/.test(o.color ?? "") ? (o.color as string) : "#2f6bff"
   const face = Object.hasOwn(FACE_OF, state) ? FACE_OF[state] : "livre"
   const micro = size <= 20
   const dim = face === "pausado" || face === "offline", tired = face === "cota"
-  const base = dim ? mix(color, "#8a93a3", 0.72) : tired ? mix(color, "#8a93a3", 0.35) : color
+  const base = face === "offline" ? mix(color, "#9aa3b4", 0.6) : face === "pausado" ? mix(color, "#aab2c2", 0.42) : tired ? mix(color, "#aab2c2", 0.22) : color
   const S = micro ? 30 : 27
   const ek = micro ? 1.5 : 1
-  let defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(base, "#ffffff", 0.22)}"/><stop offset="1" stop-color="${mix(base, "#0b1020", 0.22)}"/></linearGradient>`
+  let defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(base, "#ffffff", 0.38)}"/><stop offset=".55" stop-color="${base}"/><stop offset="1" stop-color="${mix(base, "#0b1020", 0.06)}"/></linearGradient>`
   let body: string, look: string
   if (shape === "modulo") {
     const r = S * 0.96
-    body = `<rect x="${-r}" y="${-r}" width="${2 * r}" height="${2 * r}" rx="${(r * 0.52).toFixed(1)}" fill="url(#${id})"/><rect x="${-r + 4}" y="${-r + 3.5}" width="${2 * r - 8}" height="${(r * 0.7).toFixed(1)}" rx="${(r * 0.4).toFixed(1)}" fill="#fff" opacity=".13"/>`
+    body = `<rect x="${-r}" y="${-r}" width="${2 * r}" height="${2 * r}" rx="${(r * 0.52).toFixed(1)}" fill="url(#${id})"/><rect x="${-r + 4}" y="${-r + 3.5}" width="${2 * r - 8}" height="${(r * 0.7).toFixed(1)}" rx="${(r * 0.4).toFixed(1)}" fill="#fff" opacity=".2"/>`
     look = eyes(kind, face, "#fff", micro ? 11 : 9.5, micro ? 0 : 1, ek)
   } else if (shape === "visor") {
-    const shell = dim ? "#3a4252" : "#1b2432", glow = dim ? "#9aa3b2" : mix(color, "#ffffff", tired ? 0.1 : 0.28)
+    const shell = dim ? "#3a4252" : "#1b2432", glow = dim ? mix(color, "#aab2c2", 0.5) : mix(color, "#ffffff", tired ? 0.2 : 0.42)
     defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(shell, "#ffffff", 0.14)}"/><stop offset="1" stop-color="${shell}"/></linearGradient>`
     const band = `x="${(-S * 0.8).toFixed(1)}" y="${(-S * 0.42).toFixed(1)}" width="${(S * 1.6).toFixed(1)}" height="${(S * 0.8).toFixed(1)}" rx="${(S * 0.4).toFixed(1)}"`
-    body = `<circle r="${S}" fill="url(#${id})"/><circle r="${S - 0.6}" fill="none" stroke="${glow}" stroke-opacity=".38" stroke-width="${micro ? 4 : 1.2}"/><rect ${band} fill="${mix(color, "#0b1020", dim ? 0.8 : 0.62)}"/><rect ${band} fill="none" stroke="${glow}" stroke-opacity=".5" stroke-width="${micro ? 3 : 1.2}"/>`
+    body = `<circle r="${S}" fill="url(#${id})"/><circle r="${S - 0.6}" fill="none" stroke="${glow}" stroke-opacity=".38" stroke-width="${micro ? 4 : 1.2}"/><rect ${band} fill="${mix(color, "#0b1020", dim ? 0.72 : 0.42)}"/><rect ${band} fill="none" stroke="${glow}" stroke-opacity=".5" stroke-width="${micro ? 3 : 1.2}"/>`
     look = eyes(kind, face, glow, micro ? 10 : 8.5, micro ? -1 : -1.2, micro ? 1.3 : 0.82)
   } else {
-    body = `<circle r="${S}" fill="url(#${id})"/><ellipse cx="${(-S * 0.3).toFixed(1)}" cy="${(-S * 0.5).toFixed(1)}" rx="${(S * 0.38).toFixed(1)}" ry="${(S * 0.18).toFixed(1)}" fill="#fff" opacity=".22" transform="rotate(-24 ${(-S * 0.3).toFixed(1)} ${(-S * 0.5).toFixed(1)})"/>`
+    body = `<circle r="${S}" fill="url(#${id})"/><ellipse cx="${(-S * 0.3).toFixed(1)}" cy="${(-S * 0.5).toFixed(1)}" rx="${(S * 0.38).toFixed(1)}" ry="${(S * 0.18).toFixed(1)}" fill="#fff" opacity=".34" transform="rotate(-24 ${(-S * 0.3).toFixed(1)} ${(-S * 0.5).toFixed(1)})"/>`
     look = eyes(kind, face, "#fff", micro ? 11 : 9.5, micro ? 0 : -1, ek)
   }
   let extra = ""
