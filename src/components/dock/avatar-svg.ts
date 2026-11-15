@@ -66,8 +66,12 @@ export function avatarSvg(
   o: { shape?: AvatarShape; level?: number; state?: string; size?: number; color?: string; eyes?: AvatarEyes },
   id: string,
 ): string {
-  const { shape = "astro", level = 0, state = "ocioso", size = 40, color = "#3b7cf2", eyes: kind = "capsula" } = o
-  const face = FACE_OF[state] ?? "livre"
+  const { shape = "astro", state = "ocioso", eyes: kind = "capsula" } = o
+  // só números e nomes conhecidos chegam ao markup: nada de fora é escrito no SVG
+  const level = Math.max(0, Math.min(3, Math.trunc(Number(o.level) || 0)))
+  const size = Math.max(8, Math.min(512, Math.trunc(Number(o.size) || 40)))
+  const color = /^#[0-9a-fA-F]{6}$/.test(o.color ?? "") ? (o.color as string) : "#3b7cf2"
+  const face = Object.hasOwn(FACE_OF, state) ? FACE_OF[state] : "livre"
   const micro = size <= 20
   const dim = face === "pausado" || face === "offline", tired = face === "cota"
   const base = dim ? mix(color, "#8a93a3", 0.72) : tired ? mix(color, "#8a93a3", 0.35) : color
@@ -98,5 +102,5 @@ export function avatarSvg(
   }
   if (face === "pausado" && !micro) extra += `<text class="zz" x="${(S * 0.72).toFixed(1)}" y="${(-S * 0.7).toFixed(1)}" font-size="13" font-weight="700" fill="var(--fg-3)" font-family="Inter, system-ui, sans-serif">z</text>`
   if (face === "fila" && !micro) extra += `<circle class="qdot" cx="${(S * 0.95).toFixed(1)}" cy="${(-S * 0.95).toFixed(1)}" r="4"/>`
-  return `<svg class="dock-av" data-level="${level}" data-face="${face}" width="${size}" height="${size}" viewBox="-52 -52 104 104" role="img" aria-label="nível ${level}, ${state}"><defs>${defs}</defs>${orbits(level, size, shape === "modulo")}${body}${look}${extra}</svg>`
+  return `<svg class="dock-av" data-level="${level}" data-face="${face}" width="${size}" height="${size}" viewBox="-52 -52 104 104" role="img" aria-label="nível ${level}, ${face}"><defs>${defs}</defs>${orbits(level, size, shape === "modulo")}${body}${look}${extra}</svg>`
 }
