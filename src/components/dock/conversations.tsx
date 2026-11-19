@@ -5,13 +5,14 @@ import Link from "next/link"
 import { ArrowUpIcon, BotIcon, CheckIcon, ClipboardCheckIcon, CpuIcon, ForwardIcon, HashIcon, PencilIcon, PlusIcon, RepeatIcon, SlidersHorizontalIcon, TriangleAlertIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { connectionFor, type DockAgent, type DockApproval, type DockData, type DockMessage, type DockThread } from "@/lib/domain/dock"
+import { approvalPhase, approvalVisible, connectionFor, type DockAgent, type DockApproval, type DockData, type DockMessage, type DockThread } from "@/lib/domain/dock"
 import { newKey, useDock } from "@/lib/dock/store"
 import { cn } from "@/lib/utils"
 import { BotApps, BotSettings, BotSkills } from "./bot-panels"
 import { BotAvatar, ClassTag, Empty, Hint, Label, StateTag, Tag, agentState } from "./ui"
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+const dm = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 const directThread = (d: DockData, agentId: string) => d.threads.find((t) => t.kind === "direta" && t.agentIds.length === 1 && t.agentIds[0] === agentId && !t.archived && !t.continuedFromThreadId)
 
 /** Conversas: lista de bots e canais, a conversa e o painel do bot. */
@@ -38,7 +39,7 @@ export function Conversations({ d }: { d: DockData }) {
       <aside className="grid content-start gap-1 overflow-auto rounded-[20px] bg-card/80 p-2 backdrop-blur max-lg:max-h-60" aria-label="Conversas">
         <div className="flex items-center px-2 pt-1"><Label>Bots</Label><span className="flex-1" /><Button asChild size="icon-xs" variant="ghost" aria-label="Novo bot"><Link href="/dock/bots"><PlusIcon /></Link></Button></div>
         {d.agents.map((a) => {
-          const pend = d.approvals.filter((x) => x.agentId === a.id && x.status === "pendente").length
+          const pend = d.approvals.filter((x) => x.agentId === a.id && approvalVisible(x)).length
           return (
             <button key={a.id} onClick={() => setSel({ kind: "bot", id: a.id })} aria-current={sel?.kind === "bot" && sel.id === a.id}
               className={cn("flex items-center gap-2.5 rounded-[11px] px-2 py-1.5 text-left text-sm hover:bg-foreground/[0.05]", sel?.kind === "bot" && sel.id === a.id && "bg-card font-semibold shadow-[var(--shadow-lift)]")}>
@@ -235,8 +236,27 @@ function Approval({ d, a }: { d: DockData; a: DockApproval }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(JSON.stringify(a.draft, null, 2))
   const [always, setAlways] = useState(false)
+  const [open, setOpen] = useState(false)
   const bot = d.agents.find((x) => x.id === a.agentId)
   const connector = d.connectors.find((c) => c.id === a.connectorId)
+  const phase = approvalPhase(a)
+  // venceu no 7º dia: só o registro; o banco recusaria aprovar
+  if (phase === "vencido")
+    return (
+      <p className="flex items-center gap-2 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm text-muted-foreground">
+        <XIcon className="size-4" />
+        {a.actionLabel || a.title}: venceu em {dm(a.expiresAt)}, sem resposta. Se ainda precisar, peça de novo ao bot.
+      </p>
+    )
+  // passou de 48 h: sai do contador e fica dobrado aqui; ainda dá para aprovar até vencer
+  if (phase === "guardado" && !open)
+    return (
+      <p className="flex flex-wrap items-center gap-2 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm text-muted-foreground">
+        <ClipboardCheckIcon className="size-4" />
+        <span className="min-w-0 flex-1">Pedido de {dm(a.createdAt)} ainda aberto: {a.actionLabel || a.title}. Dá para aprovar até {dm(a.expiresAt)}.</span>
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Ver pedido</Button>
+      </p>
+    )
   if (a.status !== "pendente")
     return (
       <p className="flex items-center gap-2 rounded-[11px] bg-foreground/[0.05] px-3 py-2 text-sm text-muted-foreground">

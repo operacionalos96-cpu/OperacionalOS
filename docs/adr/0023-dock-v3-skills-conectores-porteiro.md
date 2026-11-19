@@ -89,3 +89,22 @@ Fatos que pesaram:
 - **Depois:** `claim_next_job` respeitando a
   suspensão; `office-state/v2` com nível e avatar; catálogo de provedores com fonte e data; conferir a
   documentação do ACP e de cada programa antes da segunda leva.
+
+## Respostas dos founders (19/11/2026)
+
+Respostas à apresentação da vitrine (`docs/prototipos/apresentacao-vitrine.html`).
+
+- **Prazo do pedido de aprovação:** fica à vista por 48 h (contador do Dock, número no bot, avatar aceso na
+  Sede). Depois sai dali, mas continua na conversa, dobrado, e ainda dá para aprovar. No 7º dia vence de vez.
+  O banco já grava `expires_at` = criação + 7 dias e recusa aprovar depois disso; as 48 h são regra de tela
+  (`approvalPhase` em `src/lib/domain/dock.ts`) e do `/api/escritorio/estado`.
+- **Porteiro, aceitas como sugerido:** "sempre permitir" vale para a ação inteira, e medimos; rotina não tem
+  "sempre permitir"; dinheiro precisa do dono e de um founder; skills com script ficam desligadas; limites
+  iniciais de 60 ações por minuto e 5 recusas pausam o bot.
+- **Ainda em aberto, perguntas refeitas:** quem aprova um app novo no catálogo (dupla checagem ou um founder
+  só); se uma IA ainda não conferida pode receber dado da empresa; quem aprova mudança na skill da área; o que
+  sobe para o contexto da empresa (os founders querem que tudo suba, para a auto-evolução, o que esbarra no
+  "só o dono lê" da ADR 0022).
+- **Níveis:** os founders pediram todos os níveis liberados para testar. Os níveis 2 (rodar programas) e 3
+  (mouse, teclado e navegador) não existem no motor do PC (`LEVEL_CEILING = 1`). Liberar só a chave na tela
+  não daria nada a mais ao bot. Fica pendente de construir o nível 2, e depois o 3.

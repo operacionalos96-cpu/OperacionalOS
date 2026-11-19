@@ -36,3 +36,9 @@ Fatos do código que pesaram:
 - **Novos tipos de evento:** um tipo novo (por exemplo, produção de site) entra numa linha do `switch` e num teste. A cena não muda.
 - **Permissões:** a vitrine (ver o movimento sem o conteúdo) e o acesso por área (ADR 0020, PRs #39 e #40) ainda não filtram a cena. Hoje ela mostra o que o feed de eventos já mostra para quem abre o AI Office. Quando o acesso por área entrar, o filtro deve ser aplicado no feed, antes da tradução.
 - **Teste no navegador:** `?raf=timeout` existe só fora de produção, para testar com o painel do navegador escondido (que congela o `requestAnimationFrame`).
+
+## Atualização (19/11/2026)
+
+A primeira cena (prédio em corte de 4 andares, `sede-scene.ts`) foi apagada por decisão dos founders. Vale só a
+torre v2 (`sede-v2-scene.ts`, plano 38), que já a substituía. Saíram junto `sceneActionFor`, `enqueueScene` e
+`SEDE_FLOORS`, usados só por ela; a tradução atual é `sedeEventsFor` em `src/lib/domain/office-scene.ts`.

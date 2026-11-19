@@ -134,6 +134,14 @@ function seed(): DockData {
         draft: { titulo: "Formulário de contato no celular", mudancas: ["botão acima do teclado (safe area)", "envio espera a validação", "2 testes novos"], arquivos: ["contato.tsx", "contato.test.tsx"] },
         itemCount: 1, status: "pendente", createdAt: iso(61), expiresAt: new Date(Date.now() + 6 * 86_400_000).toISOString(), decidedAt: null, resultSummary: null,
       },
+      // passou das 48 h: sai do contador e aparece dobrado na conversa, ainda aprovável até o 7º dia
+      {
+        id: "apr_2", agentId: "agt_dev", threadId: "thr_dev", connectorId: "github", actionKey: "abrir_pr", actionClass: "C", gate: "lote", approver: "dono", origin: "humano",
+        originDetail: "sua mensagem de 3 dias atrás", actionLabel: "abrir PR, criar branch", ownerOkAt: null, founderOkAt: null,
+        title: "Abrir PR: \"Rodapé com o novo telefone\"", summary: "Ação de classe C (executar) no GitHub da HZK.",
+        draft: { titulo: "Rodapé com o novo telefone", mudancas: ["telefone novo no rodapé"], arquivos: ["rodape.tsx"] },
+        itemCount: 1, status: "pendente", createdAt: iso(3 * 24 * 60), expiresAt: new Date(Date.now() + 4 * 86_400_000).toISOString(), decidedAt: null, resultSummary: null,
+      },
     ],
     requests: [{ id: "crq_1", name: "Trello", url: "https://trello.com", why: "Ler os cartões do backlog para o resumo da semana.", requestedBy: "u2", requestedAt: iso(900), status: "aberto" }],
     kitBots: [

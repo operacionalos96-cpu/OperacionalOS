@@ -334,10 +334,25 @@ export function connectionFor(d: Pick<DockData, "threadModels" | "agents">, thre
   return { connectionId: a?.connectionId ?? null, model: a?.model ?? null, override: false }
 }
 
-/** Pendências que pedem a pessoa: aprovações abertas, propostas de skill e pedidos de conector. */
+/* ---------- prazo do pedido de aprovação (decisão dos founders, 19/11/2026) ----------
+ * Fica à vista (contador, lista de bots, Sede) por 48 h. Depois some de lá, mas continua na conversa,
+ * dobrado, e ainda dá para aprovar se alguém voltar a ele. No 7º dia vence de vez: o banco grava
+ * expires_at = criação + 7 dias (office_request_action, 0027) e recusa aprovar depois disso. */
+export const APPROVAL_VISIBLE_HOURS = 48
+export type ApprovalPhase = "a_vista" | "guardado" | "vencido" | "decidido"
+type ApprovalTime = Pick<DockApproval, "status" | "createdAt" | "expiresAt">
+export function approvalPhase(a: ApprovalTime, now = Date.now()): ApprovalPhase {
+  if (a.status !== "pendente") return "decidido"
+  if (new Date(a.expiresAt).getTime() <= now) return "vencido"
+  return now - new Date(a.createdAt).getTime() < APPROVAL_VISIBLE_HOURS * 3_600_000 ? "a_vista" : "guardado"
+}
+/** Pedido que ainda chama a atenção da pessoa (as primeiras 48 h). */
+export const approvalVisible = (a: ApprovalTime, now = Date.now()) => approvalPhase(a, now) === "a_vista"
+
+/** Pendências que pedem a pessoa: aprovações das últimas 48 h, propostas de skill e pedidos de conector. */
 export function pendingCount(d: Pick<DockData, "approvals" | "proposals" | "requests">, opts: { lead: boolean; founder: boolean }) {
   const now = Date.now()
-  const apr = d.approvals.filter((a) => a.status === "pendente" && new Date(a.expiresAt).getTime() > now).length
+  const apr = d.approvals.filter((a) => approvalVisible(a, now)).length
   const props = opts.lead ? d.proposals.filter((p) => p.status === "aberta").length : 0
   const reqs = opts.founder ? d.requests.filter((r) => r.status === "aberto").length : 0
   return { approvals: apr, proposals: props, requests: reqs, total: apr + props + reqs }

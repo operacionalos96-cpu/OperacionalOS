@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { APPROVAL_VISIBLE_HOURS } from "@/lib/domain/dock"
 import { ACTIVE_JOB_STATUSES, deriveOfficeState, officeStateInput, type OfficeRows } from "@/lib/domain/office"
 import { requireMember } from "@/lib/server/auth"
 import { supabaseServer } from "@/lib/supabase/server"
@@ -28,8 +29,14 @@ export async function GET() {
     db.from("office_threads").select("id, kind").eq("owner_team_id", member.teamId).eq("archived", false),
     db.from("workers").select("last_seen_at, enabled").eq("owner_team_id", member.teamId),
     db.from("office_connections").select("id, provider, kind, status, quota_resets_at").eq("owner_team_id", member.teamId),
-    // aprovações do porteiro esperando a pessoa (Dock v3, migration 0027): acendem o avatar
-    db.from("office_approvals").select("agent_id, gate").eq("owner_team_id", member.teamId).eq("status", "pendente").gt("expires_at", new Date().toISOString()),
+    // aprovações do porteiro esperando a pessoa (Dock v3, migration 0027): acendem o avatar só nas primeiras 48 h
+    db
+      .from("office_approvals")
+      .select("agent_id, gate")
+      .eq("owner_team_id", member.teamId)
+      .eq("status", "pendente")
+      .gt("expires_at", new Date().toISOString())
+      .gt("created_at", new Date(Date.now() - APPROVAL_VISIBLE_HOURS * 3_600_000).toISOString()),
   ])
   const failed = [office, agents, jobs, threads, workers, connections, approvals].find((r) => r.error)
   if (failed?.error) {

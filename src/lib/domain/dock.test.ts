@@ -8,6 +8,8 @@ import {
   endpointOk,
   grantAllowed,
   levelReleased,
+  approvalPhase,
+  approvalVisible,
   pendingCount,
   signalLooksPersonal,
   skillBlock,
@@ -70,16 +72,41 @@ describe("conversa e pendências", () => {
     expect(connectionFor(d, "outra", "b")).toEqual({ connectionId: "c1", model: "m1", override: false })
   })
 
-  it("conta só aprovação aberta e não vencida; propostas para responsável; pedidos para founder", () => {
+  it("conta só aprovação aberta das últimas 48 h; propostas para responsável; pedidos para founder", () => {
     const future = new Date(Date.now() + 86_400_000).toISOString()
     const past = new Date(Date.now() - 1000).toISOString()
+    const now = new Date().toISOString()
+    const old = new Date(Date.now() - 49 * 3_600_000).toISOString()
     const d = {
-      approvals: [{ status: "pendente", expiresAt: future }, { status: "pendente", expiresAt: past }, { status: "aprovada", expiresAt: future }] as never,
+      approvals: [
+        { status: "pendente", createdAt: now, expiresAt: future },
+        { status: "pendente", createdAt: old, expiresAt: future },
+        { status: "pendente", createdAt: old, expiresAt: past },
+        { status: "aprovada", createdAt: now, expiresAt: future },
+      ] as never,
       proposals: [{ status: "aberta" }] as never,
       requests: [{ status: "aberto" }] as never,
     }
     expect(pendingCount(d, { lead: false, founder: false }).total).toBe(1)
     expect(pendingCount(d, { lead: true, founder: true }).total).toBe(3)
+  })
+})
+
+describe("prazo do pedido de aprovação", () => {
+  const H = 3_600_000, D = 24 * H, t0 = Date.UTC(2026, 10, 19, 12)
+  const ap = (createdH: number, status = "pendente") => ({ status, createdAt: new Date(t0).toISOString(), expiresAt: new Date(t0 + 7 * D).toISOString(), at: t0 + createdH * H }) as const
+
+  it("à vista nas primeiras 48 h, guardado até o 7º dia, vencido depois", () => {
+    for (const [h, phase] of [[0, "a_vista"], [47.9, "a_vista"], [48, "guardado"], [6 * 24 + 23, "guardado"], [7 * 24, "vencido"]] as const) {
+      const a = ap(h)
+      expect(approvalPhase(a as never, a.at)).toBe(phase)
+    }
+  })
+
+  it("decidido não conta, em qualquer tempo", () => {
+    const a = ap(1, "aprovada")
+    expect(approvalPhase(a as never, a.at)).toBe("decidido")
+    expect(approvalVisible(a as never, a.at)).toBe(false)
   })
 })
 
