@@ -9,6 +9,7 @@ import {
   KanbanIcon,
   KeyRoundIcon,
   NetworkIcon,
+  OrbitIcon,
   PackageIcon,
   RadarIcon,
   ScaleIcon,
@@ -190,6 +191,19 @@ export const PAGES = [
       "No monitor, refaça uma tarefa que falhou.",
     ],
     terms: ["hipotese"],
+  },
+  {
+    href: "/dock",
+    title: "HZK Dock",
+    short: "Dock",
+    icon: OrbitIcon,
+    section: "Criação",
+    purpose: "O seu escritório de IA: seus bots, as IAs que eles usam, os apps e as skills da empresa. Só você vê.",
+    howTo: [
+      "Crie um bot do zero ou a partir do Kit da sua área; os anéis do avatar mostram quanto ele pode no seu PC.",
+      "Converse com ele; cada resposta mostra qual IA respondeu, e dá para trocar a IA só naquela conversa.",
+      "Quando um bot quer mexer em algo da empresa, a ação vem para você aprovar, com o rascunho do que será feito.",
+    ],
   },
   {
     href: "/financeiro",

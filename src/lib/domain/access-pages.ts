@@ -9,7 +9,7 @@ import { ownerOfArea, type Area, type PeopleContext } from "./areas"
 import { isAtLeast, type RoleLevel } from "./org"
 
 /** Todo mundo vê: o dia, a agenda, a captura, o time, as tarefas e as decisões. */
-export const BASE_PAGES = ["/", "/agenda", "/caixa-de-entrada", "/equipe", "/tarefas", "/decisoes"]
+export const BASE_PAGES = ["/", "/agenda", "/caixa-de-entrada", "/equipe", "/tarefas", "/decisoes", "/dock"]
 
 /** Abas de cada área (id de src/lib/domain/areas.ts). */
 export const AREA_PAGES: Record<string, string[]> = {

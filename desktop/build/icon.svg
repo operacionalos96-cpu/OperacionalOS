@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="OperacionalOS">
+  <!-- Ícone do OperacionalOS (40 px para cima). Esfera da Órbita com o símbolo HZK; traçado do Z, linha e nós
+       iguais ao public/hzk-simbolo.svg, só escalados. O aro claro separa a esfera da barra de tarefas escura. -->
+  <defs>
+    <radialGradient id="corpo" cx="34%" cy="24%" r="82%">
+      <stop offset="0" stop-color="#3b4b64" />
+      <stop offset="0.5" stop-color="#1f2a3a" />
+      <stop offset="1" stop-color="#121821" />
+    </radialGradient>
+    <radialGradient id="calor" cx="76%" cy="90%" r="58%">
+      <stop offset="0" stop-color="#ea5b25" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#ea5b25" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="aro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.12" />
+    </linearGradient>
+  </defs>
+  <g id="fundo">
+    <circle cx="128" cy="128" r="125" fill="url(#corpo)" />
+    <circle cx="128" cy="128" r="125" fill="url(#calor)" />
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#aro)" stroke-width="3.5" />
+  </g>
+  <g transform="translate(128 130) scale(2.0) translate(-48.5 -49.5)">
+    <polygon points="18.57,9.05 82.02,9.05 82.02,26.19 42.74,73.21 82.02,73.21 82.02,89.88 15.0,89.88 15.0,75.36 57.26,26.19 18.57,26.19" fill="#ffffff" />
+    <line x1="21.79" y1="83.45" x2="75.6" y2="15.48" stroke="#ea5b25" stroke-width="3.2" stroke-linecap="round" />
+    <circle cx="21.79" cy="83.45" r="7.4" fill="#ea5b25" />
+    <circle cx="48.21" cy="51.07" r="7.4" fill="#ea5b25" />
+    <circle cx="75.6" cy="15.48" r="7.4" fill="#ea5b25" />
+  </g>
+</svg>

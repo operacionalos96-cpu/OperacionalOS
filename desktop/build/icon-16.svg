@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="OperacionalOS">
+  <!-- Ícone do OperacionalOS para 16 px (e 32 px, dobrado): esfera, Z grosso na grade inteira e o nó laranja
+       no alto do traço, como no símbolo HZK. O aro claro separa a esfera da barra de tarefas escura. -->
+  <g id="fundo">
+    <circle cx="8" cy="8" r="8" fill="#1b2432" />
+    <circle cx="8" cy="8" r="7.6" fill="none" stroke="#ffffff" stroke-opacity="0.24" stroke-width="0.8" />
+  </g>
+  <polygon points="4,3 12,3 12,5 7,11 12,11 12,13 4,13 4,11 9,5 4,5" fill="#ffffff" />
+  <circle cx="11.5" cy="4.5" r="2" fill="#ea5b25" />
+</svg>

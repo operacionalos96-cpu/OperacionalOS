@@ -17,6 +17,7 @@ export const SCOPES = {
   "knowledge:read": "Ler aprendizados e hipóteses",
   "whatsapp:funnel": "Extensão do WhatsApp: achar lead pelo número, ver o passo do funil e registrar envio/resposta",
   "whatsapp:agent": "Agente do WhatsApp: pegar a próxima ação, pedir a resposta da IA e registrar o que enviou sozinho",
+  "office:engine": "Motor do HZK Dock no PC liberado: contexto da entrega, mensagens do bot, porteiro, cota e uso (só as entregas do dono do PC)",
 } as const
 export type Scope = keyof typeof SCOPES
 
@@ -31,6 +32,9 @@ export interface Worker {
   scopes: Scope[]
   /** Membro (team id) que criou o token — é quem "assina" o que a extensão registrar. */
   createdBy: string | null
+  /** Dono do trabalhador pessoal (PC liberado, 0026/0028). null = trabalhador da empresa. */
+  ownerTeamId: string | null
+  kind: "servico" | "pc"
 }
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex")
@@ -75,13 +79,15 @@ export async function authWorker(req: Request): Promise<Worker> {
   if (!/^oos_[A-Za-z0-9_-]{30,}$/.test(token)) throw new WorkerAuthError("token ausente ou inválido", 401)
   const { data } = await supabaseAdmin()
     .from("workers")
-    .select("id, name, agent_id, engine, capabilities, scopes, enabled, created_by")
+    .select("id, name, agent_id, engine, capabilities, scopes, enabled, created_by, owner_team_id, kind, pc_status")
     .eq("token_hash", hash(token))
     .maybeSingle()
   if (!data || !data.enabled) throw new WorkerAuthError("token ausente ou inválido", 401)
+  // PC liberado só vale aprovado (o banco já impede ligado sem aprovação; aqui é a segunda trava)
+  if (data.kind === "pc" && (data.pc_status !== "aprovado" || !data.owner_team_id)) throw new WorkerAuthError("token ausente ou inválido", 401)
   if (!(await rateHit(`worker:${data.id}`, 240, 60))) throw new WorkerAuthError("muitas requisições — respeite retry_after_seconds", 429)
   await supabaseAdmin().from("workers").update({ last_seen_at: new Date().toISOString() }).eq("id", data.id)
-  return { id: data.id, name: data.name, agent_id: data.agent_id, engine: data.engine, capabilities: data.capabilities ?? [], scopes: (data.scopes ?? []) as Scope[], createdBy: data.created_by ?? null }
+  return { id: data.id, name: data.name, agent_id: data.agent_id, engine: data.engine, capabilities: data.capabilities ?? [], scopes: (data.scopes ?? []) as Scope[], createdBy: data.created_by ?? null, ownerTeamId: data.owner_team_id ?? null, kind: data.kind === "pc" ? "pc" : "servico" }
 }
 
 export function requireScope(w: Worker, scope: Scope) {

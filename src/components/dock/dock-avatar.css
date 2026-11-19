@@ -1,0 +1,35 @@
+/* Avatar com rosto dos bots do HZK Dock (Astro padrão; Módulo e Visor como opção).
+ * Mesmo desenho de docs/prototipos/dock-avatar-rostos.html, com os tokens do app.
+ * Os olhos contam o estado; as luas em órbita contam o nível; laranja só para "precisa de você". */
+.dock-av {
+  --fg-3: var(--muted-foreground);
+  --hot: var(--highlight);
+  --surface: var(--card);
+  --orbit: var(--foreground);
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+.dock-av .orbit { fill: none; stroke: var(--orbit); opacity: 0.28; }
+.dock-av .moon { fill: var(--orbit); }
+.dock-av .qdot { fill: var(--orbit); opacity: 0.7; }
+.dock-av .spin { transform-box: view-box; transform-origin: 0 0; }
+.dock-av .eyes, .dock-av .eye { transform-box: fill-box; transform-origin: center; }
+.dock-av.done .eyes { transform: translateY(-1.5px); transition: transform 300ms; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dock-av[data-face="livre"] .eye, .dock-av[data-face="fila"] .eye { animation: dock-av-blink 5.2s infinite; }
+  .dock-av[data-face="trabalhando"] .eyes { animation: dock-av-scan 1.8s ease-in-out infinite; }
+  .dock-av[data-face="trabalhando"] .spin { animation: dock-av-spin 9s linear infinite; }
+  .dock-av[data-face="trabalhando"] .spin.r2 { animation-duration: 13s; animation-direction: reverse; }
+  .dock-av[data-face="trabalhando"] .spin.r3 { animation-duration: 17s; }
+  .dock-av[data-face="voce"] .ask { animation: dock-av-pulse 1.4s ease-in-out infinite; }
+  .dock-av[data-face="voce"] .eyes { animation: dock-av-nod 1.4s ease-in-out infinite; }
+  .dock-av[data-face="pausado"] .zz { animation: dock-av-float 2.6s ease-in-out infinite; }
+}
+@keyframes dock-av-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@keyframes dock-av-scan { 0%, 100% { transform: translateX(-2.6px); } 50% { transform: translateX(2.6px); } }
+@keyframes dock-av-spin { to { transform: rotate(360deg); } }
+@keyframes dock-av-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes dock-av-nod { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+@keyframes dock-av-float { 0%, 100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(-3px); opacity: 0.5; } }

@@ -1,0 +1,102 @@
+/*
+ * Bolinha flutuante (identidade Órbita): esfera navy com o símbolo, uma órbita fina e um nó.
+ * Quieta (motor parado), órbita lenta (esperando), órbita girando (trabalhando), laranja aceso (precisa de você).
+ * Fundo transparente: a janela não tem moldura e fica por cima da área de trabalho.
+ */
+/* a bolinha fica sobre qualquer papel de parede: órbita e nó têm contorno duplo (escuro sob claro) */
+:root {
+  --laranja: #ea5b25;
+  --orbita: rgb(255 255 255 / 55%);
+  --orbita-sombra: rgb(16 21 29 / 45%);
+  --no: #f2f3f5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+.bolinha {
+  width: 72px;
+  height: 72px;
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bolinha:hover { transform: scale(1.05); }
+.bolinha.apertada { transform: scale(0.95); }
+.bolinha.arrastando { cursor: grabbing; transform: scale(1.02); }
+
+svg {
+  display: block;
+  width: 72px;
+  height: 72px;
+  overflow: visible;
+}
+
+.esfera { filter: drop-shadow(0 2px 3px rgb(0 0 0 / 38%)); }
+.aro { fill: none; stroke: rgb(255 255 255 / 16%); stroke-width: 1; }
+
+.orbita {
+  opacity: 0.55;
+  transition: opacity 400ms ease;
+}
+.orbita circle { fill: none; }
+.orbita-sombra { stroke: var(--orbita-sombra); stroke-width: 2.4; }
+.orbita-linha { stroke: var(--orbita); stroke-width: 1; }
+.no {
+  fill: var(--no);
+  stroke: #1b2432;
+  stroke-width: 1.2;
+  transition: fill 300ms ease, opacity 300ms ease;
+}
+
+/* o braço gira em volta do centro da esfera */
+.braco {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transform: rotate(-45deg);
+}
+
+/* parado: quieta, nó apagado no alto à direita */
+[data-visual="quieta"] .no { opacity: 0.55; }
+[data-visual="quieta"] .orbita { opacity: 0.35; }
+
+/* esperando: órbita lenta */
+[data-visual="lenta"] .orbita { opacity: 0.7; }
+[data-visual="lenta"] .braco { animation: girar 14s linear infinite; }
+
+/* trabalhando: órbita girando, nó laranja */
+[data-visual="girando"] .orbita { opacity: 0.9; }
+[data-visual="girando"] .no { fill: var(--laranja); }
+[data-visual="girando"] .braco { animation: girar 2.6s linear infinite; }
+
+/* precisa de você: o ponto laranja acende e pulsa devagar */
+.aviso { opacity: 0; transition: opacity 300ms ease; }
+.aviso-ponto { fill: var(--laranja); stroke: #fff; stroke-width: 1.4; }
+.aviso-pulso { fill: var(--laranja); opacity: 0; transform-box: fill-box; transform-origin: center; }
+[data-visual="alerta"] .aviso { opacity: 1; }
+[data-visual="alerta"] .aviso-pulso { animation: pulsar 2.2s ease-out infinite; }
+[data-visual="alerta"] .braco { opacity: 0; }
+
+@keyframes girar {
+  from { transform: rotate(-45deg); }
+  to { transform: rotate(315deg); }
+}
+@keyframes pulsar {
+  0% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.1); }
+}
+
+/* "Reduzir movimento" do Windows: nada gira nem pulsa; o estado aparece só pela cor e pela órbita */
+@media (prefers-reduced-motion: reduce) {
+  .braco, [data-visual] .braco { animation: none !important; }
+  .aviso-pulso { animation: none !important; }
+  .bolinha { transition: none; }
+  .bolinha:hover, .bolinha.apertada, .bolinha.arrastando { transform: none; }
+}

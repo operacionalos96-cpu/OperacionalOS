@@ -48,14 +48,18 @@ export default function HomePage() {
             <GuideOrb mood={mood} className="size-full" />
           </button>
           <div className="min-w-0">
-          <p className="t-label first-letter:uppercase">{format(now, "EEEE, d 'de' MMMM", { locale: ptBR })}</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          {/* Assinatura da marca, como no cabeçalho das outras telas: traço laranja, data, título, apoio em serifa. */}
+          <p className="t-label flex items-center gap-2.5 first-letter:uppercase">
+            <span aria-hidden className="hzk-dash" />
+            {format(now, "EEEE, d 'de' MMMM", { locale: ptBR })}
+          </p>
+          <h1 className="mt-2 text-[2rem] leading-tight font-semibold tracking-[-0.03em]">
             {helloFor(now)}, {getUser(meId).name}
           </h1>
-          <p className="t-desc mt-1 text-sm">
+          <p className="hzk-voice mt-1 text-[0.9375rem] text-muted-foreground">
             {day.focus ? (
               <>
-                Foco de hoje: <span className="font-medium text-foreground">{day.focus}</span>
+                Foco de hoje: <span className="font-sans font-medium not-italic text-foreground">{day.focus}</span>
               </>
             ) : checkedIn ? (
               "Sem foco definido para hoje."

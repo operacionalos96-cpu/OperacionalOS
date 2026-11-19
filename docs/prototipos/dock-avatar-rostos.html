@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avatar com rosto · HZK Dock</title>
+<style>
+  :root { --bg:#f4f3ef; --card:#fff; --fg:#1b2432; --mut:#6b7280; --line:#e4e2dc; --orbit:#1b2432; --orange:#ea5b25; }
+  :root[data-theme="dark"] { --bg:#0f1420; --card:#182030; --fg:#eef0f4; --mut:#94a0b4; --line:#263146; --orbit:#dfe5f0; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 Inter, system-ui, sans-serif; padding:28px 20px 60px; }
+  main { max-width:1080px; margin:0 auto; display:grid; gap:18px }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap }
+  h1 { font-size:22px; margin:0; flex:1; letter-spacing:-.02em }
+  h2 { font-size:15px; margin:0 }
+  .dash { width:22px; height:2px; background:var(--orange); display:inline-block; vertical-align:middle; margin-right:8px }
+  button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:11px; padding:6px 12px; cursor:pointer }
+  button[aria-pressed="true"] { background:var(--fg); color:var(--bg); border-color:var(--fg) }
+  .dirs { display:grid; gap:14px; grid-template-columns:repeat(3, minmax(0,1fr)) }
+  @media (max-width:860px){ .dirs { grid-template-columns:1fr } }
+  .card { background:var(--card); border-radius:18px; padding:18px; display:grid; gap:14px; align-content:start }
+  .card.sel { box-shadow:0 0 0 2px var(--fg) }
+  .hero { display:grid; place-items:center; padding:6px 0 }
+  .row { display:flex; align-items:end; gap:14px; flex-wrap:wrap }
+  .cell { display:grid; justify-items:center; gap:6px; font-size:11px; color:var(--mut); min-width:54px }
+  .lab { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mut) }
+  .list { display:grid; gap:2px }
+  .li { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:11px; font-size:14px }
+  .li:hover { background:color-mix(in srgb, var(--fg) 6%, transparent) }
+  .sw { width:22px; height:22px; border-radius:50%; border:0; padding:0 }
+  .sw[aria-pressed="true"] { outline:2px solid var(--fg); outline-offset:2px }
+  .wide { grid-column:1/-1 }
+
+  /* ---------- o avatar ---------- */
+  .av { overflow:visible; display:block }
+  .av .orbit { fill:none; stroke:var(--orbit); opacity:.28 }
+  .av .moon { fill:var(--orbit) }
+  .av .spin { transform-box:view-box; transform-origin:0 0 }
+  .av .eyes { transform-box:fill-box; transform-origin:center }
+  .av .eye { transform-box:fill-box; transform-origin:center }
+  @media (prefers-reduced-motion:no-preference) {
+    .av[data-state="livre"] .eye, .av[data-state="fila"] .eye { animation:blink 5.2s infinite }
+    .av[data-state="trabalhando"] .eyes { animation:scan 1.8s ease-in-out infinite }
+    .av[data-state="trabalhando"] .spin { animation:spin 9s linear infinite }
+    .av[data-state="trabalhando"] .spin.r2 { animation-duration:13s; animation-direction:reverse }
+    .av[data-state="trabalhando"] .spin.r3 { animation-duration:17s }
+    .av[data-state="voce"] .ask { animation:pulse 1.4s ease-in-out infinite }
+    .av[data-state="voce"] .eyes { animation:nod 1.4s ease-in-out infinite }
+    .av[data-state="pausado"] .zz { animation:float 2.6s ease-in-out infinite }
+  }
+  @keyframes blink { 0%,92%,100% { transform:scaleY(1) } 95% { transform:scaleY(.12) } }
+  @keyframes scan { 0%,100% { transform:translateX(-2.6px) } 50% { transform:translateX(2.6px) } }
+  @keyframes spin { to { transform:rotate(360deg) } }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+  @keyframes nod { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-1.2px) } }
+  @keyframes float { 0%,100% { transform:translateY(0); opacity:.9 } 50% { transform:translateY(-3px); opacity:.5 } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><span class="dash"></span>Avatar com rosto</h1>
+    <button id="theme">Tema</button>
+  </header>
+
+  <div class="card">
+    <div class="row" style="align-items:center">
+      <span class="lab">Cor</span><span id="colors" class="row" style="gap:8px"></span>
+      <span class="lab" style="margin-left:12px">Olhos</span><span id="eyes" class="row" style="gap:6px"></span>
+      <span class="lab" style="margin-left:12px">Estado</span><span id="states" class="row" style="gap:6px"></span>
+    </div>
+  </div>
+
+  <div class="dirs" id="dirs"></div>
+
+  <div class="card wide">
+    <h2>Lado a lado com o de hoje</h2>
+    <div class="row" id="compare" style="gap:28px; align-items:center"></div>
+  </div>
+</main>
+
+<script>
+/* Cores: mesmos seis nomes do banco (nada muda lá), com tons mais vivos. O laranja continua só para "precisa de você". */
+const COLORS = [
+  { id:"grafite", hex:"#0fb5e0" }, { id:"aco", hex:"#2f6bff" }, { id:"musgo", hex:"#12c97a" },
+  { id:"areia", hex:"#ffc21a" }, { id:"vinho", hex:"#ff4d8d" }, { id:"lilas", hex:"#8b5cf6" },
+]
+const STATES = [["livre","Livre"],["trabalhando","Trabalhando"],["voce","Precisa de você"],["fila","Na fila"],["pausado","Pausado"],["cota","Sem cota"],["offline","Sem conexão"],["feito","Concluiu"]]
+const EYES = [["capsula","Cápsula"],["ponto","Ponto"],["largo","Largo"]]
+const DIRS = [
+  { id:"astro", name:"A · Astro", idea:"Um planetinha com olhos. As luas em órbita contam o nível." },
+  { id:"modulo", name:"B · Módulo", idea:"Bloco de cantos redondos, o mais próximo do OpenBot. Órbitas em volta." },
+  { id:"visor", name:"C · Visor", idea:"Corpo escuro com um visor aceso na cor do bot. Mais robô." },
+]
+let cur = { color:"#2f6bff", eyes:"capsula", state:"livre", pick:null }
+
+const hx = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16))
+const mix = (a,b,t) => { const A=hx(a),B=hx(b); return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("") }
+let uid = 0
+
+/* Olhos: a forma muda com o estado. É o rosto que diz o que o bot está fazendo. */
+function eyes(kind, state, fill, dx = 9.5, y = -1, k = 1) {
+  const w = (kind === "largo" ? 9 : kind === "ponto" ? 7.4 : 6.6) * k, h = (kind === "ponto" ? 7.4 : kind === "largo" ? 8.4 : 11.5) * k
+  const eye = (x) => {
+    if (state === "pausado") return `<rect class="eye" x="${x-w/2-.6}" y="${y-1.3}" width="${w+1.2}" height="2.6" rx="1.3" fill="${fill}"/>`
+    if (state === "offline") return `<path class="eye" d="M${x-3.4} ${y-3.4}l6.8 6.8M${x+3.4} ${y-3.4}l-6.8 6.8" stroke="${fill}" stroke-width="2.4" stroke-linecap="round" fill="none"/>`
+    if (state === "feito") return `<path class="eye" d="M${x-4.2} ${y+2}q4.2 -7 8.4 0" stroke="${fill}" stroke-width="2.8" stroke-linecap="round" fill="none"/>`
+    if (state === "cota") return `<path class="eye" d="M${x-w/2} ${y-.5}h${w}v${h*.28}a${w/2} ${w/2} 0 0 1 -${w} 0z" fill="${fill}"/>`
+    if (state === "voce") return `<circle class="eye" cx="${x}" cy="${y}" r="${Math.max(w,h)*.5+.8}" fill="${fill}"/>`
+    return `<rect class="eye" x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="${Math.min(w,h)/2}" fill="${fill}"/>`
+  }
+  const shift = state === "fila" ? "translate(2.2 -2.4)" : ""
+  return `<g transform="${shift}"><g class="eyes">${eye(-dx)}${eye(dx)}</g></g>`
+}
+
+/* Órbitas: uma lua por nível. Sem lua = só conversa. */
+function orbits(level, size, square) {
+  if (size <= 20) {
+    let s = ""
+    for (let i = 0; i < level; i++) { const a = (-50 + i * 34) * Math.PI/180; s += `<circle class="moon" cx="${(44*Math.cos(a)).toFixed(1)}" cy="${(44*Math.sin(a)).toFixed(1)}" r="7"/>` }
+    return s
+  }
+  const R = [35, 41.5, 48], ph = [-48, 150, 62], sw = size >= 100 ? 1 : 1.5
+  let s = ""
+  for (let i = 0; i < level; i++) {
+    const a = ph[i] * Math.PI/180
+    const ring = square ? `<rect class="orbit" x="${-R[i]}" y="${-R[i]}" width="${2*R[i]}" height="${2*R[i]}" rx="${R[i]*.52}" stroke-width="${sw}"/>` : `<circle class="orbit" r="${R[i]}" stroke-width="${sw}"/>`
+    const mr = square ? R[i] * 1.0 : R[i]
+    const mx = square ? Math.max(-R[i], Math.min(R[i], mr*Math.cos(a)*1.25)) : mr*Math.cos(a), my = square ? (Math.abs(Math.cos(a))*1.25 > 1 ? mr*Math.sin(a) : (Math.sin(a) > 0 ? R[i] : -R[i])) : mr*Math.sin(a)
+    s += `<g class="spin r${i+1}">${ring}<circle class="moon" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${size >= 100 ? 3 : 4}"/></g>`
+  }
+  return s
+}
+
+function avatar({ dir = "astro", color = "#2f6bff", level = 1, state = "livre", eyeKind = "capsula", size = 64 }) {
+  const id = "g" + (++uid), micro = size <= 20
+  const dim = state === "pausado" || state === "offline", tired = state === "cota"
+  const base = dim ? mix(color, "#8a93a3", .72) : tired ? mix(color, "#8a93a3", .35) : color
+  const top = mix(base, "#ffffff", .22), low = mix(base, "#0b1020", .22)
+  const S = micro ? 30 : 27
+  let defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${low}"/></linearGradient>`
+  let body = "", face = ""
+  const ek = micro ? 1.5 : 1
+  if (dir === "astro") {
+    body = `<circle r="${S}" fill="url(#${id})"/><ellipse cx="${-S*.3}" cy="${-S*.5}" rx="${S*.38}" ry="${S*.18}" fill="#fff" opacity=".22" transform="rotate(-24 ${-S*.3} ${-S*.5})"/>`
+    face = eyes(eyeKind, state, "#fff", micro ? 11 : 9.5, micro ? 0 : -1, ek)
+  } else if (dir === "modulo") {
+    const r = S * .96
+    body = `<rect x="${-r}" y="${-r}" width="${2*r}" height="${2*r}" rx="${r*.52}" fill="url(#${id})"/><rect x="${-r+4}" y="${-r+3.5}" width="${2*r-8}" height="${r*.7}" rx="${r*.4}" fill="#fff" opacity=".13"/>`
+    face = eyes(eyeKind, state, "#fff", micro ? 11 : 9.5, micro ? 0 : 1, ek)
+  } else {
+    const shell = dim ? "#3a4252" : "#1b2432", glow = dim ? "#9aa3b2" : mix(color, "#ffffff", tired ? .1 : .28)
+    defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(shell,"#ffffff",.14)}"/><stop offset="1" stop-color="${shell}"/></linearGradient>`
+    body = `<circle r="${S}" fill="url(#${id})"/><circle r="${S - .6}" fill="none" stroke="${glow}" stroke-opacity=".38" stroke-width="${micro ? 4 : 1.2}"/><rect x="${-S*.8}" y="${-S*.42}" width="${S*1.6}" height="${S*.8}" rx="${S*.4}" fill="${mix(color,"#0b1020", dim ? .8 : .62)}"/><rect x="${-S*.8}" y="${-S*.42}" width="${S*1.6}" height="${S*.8}" rx="${S*.4}" fill="none" stroke="${glow}" stroke-opacity=".5" stroke-width="${micro ? 3 : 1.2}"/>`
+    face = eyes(eyeKind, state, glow, micro ? 10 : 8.5, micro ? -1 : -1.2, micro ? 1.3 : .82)
+  }
+  // "precisa de você": anel laranja e um ponto. É o único uso do laranja.
+  const ask = state === "voce" ? `<g class="ask">${dir === "modulo" ? `<rect x="${-S-4}" y="${-S-4}" width="${2*S+8}" height="${2*S+8}" rx="${(S+4)*.52}" fill="none" stroke="var(--orange)" stroke-width="${micro ? 6 : 2.4}"/>` : `<circle r="${S+4.5}" fill="none" stroke="var(--orange)" stroke-width="${micro ? 6 : 2.4}"/>`}</g>${micro ? "" : `<circle cx="${S*.86}" cy="${-S*.86}" r="6.2" fill="var(--orange)" stroke="var(--card)" stroke-width="2"/>`}` : ""
+  const zz = state === "pausado" && !micro ? `<text class="zz" x="${S*.72}" y="${-S*.7}" font-size="13" font-weight="700" fill="var(--mut)" font-family="Inter, system-ui">z</text>` : ""
+  const q = state === "fila" && !micro ? `<circle cx="${S*.95}" cy="${-S*.95}" r="4" fill="var(--orbit)" opacity=".7"/>` : ""
+  return `<svg class="av" data-state="${state}" width="${size}" height="${size}" viewBox="-52 -52 104 104" role="img" aria-label="nível ${level}, ${state}"><defs>${defs}</defs>${orbits(level, size, dir === "modulo")}${body}${face}${ask}${zz}${q}</svg>`
+}
+
+/* O avatar de hoje (Constelação), só para comparar */
+function old(color, level, size) {
+  const id = "o" + (++uid), R = [33.5, 40, 46.5], ph = [30, 150, 260]
+  let rings = ""
+  for (let i = 0; i < level; i++) { const a = ph[i]*Math.PI/180; rings += `<circle class="orbit" r="${R[i]}" stroke-width="1.4"/><circle class="moon" cx="${(R[i]*Math.cos(a)).toFixed(1)}" cy="${(R[i]*Math.sin(a)).toFixed(1)}" r="4"/>` }
+  return `<svg class="av" width="${size}" height="${size}" viewBox="-52 -52 104 104"><defs><radialGradient id="${id}" cx="36%" cy="28%" r="78%"><stop offset="0" stop-color="${mix(color,"#fff",.3)}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="${mix(color,"#000",.4)}"/></radialGradient></defs>${rings}<circle r="26" fill="url(#${id})"/><text y="8.5" text-anchor="middle" font-size="24" font-weight="600" fill="#f3f4f6" font-family="Inter, system-ui">P</text></svg>`
+}
+
+const $ = (id) => document.getElementById(id)
+const cell = (svg, label) => `<span class="cell">${svg}${label ? `<span>${label}</span>` : ""}</span>`
+const NAMES = [["Pesquisadora","#2f6bff",1,"livre"],["Dev do site","#12c97a",1,"voce"],["Coordenadora","#0fb5e0",0,"trabalhando"],["Analista","#ff4d8d",1,"cota"],["Organizadora","#ffc21a",0,"pausado"]]
+
+function render() {
+  $("colors").innerHTML = COLORS.map(c => `<button class="sw" style="background:${c.hex}" aria-label="${c.id}" aria-pressed="${cur.color===c.hex}" data-c="${c.hex}"></button>`).join("")
+  $("eyes").innerHTML = EYES.map(([k,l]) => `<button aria-pressed="${cur.eyes===k}" data-e="${k}">${l}</button>`).join("")
+  $("states").innerHTML = STATES.map(([k,l]) => `<button aria-pressed="${cur.state===k}" data-s="${k}">${l}</button>`).join("")
+  $("dirs").innerHTML = DIRS.map(d => {
+    const a = (o) => avatar({ dir:d.id, color:cur.color, eyeKind:cur.eyes, state:cur.state, level:1, ...o })
+    return `<section class="card${cur.pick===d.id ? " sel" : ""}">
+      <div class="row" style="align-items:center"><h2 style="flex:1">${d.name}</h2><button data-pick="${d.id}" aria-pressed="${cur.pick===d.id}">Este</button></div>
+      <div style="color:var(--mut);font-size:13px">${d.idea}</div>
+      <div class="hero">${a({ size:150, level:2 })}</div>
+      <div><div class="lab">Nível de acesso</div><div class="row">${[0,1,2,3].map(l => cell(a({ size:56, level:l }), ["Conversa","Pastas","Programas","PC inteiro"][l])).join("")}</div></div>
+      <div><div class="lab">O rosto conta o estado</div><div class="row">${STATES.map(([k,l]) => cell(a({ size:48, state:k }), l)).join("")}</div></div>
+      <div><div class="lab">Na lista de conversas</div><div class="list">${NAMES.map(([n,c,l,s]) => `<div class="li">${avatar({ dir:d.id, color:c, level:l, state:s, eyeKind:cur.eyes, size:30 })}<span style="flex:1">${n}</span></div>`).join("")}</div></div>
+      <div><div class="lab">Tamanhos</div><div class="row">${[16,24,40,72].map(s => cell(a({ size:s }), s+" px")).join("")}</div></div>
+    </section>`
+  }).join("")
+  $("compare").innerHTML = cell(old("#3d5a80", 1, 88), "Hoje") + DIRS.map(d => cell(avatar({ dir:d.id, color:cur.color, eyeKind:cur.eyes, level:1, state:"livre", size:88 }), d.name)).join("")
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return
+  if (t.id === "theme") { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "" : "dark"; return }
+  if (t.dataset.c) cur.color = t.dataset.c
+  if (t.dataset.e) cur.eyes = t.dataset.e
+  if (t.dataset.s) cur.state = t.dataset.s
+  if (t.dataset.pick) cur.pick = t.dataset.pick
+  render()
+})
+if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark"
+render()
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+  "name": "operacionalos-desktop",
+  "productName": "OperacionalOS",
+  "version": "0.1.0",
+  "private": true,
+  "description": "App do OperacionalOS para Windows: abre o OperacionalOS publicado e roda o motor do HZK Dock no PC.",
+  "author": "HZK Company",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --win --dir",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0",
+    "typescript": "5.9.3"
+  },
+  "build": {
+    "appId": "com.hzk.operacionalos",
+    "productName": "OperacionalOS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "abertura/**/*",
+      "bolinha/**/*",
+      "package.json",
+      "!dist/**/*.test.js"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "${env.OPOS_UPDATE_URL}"
+      }
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": false
+    }
+  }
+}

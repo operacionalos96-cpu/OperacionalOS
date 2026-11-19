@@ -39,6 +39,9 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       "workers/**",
+      "desktop/node_modules/**",
+      "desktop/dist/**",
+      "desktop/release*/**",
     ],
   },
   // Fronteiras entre módulos (docs/adr/0007-frontend-modular.md): uma área (ex.: tarefas) não usa

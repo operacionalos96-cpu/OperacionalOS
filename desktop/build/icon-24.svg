@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="OperacionalOS">
+  <!-- Ícone do OperacionalOS para 24 px (barra de tarefas em 100%): mesma ideia do de 16, na grade de 24. -->
+  <g id="fundo">
+    <circle cx="12" cy="12" r="12" fill="#1b2432" />
+    <circle cx="12" cy="12" r="11.5" fill="none" stroke="#ffffff" stroke-opacity="0.24" stroke-width="1" />
+  </g>
+  <polygon points="6,4 18,4 18,7 10,17 18,17 18,20 6,20 6,17 14,7 6,7" fill="#ffffff" />
+  <circle cx="17" cy="6" r="3" fill="#ea5b25" />
+</svg>
