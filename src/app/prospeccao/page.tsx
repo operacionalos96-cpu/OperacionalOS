@@ -24,6 +24,7 @@ import { EmptyState, Led, PageHeader } from "@/components/shared/layout"
 import { AnalysisBlock } from "@/components/prospecting/review-panel"
 import { RejectLeadDialog } from "@/components/prospecting/reject-dialog"
 import { FunnelTab, type FunnelPending } from "@/components/prospecting/funnel-tab"
+import { AgentTab } from "@/components/prospecting/agent-tab"
 import { RoutineButton } from "@/components/hzk/doing-now"
 import { ROUTINES } from "@/lib/domain/work-sessions"
 import { startRoutine } from "@/lib/use-my-day"
@@ -36,11 +37,11 @@ import { startRoutine } from "@/lib/use-my-day"
 export default function ProspectingPage() {
   const leads = useStore((s) => s.leads)
   const meId = useStore((s) => s.meId)
-  const [tab, setTab] = useState<"fila" | "aguardando" | "funil" | "descartados">("fila")
+  const [tab, setTab] = useState<"fila" | "aguardando" | "funil" | "agente" | "descartados">("fila")
   // Link direto para uma aba (ex.: a Início abre /prospeccao?aba=funil).
   useEffect(() => {
     const aba = new URLSearchParams(window.location.search).get("aba")
-    if (aba === "aguardando" || aba === "funil" || aba === "descartados") setTab(aba)
+    if (aba === "aguardando" || aba === "funil" || aba === "agente" || aba === "descartados") setTab(aba)
   }, [])
   const steps = useFunnel((s) => s.steps)
   const loadFunnel = useFunnel((s) => s.load)
@@ -142,6 +143,7 @@ export default function ProspectingPage() {
   const elapsed = session.current.start ? Date.now() - session.current.start : 0
   const done = session.current.done
   const waiting = leads.filter((l) => reviewStatus(l) === "approved" && !wasContacted(l) && (scope === "todos" || l.review?.approvedBy === meId))
+  const humanCount = leads.filter((l) => l.agent?.needsHuman && (scope === "todos" || l.ownerId === meId)).length
   const discarded = leads.filter((l) => isDiscarded(l)).sort((a, b) => (b.review?.rejectedAt ?? "").localeCompare(a.review?.rejectedAt ?? ""))
 
   return (
@@ -207,6 +209,7 @@ export default function ProspectingPage() {
             { value: "fila", label: `Fila (${queue.length})` },
             { value: "aguardando", label: `Aguardando contato (${waiting.length})` },
             { value: "funil", label: "Funil" },
+            { value: "agente", label: `Agente${humanCount ? ` (${humanCount} com humano)` : ""}` },
             { value: "descartados", label: `Descartados (${discarded.length})` },
           ]}
         />
@@ -284,6 +287,8 @@ export default function ProspectingPage() {
             }))}
           />
         )}
+
+        {tab === "agente" && <AgentTab leads={leads} ownerId={scope === "meus" ? meId : undefined} />}
 
         {tab === "funil" && <FunnelTab leads={leads} ownerId={scope === "meus" ? meId : undefined} whatsTarget={whatsTarget} onPending={setPending} />}
 

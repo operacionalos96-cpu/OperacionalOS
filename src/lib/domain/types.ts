@@ -53,6 +53,8 @@ export interface Lead {
   funnel?: { step: number; lastSentAt?: string; history: { step: number; at: string; by?: string }[]; repliedAt?: string; stopped?: boolean }
   /** Vídeo de análise personalizado (gerado só quando o lead chega nessa parte do funil). Ver src/lib/domain/prospect-video.ts. */
   video?: import("./prospect-video").LeadVideo
+  /** O que o agente do WhatsApp fez neste lead (envios e se pediu um humano). Ver src/lib/domain/whatsapp-agent.ts. */
+  agent?: import("./whatsapp-agent").LeadAgent
 }
 
 export interface SiteInfo {

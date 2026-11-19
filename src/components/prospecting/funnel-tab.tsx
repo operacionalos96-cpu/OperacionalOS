@@ -133,7 +133,7 @@ function StepRow({ lead, index, step, total, detail, whatsTarget, onPending }: {
   )
 }
 
-/** Gera o token da extensão (só o escopo do funil). Aparece UMA vez. */
+/** Gera o token da extensão (escopos do funil e do agente). Aparece UMA vez. */
 function ConnectExtension() {
   const [token, setToken] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -160,7 +160,7 @@ function ConnectExtension() {
         <RevealOnce
           title="Token da extensão do WhatsApp"
           value={token}
-          hint="Cole no ícone da extensão “Funil Operacional OS” (Chrome). Ele só acha leads e registra envio/resposta — não lê o Cofre nem mexe em outras coisas. Para desligar: AI Office › Workers."
+          hint="Cole no ícone da extensão “Funil HZK” (Chrome). Ele acha leads, registra envio/resposta e, com o agente ligado (aba Agente), pega as tarefas do agente — não lê o Cofre nem mexe em outras coisas. Para desligar: AI Office › Workers."
           onClose={() => setToken(null)}
         />
       )}
