@@ -19,13 +19,14 @@ import { RoleBadge } from "@/components/org/role-badge"
 import { RoleDialog } from "@/components/org/role-dialog"
 import { InviteMemberDialog } from "@/components/org/invite-member-dialog"
 import { OrgTreeView } from "@/components/org/org-tree-view"
+import { AreaAccessPanel } from "@/components/org/area-access-panel"
 import { TeamOverview } from "@/components/hzk/team-overview"
 import { TeamFeedPanel } from "@/components/dashboard/team-panels"
 import { TeamWeek } from "@/components/hzk/team-week"
 import { SectionTabs } from "@/components/shared/fields"
 import type { OrgRole } from "@/lib/domain/org"
 
-type TabType = "responsabilidades" | "semana" | "agenda" | "membros" | "cargos" | "hierarquia"
+type TabType = "responsabilidades" | "semana" | "agenda" | "membros" | "cargos" | "acesso" | "hierarquia"
 
 export default function EquipePage() {
   const { canAdmin } = useAccess()
@@ -41,7 +42,7 @@ export default function EquipePage() {
     const aba = new URLSearchParams(window.location.search).get("aba")
     // A agenda agora é a página Agenda (calendário do time).
     if (aba === "agenda") router.replace("/agenda")
-    else if (aba === "semana" || aba === "membros" || aba === "cargos" || aba === "hierarquia") setActiveTab(aba)
+    else if (aba === "semana" || aba === "membros" || aba === "cargos" || aba === "acesso" || aba === "hierarquia") setActiveTab(aba)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [creatingRole, setCreatingRole] = useState(false)
   const [roleToEdit, setRoleToEdit] = useState<OrgRole | undefined>()
@@ -97,6 +98,7 @@ export default function EquipePage() {
             { value: "agenda" as TabType, label: "Agenda" },
             { value: "membros", label: `Membros (${members.length})` },
             { value: "cargos", label: `Cargos e funções (${orgRoles.length})` },
+            { value: "acesso", label: "Acesso por área" },
             { value: "hierarquia", label: "Árvore hierárquica" },
           ]}
         />
@@ -181,6 +183,9 @@ export default function EquipePage() {
             </div>
           </Panel>
         )}
+
+        {/* Acesso por área (ADR 0020): áreas restritas, concessões e vitrine. */}
+        {activeTab === "acesso" && <AreaAccessPanel />}
 
         {/* Aba 3: Hierarquia */}
         {activeTab === "hierarquia" && (

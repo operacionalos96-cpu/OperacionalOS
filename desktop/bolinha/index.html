@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+  <meta charset="utf-8" />
+  <!-- Tudo local: sem CDN, sem fonte remota, sem script inline. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="viewport" content="width=72, height=72, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>OperacionalOS</title>
+  <link rel="stylesheet" href="bolinha.css" />
+</head>
+<body>
+  <!-- A esfera da Órbita com o símbolo HZK (mesmas proporções do public/hzk-simbolo.svg) e uma órbita com um nó. -->
+  <div class="bolinha" id="bolinha" data-visual="quieta" title="OperacionalOS">
+    <svg viewBox="0 0 72 72" aria-hidden="true">
+      <defs>
+        <radialGradient id="corpo" cx="34%" cy="26%" r="80%">
+          <stop offset="0" stop-color="#34425a" />
+          <stop offset="0.55" stop-color="#1b2432" />
+          <stop offset="1" stop-color="#10151d" />
+        </radialGradient>
+        <radialGradient id="calor" cx="72%" cy="88%" r="60%">
+          <stop offset="0" stop-color="#ea5b25" stop-opacity="0.3" />
+          <stop offset="1" stop-color="#ea5b25" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="brilho" cx="32%" cy="22%" r="46%">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.22" />
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <g transform="translate(36 36)">
+        <g class="orbita"><circle class="orbita-sombra" r="30" /><circle class="orbita-linha" r="30" /></g>
+        <g class="esfera">
+          <circle r="23" fill="url(#corpo)" />
+          <circle r="23" fill="url(#calor)" />
+          <circle r="23" fill="url(#brilho)" />
+          <circle class="aro" r="22.5" />
+          <g transform="scale(0.36) translate(-50 -50)">
+            <polygon points="18.57,9.05 82.02,9.05 82.02,26.19 42.74,73.21 82.02,73.21 82.02,89.88 15.0,89.88 15.0,75.36 57.26,26.19 18.57,26.19" fill="#fff" />
+            <line x1="21.79" y1="83.45" x2="75.6" y2="15.48" stroke="#ea5b25" stroke-width="3.4" />
+            <circle cx="21.79" cy="83.45" r="7" fill="#ea5b25" />
+            <circle cx="48.21" cy="51.07" r="7" fill="#ea5b25" />
+            <circle cx="75.6" cy="15.48" r="7" fill="#ea5b25" />
+          </g>
+        </g>
+        <!-- o nó que gira na órbita (parado: quieto no alto à direita) -->
+        <g class="braco"><circle class="no" cx="30" r="3.2" /></g>
+        <!-- precisa de você: o laranja acende no alto à direita da esfera -->
+        <g class="aviso"><circle class="aviso-pulso" cx="17" cy="-17" r="6" /><circle class="aviso-ponto" cx="17" cy="-17" r="5.2" /></g>
+      </g>
+    </svg>
+  </div>
+  <script src="bolinha.js"></script>
+</body>
+</html>

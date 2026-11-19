@@ -1,0 +1,319 @@
+/*
+ * Tela de abertura do app (nota 39, Parte A). Identidade Órbita (nota 34):
+ * fundo fosco, esfera navy com o símbolo, órbitas finas, laranja só no que age e no fim.
+ * Fontes só locais: pede a Milliard pelo nome (se a HZK instalar) e cai no Segoe UI do Windows.
+ */
+:root {
+  --laranja: #ea5b25;
+  --suave: cubic-bezier(0.22, 1, 0.36, 1);
+  --fonte: "Milliard", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+}
+
+/* escuro: grafite fosco */
+:root[data-tema="escuro"] {
+  --fundo: #121418;
+  --fundo-luz: #1d2128;
+  --texto: #eef0f3;
+  --texto-suave: #9aa2ae;
+  --texto-fraco: #6c7480;
+  --orbita: rgb(255 255 255 / 9%);
+  --orbita-fora: rgb(255 255 255 / 6%);
+  --no: rgb(238 240 243 / 58%);
+  --no-encaixado: #f2f3f5;
+  --estrela: rgb(255 255 255 / 22%);
+  --trilho: rgb(255 255 255 / 8%);
+  --cheio: rgb(238 240 243 / 78%);
+  --tom: rgb(255 255 255 / 7%);
+  --tom-forte: rgb(255 255 255 / 12%);
+  --aro: rgb(255 255 255 / 10%);
+  --grao: 0.07;
+  --aviso: #e7b45a;
+}
+
+/* claro: mineral da marca */
+:root[data-tema="claro"] {
+  --fundo: #f1f1ed;
+  --fundo-luz: #fbfbf9;
+  --texto: #1b2432;
+  --texto-suave: #5a5c60;
+  --texto-fraco: #8a8c90;
+  --orbita: rgb(27 36 50 / 13%);
+  --orbita-fora: rgb(27 36 50 / 8%);
+  --no: rgb(27 36 50 / 38%);
+  --no-encaixado: #1b2432;
+  --estrela: rgb(27 36 50 / 20%);
+  --trilho: rgb(27 36 50 / 9%);
+  --cheio: rgb(27 36 50 / 72%);
+  --tom: rgb(27 36 50 / 6%);
+  --tom-forte: rgb(27 36 50 / 10%);
+  --aro: rgb(255 255 255 / 14%);
+  --grao: 0.05;
+  --aviso: #a86a12;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+html, body {
+  width: 480px;
+  height: 300px;
+  overflow: hidden;
+  background: var(--fundo);
+}
+
+body {
+  font-family: var(--fonte);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+.abertura {
+  position: relative;
+  width: 480px;
+  height: 300px;
+  overflow: hidden;
+  /* janela sem moldura: arrastar por qualquer parte */
+  -webkit-app-region: drag;
+  background:
+    radial-gradient(260px 200px at 50% 36%, var(--fundo-luz), transparent 72%),
+    radial-gradient(420px 180px at 50% 120%, color-mix(in srgb, var(--laranja) 5%, transparent), transparent 70%),
+    var(--fundo);
+}
+
+/* grão fosco: ruído local (SVG em data:), sem imagem externa */
+.grao {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grao);
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+/* ---------- topo ---------- */
+.topo {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+  z-index: 2;
+}
+.marca { font-weight: 600; color: var(--texto-suave); }
+.etapa { font-family: var(--mono); letter-spacing: 0.04em; text-transform: none; transition: opacity 0.3s ease; }
+.abertura[data-fase="pronto"] .etapa,
+.abertura[data-fase="pc-desligado"] .etapa,
+.abertura[data-fase="offline"] .etapa { opacity: 0; }
+
+/* ---------- palco ---------- */
+.palco {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 480px;
+  height: 204px;
+  overflow: visible;
+}
+.estrelas circle { fill: var(--estrela); }
+.orbita { fill: none; stroke: var(--orbita); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.orbita--fora { stroke: var(--orbita-fora); }
+.esfera-aro { fill: none; stroke: var(--aro); stroke-width: 1; }
+
+.no {
+  fill: var(--no);
+  transition: fill 0.45s var(--suave), r 0.45s var(--suave);
+}
+.braco.encaixado .no { fill: var(--no-encaixado); }
+.rastro {
+  fill: none;
+  stroke: var(--no);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.pulso { fill: none; stroke: var(--no-encaixado); stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.braco.clique .pulso { animation: pulso 0.7s var(--suave) both; }
+@keyframes pulso {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0; transform: scale(3.2); }
+}
+
+.linha-z {
+  stroke: var(--no-encaixado);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: stroke 0.4s var(--suave);
+}
+.halo { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.sombra { opacity: 0.9; }
+:root[data-tema="claro"] .sombra { opacity: 0.45; }
+
+/* fim: os três no Z, a linha se desenha e o laranja acende uma vez */
+.abertura.z .linha-z { opacity: 1; animation: desenhar 0.42s var(--suave) both; }
+.abertura.acende .no,
+.abertura.acende .linha-z { fill: var(--laranja); stroke: var(--laranja); }
+.abertura.acende .linha-z { fill: none; }
+.abertura.acende .halo { animation: acender 0.9s var(--suave) both; }
+@keyframes desenhar {
+  from { stroke-dashoffset: var(--comprimento, 200); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes acender {
+  0% { opacity: 0; transform: scale(0.7); }
+  35% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0.28; transform: scale(1); }
+}
+
+/* sem internet: alinhados, mas sem o laranja (linha tracejada neutra) */
+.abertura[data-fase="offline"] .linha-z { opacity: 0.55; stroke-dasharray: 3 5; animation: none; }
+
+/* PC desligado: tudo apaga e para */
+.abertura[data-fase="pc-desligado"] .no { fill: var(--texto-fraco); }
+.abertura[data-fase="pc-desligado"] .esfera { opacity: 0.55; transition: opacity 0.6s ease; }
+.abertura[data-fase="pc-desligado"] .orbita { stroke-dasharray: 2 4; }
+
+/* ---------- texto e barra ---------- */
+.info {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 206px;
+  z-index: 2;
+}
+.linha-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 20px; }
+.status {
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status.entra { animation: entrar 0.32s var(--suave) both; }
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+.abertura[data-fase="offline"] .status { color: var(--aviso); }
+.detalhe {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 15px;
+  min-height: 15px;
+  color: var(--texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detalhe b { font-weight: 600; color: var(--texto); }
+
+/* código curto do pedido de liberação: é dado, canto quase reto */
+.codigo {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  flex: none;
+  padding: 3px 8px 3px 9px;
+  border-radius: 5px;
+  background: var(--tom-forte);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.codigo b { font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em; text-transform: none; color: var(--texto); }
+.codigo[hidden] { display: none; }
+
+.barra {
+  position: relative;
+  margin-top: 10px;
+  height: 2px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--trilho);
+  transition: opacity 0.3s ease;
+}
+.barra-cheia {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 2px;
+  background: var(--cheio);
+  transition: width 0.35s var(--suave), background 0.4s ease;
+}
+.barra[data-modo="indeterminada"] .barra-cheia {
+  width: 32%;
+  animation: vai-e-volta 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes vai-e-volta {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(320%); }
+}
+.barra[data-modo="cheia"] .barra-cheia { width: 100%; }
+.abertura.acende .barra-cheia { background: var(--laranja); }
+.barra[data-modo="nenhuma"] { opacity: 0; }
+
+/* ---------- ações (só no "PC desligado") ---------- */
+.acoes {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+.acoes[hidden] { display: none; }
+.botao {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--texto);
+  transition: background 0.2s ease, transform 0.12s ease;
+}
+.botao--tom { background: var(--tom); }
+.botao--tom:hover { background: var(--tom-forte); }
+.botao--solido { background: var(--texto); color: var(--fundo); }
+.botao--solido:hover { background: color-mix(in srgb, var(--texto) 88%, var(--fundo)); }
+.botao:active { transform: scale(0.97); }
+.botao:focus-visible { outline: 2px solid var(--laranja); outline-offset: 2px; }
+
+/* ---------- rodapé ---------- */
+.rodape {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--texto-fraco);
+  z-index: 2;
+}
+.versao { font-family: var(--mono); letter-spacing: 0.02em; }
+.hzk { font-weight: 700; letter-spacing: 0.28em; margin-right: -0.28em; color: var(--texto-suave); }
+.abertura[data-fase="pc-desligado"] .rodape { opacity: 0; }
+
+/* reduzir movimento (do sistema ou ?movimento=reduzido; o JS põe a classe): nós já alinhados, sem giro nem pulso;
+   só o texto e a cor mudam */
+:root.sem-movimento .status,
+:root.sem-movimento .abertura.z .linha-z,
+:root.sem-movimento .abertura.acende .halo,
+:root.sem-movimento .braco.clique .pulso { animation: none !important; }
+:root.sem-movimento .abertura.acende .halo { opacity: 0.28; }
+:root.sem-movimento .barra[data-modo="indeterminada"] .barra-cheia { animation: none; width: 100%; opacity: 0.35; }
+:root.sem-movimento .rastro { display: none; }

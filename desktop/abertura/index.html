@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+  <meta charset="utf-8" />
+  <!-- Tudo local: sem CDN, sem fonte remota, sem script inline. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="viewport" content="width=480, height=300, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>OperacionalOS</title>
+  <link rel="stylesheet" href="abertura.css" />
+</head>
+<body>
+  <main class="abertura" id="abertura" data-fase="conferindo" aria-live="polite">
+    <div class="grao" aria-hidden="true"></div>
+
+    <header class="topo">
+      <span class="marca">OperacionalOS</span>
+      <span class="etapa" id="etapa">1 de 3</span>
+    </header>
+
+    <!-- Palco: esfera fosca da Órbita, três órbitas finas e os três nós que se alinham no Z. -->
+    <svg class="palco" id="palco" viewBox="0 0 480 204" aria-hidden="true">
+      <defs>
+        <radialGradient id="esfera-corpo" cx="34%" cy="26%" r="80%">
+          <stop offset="0" stop-color="#2b3646" />
+          <stop offset="0.55" stop-color="#1b2432" />
+          <stop offset="1" stop-color="#0f141c" />
+        </radialGradient>
+        <radialGradient id="esfera-brilho" cx="32%" cy="22%" r="46%">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.2" />
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="esfera-calor" cx="72%" cy="88%" r="60%">
+          <stop offset="0" stop-color="#ea5b25" stop-opacity="0.32" />
+          <stop offset="1" stop-color="#ea5b25" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+          <stop offset="0.45" stop-color="#ea5b25" stop-opacity="0.38" />
+          <stop offset="1" stop-color="#ea5b25" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="sombra" cx="50%" cy="50%" r="50%">
+          <stop offset="0.5" stop-color="#000000" stop-opacity="0.32" />
+          <stop offset="1" stop-color="#000000" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+
+      <g transform="translate(240 104)">
+        <!-- estrelas e nós de fundo (parados, bem leves) -->
+        <g class="estrelas">
+          <circle cx="-176" cy="-62" r="1" /><circle cx="-132" cy="58" r="0.8" /><circle cx="-198" cy="22" r="0.7" />
+          <circle cx="150" cy="-70" r="0.9" /><circle cx="186" cy="34" r="1" /><circle cx="122" cy="74" r="0.7" />
+          <circle cx="-104" cy="-84" r="0.7" /><circle cx="98" cy="-88" r="0.6" />
+        </g>
+
+        <circle class="orbita" r="50" />
+        <circle class="orbita" r="68" />
+        <circle class="orbita orbita--fora" r="86" />
+
+        <!-- a linha do Z: passa por trás da esfera e continua a diagonal do símbolo -->
+        <line class="linha-z" id="linha-z" x1="0" y1="0" x2="0" y2="0" />
+
+        <circle class="halo" r="62" fill="url(#halo)" />
+        <circle class="sombra" r="44" cy="6" fill="url(#sombra)" />
+
+        <!-- esfera fosca com o símbolo HZK (intocável: mesmas proporções do public/hzk-simbolo.svg) -->
+        <g class="esfera">
+          <circle r="32" fill="url(#esfera-corpo)" />
+          <circle r="32" fill="url(#esfera-calor)" />
+          <circle r="32" fill="url(#esfera-brilho)" />
+          <circle class="esfera-aro" r="31.5" />
+          <g transform="scale(0.5) translate(-50 -50)">
+            <polygon points="18.57,9.05 82.02,9.05 82.02,26.19 42.74,73.21 82.02,73.21 82.02,89.88 15.0,89.88 15.0,75.36 57.26,26.19 18.57,26.19" fill="#fff" />
+            <line x1="21.79" y1="83.45" x2="75.6" y2="15.48" stroke="#ea5b25" stroke-width="2.62" />
+            <circle cx="21.79" cy="83.45" r="6.55" fill="#ea5b25" />
+            <circle cx="48.21" cy="51.07" r="6.55" fill="#ea5b25" />
+            <circle cx="75.6" cy="15.48" r="6.55" fill="#ea5b25" />
+          </g>
+        </g>
+
+        <!-- os três nós; o JS gira cada braço -->
+        <g class="braco" id="no-0"><circle class="rastro" r="50" /><circle class="pulso" cx="50" r="4.5" /><circle class="no" cx="50" r="4.5" /></g>
+        <g class="braco" id="no-1"><circle class="rastro" r="68" /><circle class="pulso" cx="68" r="4.5" /><circle class="no" cx="68" r="4.5" /></g>
+        <g class="braco" id="no-2"><circle class="rastro" r="86" /><circle class="pulso" cx="86" r="4.5" /><circle class="no" cx="86" r="4.5" /></g>
+      </g>
+    </svg>
+
+    <section class="info">
+      <div class="linha-status">
+        <p class="status" id="status">Conferindo atualização…</p>
+        <span class="codigo" id="codigo" hidden><span class="codigo-rotulo">Código</span><b id="codigo-valor">0000</b></span>
+      </div>
+      <p class="detalhe" id="detalhe"></p>
+      <div class="barra" id="barra" data-modo="indeterminada"><span class="barra-cheia" id="barra-cheia"></span></div>
+      <div class="acoes" id="acoes" hidden>
+        <button type="button" class="botao botao--tom" id="botao-fechar">Fechar</button>
+        <button type="button" class="botao botao--solido" id="botao-pedir">Pedir liberação de novo</button>
+      </div>
+    </section>
+
+    <footer class="rodape">
+      <span class="versao" id="versao">v0.1.0</span>
+      <span class="hzk">HZK</span>
+    </footer>
+  </main>
+  <script src="abertura.js"></script>
+</body>
+</html>
