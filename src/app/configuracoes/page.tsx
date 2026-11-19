@@ -246,7 +246,7 @@ function PagesByMemberPanel({ editable }: { editable: boolean }) {
   const areas = useAreaList()
   const people = usePeople()
   const overrides = current?.pagesByMember ?? {}
-  const pages = PAGES.filter((p) => p.href !== "/")
+  const pages = PAGES
   const others = members.filter((m) => m.active && m.roleLevel !== "owner")
 
   function set(memberId: string, list: string[] | undefined) {
@@ -282,13 +282,15 @@ function PagesByMemberPanel({ editable }: { editable: boolean }) {
                   {pages.map((p) => {
                     const on = canSee(visible, p.href)
                     const blocked = !!ROLE_PAGES[p.href] && !isAtLeast(m.roleLevel, ROLE_PAGES[p.href])
+                    // A Início aparece para todo mundo: fica marcada e não desliga.
+                    const fixed = p.href === "/"
                     return (
                       <button
                         key={p.href}
                         type="button"
                         aria-pressed={on}
-                        disabled={!editable || blocked}
-                        title={blocked ? "Exige um nível de acesso maior" : undefined}
+                        disabled={!editable || blocked || fixed}
+                        title={fixed ? "A Início aparece para todo mundo" : blocked ? "Exige um nível de acesso maior" : undefined}
                         onClick={() => {
                           const base = visible === "all" ? pages.map((x) => x.href) : [...visible]
                           set(m.teamId, on ? base.filter((h) => h !== p.href) : [...base, p.href])
