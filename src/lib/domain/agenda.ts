@@ -1,11 +1,12 @@
 /**
  * Agenda (calendário, ADR 0010): junta num lugar só o que tem dia e hora — eventos da agenda,
- * prazos de tarefas e prazos de conteúdos. Não guarda nada: lê as fontes de sempre. Filtra por
+ * prazos de tarefas, prazos de conteúdos e vencimentos de contratos (ADR 0025). Não guarda nada: lê as fontes de sempre. Filtra por
  * pessoa. Testado em agenda.test.ts.
  */
 import { addDays, eachDayOfInterval, format, isSameDay, max, min, startOfDay } from "date-fns"
 import { involves, type CalendarEvent, type EventKind } from "./calendar"
 import type { ContentItem } from "./content"
+import type { Contract } from "./contracts"
 import { isWorkTask } from "./items"
 import { isTaskFor } from "./rules"
 import type { Task } from "./types"
@@ -13,7 +14,7 @@ import type { Task } from "./types"
 export interface AgendaEntry {
   /** Único na tela (o mesmo evento aparece em cada dia que atravessa). */
   key: string
-  source: "evento" | "tarefa" | "conteudo"
+  source: "evento" | "tarefa" | "conteudo" | "contrato"
   refId: string
   title: string
   /** yyyy-MM-dd */
@@ -27,7 +28,7 @@ export interface AgendaEntry {
   done?: boolean
 }
 
-export function agendaEntries(from: Date, to: Date, src: { events: CalendarEvent[]; tasks: Task[]; content: ContentItem[] }, personId?: string): AgendaEntry[] {
+export function agendaEntries(from: Date, to: Date, src: { events: CalendarEvent[]; tasks: Task[]; content: ContentItem[]; contracts?: Contract[] }, personId?: string): AgendaEntry[] {
   const first = startOfDay(from)
   const last = startOfDay(to)
   const inRange = (d: string) => d >= format(first, "yyyy-MM-dd") && d <= format(last, "yyyy-MM-dd")
@@ -63,6 +64,14 @@ export function agendaEntries(from: Date, to: Date, src: { events: CalendarEvent
     if (!c.dueDate || c.stage === "publicado" || !inRange(c.dueDate.slice(0, 10))) continue
     if (personId && c.ownerId !== personId) continue
     out.push({ key: `c:${c.id}`, source: "conteudo", refId: c.id, title: c.title, day: c.dueDate.slice(0, 10), allDay: true })
+  }
+  // Contrato é da empresa, não de uma pessoa: aparece na agenda do time, não no filtro por pessoa.
+  // Só os assinados e ainda não encerrados têm vencimento a lembrar.
+  if (!personId) {
+    for (const k of src.contracts ?? []) {
+      if (!k.endsAt || !k.signedAt || k.closedAt || !inRange(k.endsAt)) continue
+      out.push({ key: `k:${k.id}`, source: "contrato", refId: k.id, title: `${k.autoRenews ? "Renova" : "Vence"}: ${k.title}`, day: k.endsAt, allDay: true, areaId: "contratos" })
+    }
   }
   return out.sort((a, b) => a.day.localeCompare(b.day) || Number(b.allDay) - Number(a.allDay) || +(a.start ?? 0) - +(b.start ?? 0))
 }

@@ -3,6 +3,7 @@ import {
   CalendarDaysIcon,
   CheckSquareIcon,
   ClapperboardIcon,
+  FileSignatureIcon,
   HandshakeIcon,
   HomeIcon,
   InboxIcon,
@@ -245,6 +246,20 @@ export const PAGES = [
       "Quem decide escolhe uma opção, recusa ou pede mais contexto, direto no card.",
     ],
     terms: ["decisao", "porta"],
+  },
+  {
+    href: "/contratos",
+    title: "Contratos",
+    icon: FileSignatureIcon,
+    section: "Gestão",
+    purpose: "O que a empresa assinou: com quem, quanto vale, até quando e o arquivo, com aviso antes de vencer.",
+    howTo: [
+      "Crie o contrato com o nome, com quem é, o valor e até quando vale.",
+      "Depois de salvar, anexe o PDF assinado: ele fica num espaço privado da área de Contratos.",
+      "Perto do fim, o contrato pede atenção: crie a tarefa de renovação com um clique.",
+      "Acabou antes da hora? Use \"Encerrar contrato\"; o histórico continua guardado.",
+    ],
+    terms: ["area", "nivel-acesso"],
   },
   {
     href: "/equipe",

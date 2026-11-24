@@ -13,6 +13,7 @@ import type { CalendarEvent } from "@/lib/domain/calendar"
 import type { TeamSettings } from "@/lib/domain/daily"
 import type { DailyPlan } from "@/lib/domain/presence"
 import type { WeeklyCheckin } from "@/lib/domain/weekly"
+import type { Contract } from "@/lib/domain/contracts"
 
 /**
  * Coleções dos módulos. Módulo novo = uma linha aqui + a tabela no SQL
@@ -52,3 +53,23 @@ export const useCheckins = createCollection<WeeklyCheckin>("checkins")
 // Estrutura Organizacional e Cargos (SQL 0017 - HZK V1)
 export const useOrgRoles = createCollection<OrgRole>("org_roles")
 export const useMemberRoles = createCollection<MemberRole>("member_roles")
+
+// Contratos (migration 0029, ADR 0025): quem lê e grava é a área "contratos" (acesso por área).
+export const useContracts = createCollection<Contract>("contracts")
+/** A tabela ainda não existe no banco (deploy feito antes de aplicar a 0029)? A página avisa; o resto do app abre normal. */
+export let contractsTableMissing = false
+{
+  const load = useContracts.getState().load
+  useContracts.setState({
+    async load() {
+      try {
+        await load()
+      } catch (e) {
+        const code = (e as { code?: string } | null)?.code
+        if (code !== "PGRST205" && code !== "42P01") throw e
+        contractsTableMissing = true
+        useContracts.setState({ items: [], loaded: true })
+      }
+    },
+  })
+}

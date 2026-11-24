@@ -20,7 +20,7 @@ export const AREA_PAGES: Record<string, string[]> = {
   trafego: ["/conteudos", "/ai-office"],
   financeiro: ["/financeiro"],
   estrategia: ["/metas", "/mapas"],
-  contratos: ["/decisoes"],
+  contratos: ["/decisoes", "/contratos"],
   pessoas: ["/equipe"],
 }
 
