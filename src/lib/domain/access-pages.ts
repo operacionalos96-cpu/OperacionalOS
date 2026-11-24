@@ -8,8 +8,8 @@
 import { ownerOfArea, type Area, type PeopleContext } from "./areas"
 import { isAtLeast, type RoleLevel } from "./org"
 
-/** Todo mundo vê: o dia, a agenda, a captura, o time, as tarefas e as decisões. */
-export const BASE_PAGES = ["/", "/agenda", "/caixa-de-entrada", "/equipe", "/tarefas", "/decisoes", "/dock"]
+/** Todo mundo vê: o dia, a agenda, o time, as tarefas (com a caixa de entrada) e as decisões. */
+export const BASE_PAGES = ["/", "/agenda", "/equipe", "/tarefas", "/decisoes", "/dock"]
 
 /** Abas de cada área (id de src/lib/domain/areas.ts). */
 export const AREA_PAGES: Record<string, string[]> = {
@@ -24,8 +24,8 @@ export const AREA_PAGES: Record<string, string[]> = {
   pessoas: ["/equipe"],
 }
 
-/** Abas que exigem nível de acesso (mesma regra das próprias telas). */
-export const ROLE_PAGES: Record<string, RoleLevel> = { "/configuracoes": "admin", "/cofre": "owner" }
+/** Abas que exigem nível de acesso (mesma regra das próprias telas). O Cofre é uma aba de Configurações, só do owner. */
+export const ROLE_PAGES: Record<string, RoleLevel> = { "/configuracoes": "admin" }
 
 /** As áreas em que a pessoa trabalha: dona ou apoio. */
 export function areasOf(memberId: string, areas: Area[], people: PeopleContext): Area[] {

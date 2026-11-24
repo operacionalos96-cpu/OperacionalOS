@@ -133,7 +133,8 @@ export function DayGuide() {
 
   /** `intro`: a abertura automática do dia passa pelas etapas; reabrir pela bolinha vai direto à lista. */
   function open(intro = false, start?: Screen) {
-    setScreen(start ?? (intro ? "ola" : "lista"))
+    // Sem check-in hoje (mesmo tendo dito "Agora não"), a bolinha reabre direto no check-in.
+    setScreen(start ?? (intro ? "ola" : mine?.checkedInAt ? "lista" : "direcao"))
     setDir(1)
     setOpenId(null)
     setHint(false)
@@ -221,6 +222,8 @@ export function DayGuide() {
 
   const me = getUser(meId)
   const needs = needsCheckIn(mine)
+  // "Agora não" só para de insistir: o check-in continua disponível até ser feito.
+  const canCheckIn = !mine?.checkedInAt
   const g = greeting(me.name, now, { ...hello, pending: steps.length })
   const mood: GuideMood = waving ? "hello" : needs ? "calm" : guideMood(steps, progress)
   const allDone = progress.total > 0 && progress.done === progress.total
@@ -337,7 +340,7 @@ export function DayGuide() {
                 {screen === "direcao" && (
                   <>
                     <h2 className="text-xl font-semibold">Direção do dia</h2>
-                    {needs ? (
+                    {canCheckIn ? (
                       <form onSubmit={checkIn} className="grid gap-2 rounded-2xl bg-highlight-soft p-3">
                         <label htmlFor="guide-focus" className="text-sm font-medium">
                           Foco de hoje <span className="font-normal text-muted-foreground">{mine?.focus ? "(você deixou planejado ontem)" : "(opcional)"}</span>
@@ -346,7 +349,7 @@ export function DayGuide() {
                         <Button type="submit" size="lg" className="w-full">
                           Fazer check-in
                         </Button>
-                        <button type="button" onClick={skip} className="justify-self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
+                        <button type="button" onClick={needs ? skip : minimize} className="justify-self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
                           Agora não
                         </button>
                       </form>

@@ -16,7 +16,7 @@ Fatos do código que pesaram:
 
 ## Decisão
 
-1. **A cena entra no app como componente:** `three@0.160.0` vira dependência do projeto, servido pelo próprio site, então a CSP não muda. A aba "Sede 3D" do AI Office monta a cena com `import()` dinâmico, e o three.js só é baixado quando a aba abre. A primeira carga de `/ai-office` continua igual.
+1. **A cena entra no app como componente:** `three@0.160.0` vira dependência do projeto, servido pelo próprio site, então a CSP não muda. A aba "Sede 3D" do AI Office (desde a ADR 0024, o bloco da Sede na Início) monta a cena com `import()` dinâmico, e o three.js só é baixado quando a aba abre. A primeira carga de `/ai-office` continua igual.
 2. **Tradução pura e testada:** `src/lib/domain/office-scene.ts` (`sceneActionFor`) transforma um evento em uma ação da cena. A cena só desenha o que essa função manda. Mapa:
    - **Lead chega ao funil:** cadastrado, respondeu ou demonstrou interesse.
    - **Funil para análise:** analisado. O robô fica com o "!" esperando decisão.
