@@ -55,7 +55,7 @@ Depois, no GitHub, abra um **Pull Request** para a `main`:
 - O banco é compartilhado com outros apps (ver `docs/adr/0004-banco-compartilhado.md`): não use o
   histórico de migrações do Supabase CLI.
 
-**Última migration aplicada em produção:** `0028_dock_pc.sql` (19/11/2026: 0025 a 0028, depois do deploy da vitrine, PR #47).
+**Última migration aplicada em produção:** `0029_contratos.sql` (24/11/2026, pelo SQL Editor, depois do deploy dos Contratos, PR #50). Antes: 0025 a 0028 em 19/11/2026, depois do deploy da vitrine (PR #47).
 
 ## Se der conflito
 
