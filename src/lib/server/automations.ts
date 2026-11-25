@@ -47,15 +47,15 @@ type Handler = (job: SystemJob, store: AutomationStore, now: Date) => Promise<Re
 export class PermanentError extends Error {}
 
 const HANDLERS: Record<string, Handler> = {
-  // Virou cliente: tarefa de onboarding + recebimento previsto (src/lib/domain/won-lead.ts).
+  // Virou cliente: tarefa de onboarding + recebimentos previstos (50% entrada, 50% conclusão) (src/lib/domain/won-lead.ts).
   async auto_won_lead(job, store, now) {
     if (!job.entity_id) throw new PermanentError("job sem lead")
     const ctx = await store.loadLeadContext(job.entity_id)
     if (!ctx) throw new PermanentError(`lead ${job.entity_id} não existe mais`)
-    const { task, transaction } = wonLeadRecords(ctx.lead, ctx.tasks, ctx.transactions, now)
+    const { task, transactions } = wonLeadRecords(ctx.lead, ctx.tasks, ctx.transactions, now)
     if (task) await store.insertTask(task)
-    if (transaction) await store.insertTransaction(transaction)
-    return { task_id: task?.id ?? null, transaction_id: transaction?.id ?? null }
+    for (const tx of transactions) await store.insertTransaction(tx)
+    return { task_id: task?.id ?? null, transaction_ids: transactions.map((t) => t.id) }
   },
 }
 
