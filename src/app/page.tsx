@@ -16,12 +16,13 @@ import { Button } from "@/components/ui/button"
 import { PageHelp } from "@/components/shared/page-help"
 import { CountUp } from "@/components/shared/count-up"
 import { GuideOrb } from "@/components/hzk/guide-orb"
+import { HomeSede } from "@/components/hzk/home-sede"
 import { cn } from "@/lib/utils"
 import { AgendaToday, DailyCard, DayPlanPanel, InboxCounter, SectorStepsPanel, TeamNow, WaitingForYou, WeeklyNudge } from "@/components/hzk/my-day"
 
 /**
  * Início · Meu Dia (blueprint, ADR 0010): o dia de quem está usando, na ordem em que se pensa —
- * cabeçalho, nota de ontem, daily, agenda, time agora, plano do dia, esperando por você, próximo
+ * cabeçalho, nota de ontem, a Sede 3D (recolhível, ADR 0024), daily, agenda, time agora, plano do dia, esperando por você, próximo
  * passo de cada setor e caixa de entrada. Todos os blocos vêm de myDay() (um item, um bloco).
  * Os números da empresa (caixa, metas, pipeline) ficam nas próprias telas.
  */
@@ -104,6 +105,11 @@ export default function HomePage() {
           </div>
         </aside>
       )}
+
+      {/* A Sede 3D abre o dia (recolhível; cada pessoa escolhe e o app lembra). */}
+      <div className="guided" style={at(1)}>
+        <HomeSede />
+      </div>
 
       <div className="guided" style={at(2)}>
         <DailyCard />

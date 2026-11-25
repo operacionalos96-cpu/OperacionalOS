@@ -33,7 +33,6 @@ import { useContracts } from "@/lib/modules"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
 import { openCapture, openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
-import { inInbox } from "@/lib/domain/items"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -54,6 +53,7 @@ import { LostDialog, NextActionDialog, WonDialog } from "@/components/dialogs/le
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
 import { CommandPalette } from "./command-palette"
 import { QuickCapture } from "@/components/hzk/quick-capture"
+import { useMyInboxCount } from "@/components/hzk/inbox-view"
 import { DayGuide } from "@/components/hzk/day-guide"
 import { DoingRail } from "@/components/hzk/doing-now"
 import { HzkMark } from "@/components/hzk/hzk-mark"
@@ -159,10 +159,10 @@ function useGlobalShortcuts() {
 function useBadges() {
   const leads = useStore((s) => s.leads)
   const tasks = useStore((s) => s.tasks)
-  const items = useStore((s) => s.items)
   const meId = useStore((s) => s.meId)
   // Contratos: os que vencem em breve ou já venceram (o banco só entrega a quem vê a área).
   const contracts = useContracts((s) => s.items)
+  const inbox = useMyInboxCount()
   // Pipeline: só follow-ups do funil vencidos (mesma regra do selo e da aba "Precisa de ação").
   const steps = useFunnel((s) => s.steps)
   const loadFunnel = useFunnel((s) => s.load)
@@ -170,12 +170,12 @@ function useBadges() {
   return useMemo(() => {
     const now = new Date()
     return {
-      "/caixa-de-entrada": [...items, ...tasks].filter((t) => inInbox(t) && (t.ownerId === meId || t.createdById === meId || !t.ownerId)).length,
       "/pipeline": followupsDue(leads, steps, now, meId).length,
       "/contratos": contractsDue(contracts, now).length,
-      "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length,
+      // Tarefas: o que está atrasado + o que espera triagem na aba Entrada.
+      "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length + inbox,
     } as Record<string, number>
-  }, [leads, tasks, items, meId, steps, contracts])
+  }, [leads, tasks, meId, steps, inbox, contracts])
 }
 
 /** Menu em seções, só com as abas que esta pessoa vê (ADR 0012); seção vazia some. */

@@ -77,7 +77,7 @@ export function dayPlan(day: MyDay, now: Date): GuideStep[] {
     steps.push({ id: i.task.id, kind: "hoje", title: i.task.title, hint: i.badges.includes("fazendo") ? "Fazendo agora" : i.task.dueDate === format(now, "yyyy-MM-dd") ? "Prazo hoje" : "Planejada para hoje", href: "/tarefas", taskId: i.task.id })
   }
   if (day.inboxCount) {
-    steps.push({ id: "caixa", kind: "caixa", title: `Triar ${day.inboxCount} ${day.inboxCount === 1 ? "item" : "itens"} da caixa de entrada`, hint: "Decidir o que cada um vira", href: "/caixa-de-entrada" })
+    steps.push({ id: "caixa", kind: "caixa", title: `Triar ${day.inboxCount} ${day.inboxCount === 1 ? "item" : "itens"} da caixa de entrada`, hint: "Decidir o que cada um vira", href: "/tarefas?aba=entrada" })
   }
   return steps
 }

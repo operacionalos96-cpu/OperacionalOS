@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { CalendarIcon, CoinsIcon, LayersIcon, LockIcon, UsersIcon } from "lucide-react"
 import { getUser } from "@/config/team"
@@ -18,35 +19,78 @@ import { useAreaList, useCeoLimit, usePeople } from "@/lib/use-hzk"
 import { useTeam } from "@/lib/use-team"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Field, MoneyInput } from "@/components/shared/fields"
+import { Field, MoneyInput, SectionTabs } from "@/components/shared/fields"
 import { Input } from "@/components/ui/input"
 import { PageHeader, Panel } from "@/components/shared/layout"
 import { ownerLabel } from "@/components/hzk/item-bits"
+import { PeopleAdmin } from "@/components/org/people-admin"
+import { VaultView } from "@/components/vault/vault-view"
 
-/** Configurações (HZK OS): áreas com dono, apoio e aprovador, e o limite de gasto que vai para a CEO. */
+type Tab = "empresa" | "pessoas" | "cofre"
+
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <Settings />
+    </Suspense>
+  )
+}
+
+/**
+ * Configurações (HZK OS), em abas: Empresa (áreas com dono, apoio e aprovador, limite da CEO, reunião
+ * diária e o menu de cada pessoa), Pessoas (membros, árvore e cargos) e Cofre (só o owner).
+ * A aba fica no endereço (?aba=…): dá para mandar o link e os endereços antigos caem na aba certa.
+ */
+function Settings() {
   const { canAdmin, isOwner } = useAccess()
   const areas = useAreaList()
   const people = usePeople()
+  const params = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const aba = params.get("aba")
+  const tab: Tab = aba === "pessoas" ? "pessoas" : aba === "cofre" && isOwner ? "cofre" : "empresa"
+  const go = (next: Tab) => router.replace(next === "empresa" ? pathname : `${pathname}?aba=${next}`, { scroll: false })
 
   return (
     <div className="flex flex-col">
-      <PageHeader page="/configuracoes" />
-      <div className="page-body grid gap-4">
-        {!canAdmin && (
-          <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm text-muted-foreground">
-            <LockIcon className="size-4" /> Só a gestão muda estas configurações. Você pode consultar.
-          </p>
-        )}
-        <Panel icon={LayersIcon} title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela. Compare de relance quem é dono de quê.">
-          <AreasMatrix areas={areas} editable={canAdmin} ownerName={(a) => ownerLabel(a, people)} />
-        </Panel>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <CeoLimitPanel editable={canAdmin} />
-          <DailyMeetingPanel editable={canAdmin} />
+      <PageHeader page="/configuracoes">
+        <SectionTabs
+          value={tab}
+          onChange={go}
+          options={[
+            { value: "empresa" as Tab, label: "Empresa" },
+            { value: "pessoas" as Tab, label: "Pessoas" },
+            // O Cofre é só do owner (o servidor confere de novo): para os demais a aba nem aparece.
+            ...(isOwner ? [{ value: "cofre" as Tab, label: "Cofre" }] : []),
+          ]}
+        />
+      </PageHeader>
+      {tab === "cofre" ? (
+        <VaultView />
+      ) : (
+        <div className="page-body grid gap-4">
+          {!canAdmin && (
+            <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm text-muted-foreground">
+              <LockIcon className="size-4" /> Só a gestão muda estas configurações. Você pode consultar.
+            </p>
+          )}
+          {tab === "pessoas" ? (
+            <PeopleAdmin />
+          ) : (
+            <>
+              <Panel icon={LayersIcon} title="Áreas da empresa" description="O dono recebe as tarefas da área e decide o que é reversível dentro dela. Compare de relance quem é dono de quê.">
+                <AreasMatrix areas={areas} editable={canAdmin} ownerName={(a) => ownerLabel(a, people)} />
+              </Panel>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <CeoLimitPanel editable={canAdmin} />
+                <DailyMeetingPanel editable={canAdmin} />
+              </div>
+              <PagesByMemberPanel editable={isOwner} />
+            </>
+          )}
         </div>
-        <PagesByMemberPanel editable={isOwner} />
-      </div>
+      )}
     </div>
   )
 }

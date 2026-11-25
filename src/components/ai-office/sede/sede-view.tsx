@@ -59,7 +59,7 @@ const LUZ: { value: SedeLuz; label: string; icon: typeof SunIcon }[] = [
  * um pulso que sobe pela fachada até o andar da área; o histórico já carregado não é reencenado.
  * Os andares ocupados vêm das áreas da empresa (Configurações › Áreas).
  */
-export function SedeView() {
+export function SedeView({ stageClassName = "h-[min(72vh,720px)] min-h-[420px]" }: { /** Altura do palco 3D (a Início usa uma menor). */ stageClassName?: string } = {}) {
   const stage = useRef<HTMLDivElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const handle = useRef<SedeV2Handle | null>(null)
@@ -88,7 +88,7 @@ export function SedeView() {
     setLog((l) => [line, ...l].slice(0, 10))
   }
 
-  // monta a cena (o three.js só é baixado quando esta aba abre)
+  // monta a cena (o three.js só é baixado quando a Sede aparece na tela)
   useEffect(() => {
     let alive = true
     let h: SedeV2Handle | null = null
@@ -200,7 +200,7 @@ export function SedeView() {
   return (
     <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div ref={wrap} className="relative min-w-0 overflow-hidden rounded-2xl border bg-muted shadow-card">
-        <div ref={stage} className="h-[min(72vh,720px)] min-h-[420px] w-full" role="img" aria-label="Sede da HZK em 3D: torre de 14 andares; cada andar ocupado é uma área da empresa e os eventos sobem pela fachada até ele" />
+        <div ref={stage} className={cn("w-full", stageClassName)} role="img" aria-label="Sede da HZK em 3D: torre de 14 andares; cada andar ocupado é uma área da empresa e os eventos sobem pela fachada até ele" />
 
         {/* cabeçalho */}
         <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
@@ -266,7 +266,7 @@ export function SedeView() {
         )}
 
         {!ready && !failed && <p className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">Montando a Sede…</p>}
-        {failed && <p className="absolute inset-0 grid place-items-center bg-muted px-6 text-center text-sm text-muted-foreground">Não deu para abrir o 3D neste navegador. O resto do AI Office continua funcionando.</p>}
+        {failed && <p className="absolute inset-0 grid place-items-center bg-muted px-6 text-center text-sm text-muted-foreground">Não deu para abrir o 3D neste navegador. O resto do app continua funcionando.</p>}
       </div>
 
       <aside className="grid min-w-0 content-start gap-4">

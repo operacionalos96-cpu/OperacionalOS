@@ -20,11 +20,11 @@ describe("abas por pessoa", () => {
   })
 
   it("o ajuste do owner vale mais que o padrão; a Início sempre aparece; aba de nível só com nível", () => {
-    const v = visiblePages("u1", "operator", { areas: DEFAULT_AREAS, people, overrides: { u1: ["/conteudos", "/cofre"] } })
+    const v = visiblePages("u1", "operator", { areas: DEFAULT_AREAS, people, overrides: { u1: ["/conteudos", "/configuracoes"] } })
     expect(canSee(v, "/conteudos")).toBe(true)
     expect(canSee(v, "/")).toBe(true)
     expect(canSee(v, "/prospeccao")).toBe(false)
-    expect(canSee(v, "/cofre")).toBe(false)
+    expect(canSee(v, "/configuracoes")).toBe(false)
     expect(canSee(visiblePages("u3", "admin", { areas: DEFAULT_AREAS, people }), "/configuracoes")).toBe(true)
   })
 

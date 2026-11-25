@@ -39,4 +39,5 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0020](0020-acesso-por-area.md) | Acesso por área no banco: áreas restritas, concessões e vitrine | Proposto |
 | [0021](0021-sede-3d-com-eventos-reais.md) | Sede 3D: os eventos reais viram pacotes viajando pelo prédio | Proposto |
 | [0022](0022-escritorio-pessoal-isolado.md) | Escritório pessoal: privado por dono, sobre a fila que já existe | Proposto |
+| [0024](0024-menu-agrupado-e-sede-na-inicio.md) | Menu agrupado (Entrada em Tarefas, cadastro e cofre em Configurações) e Sede 3D na Início | Proposto |
 | [0025](0025-contratos.md) | Contratos: cadastro, arquivo privado e aviso de vencimento | Proposto |
