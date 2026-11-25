@@ -15,7 +15,7 @@ import { SANDBOX } from "@/lib/supabase/env"
  */
 export const AUTOMATIONS = [
   { id: "meta-batida", label: "Meta batida", description: "Comemora quando uma meta chega a 100% (por qualquer um da equipe)." },
-  { id: "virou-cliente", label: "Virou cliente", description: "Lead ganho vira cliente e gera tarefa de onboarding e recebimento previsto (uma vez por lead); o evento lead.converted também segue para os webhooks." },
+  { id: "virou-cliente", label: "Virou cliente", description: "Lead ganho vira cliente e gera tarefa de onboarding e dois recebimentos previstos, 50% na entrada e 50% na conclusão (uma vez por lead); o evento lead.converted também segue para os webhooks." },
 ] as const
 
 let started = false
@@ -35,13 +35,13 @@ export function startAutomations(navigate: (href: string) => void) {
       const st = useStore.getState()
       const plan = planWonLead(lead, st.tasks, st.transactions, new Date())
       if (plan.task) st.createTask(plan.task)
-      if (plan.transaction) st.createTransaction(plan.transaction)
+      for (const tx of plan.transactions) st.createTransaction(tx)
     } else {
       // Pequena espera: o evento lead.converted precisa estar gravado antes de a fila ser processada.
       setTimeout(() => void fetch("/api/automacoes/processar", { method: "POST" }).catch(() => {}), 1500)
     }
     toast.success(`${lead.name} virou cliente`, {
-      description: "Tarefa de onboarding e recebimento previsto a caminho.",
+      description: "Tarefa de onboarding e recebimentos (50% agora, 50% na conclusão) a caminho.",
       action: { label: "Ver clientes", onClick: () => navigate("/clientes") },
     })
   })

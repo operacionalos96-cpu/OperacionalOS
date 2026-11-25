@@ -52,16 +52,16 @@ describe("executor de automações", () => {
     const m = memoryStore([job()])
     expect(await runSystemJobs(m.store, 10, () => NOW)).toEqual({ done: 1, failed: 0 })
     expect(m.tasks).toHaveLength(1)
-    expect(m.transactions).toHaveLength(1)
-    expect(m.completed[0].result).toEqual({ task_id: "won-task-l1", transaction_id: "won-tx-l1" })
+    expect(m.transactions).toHaveLength(2)
+    expect(m.completed[0].result).toEqual({ task_id: "won-task-l1", transaction_ids: ["won-tx-l1", "won-tx2-l1"] })
   })
 
   it("rodar de novo (retry, dois servidores) não duplica nada", async () => {
     const m = memoryStore([job({ public_id: "a" }), job({ public_id: "b" })])
     await runSystemJobs(m.store, 10, () => NOW)
     expect(m.tasks).toHaveLength(1)
-    expect(m.transactions).toHaveLength(1)
-    expect(m.completed[1].result).toEqual({ task_id: null, transaction_id: null })
+    expect(m.transactions).toHaveLength(2)
+    expect(m.completed[1].result).toEqual({ task_id: null, transaction_ids: [] })
   })
 
   it("lead apagado: falha sem retry (dead letter), não fica tentando para sempre", async () => {
