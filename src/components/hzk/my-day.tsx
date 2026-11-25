@@ -478,7 +478,7 @@ export function SectorStepsPanel() {
 
 export function InboxCounter({ count }: { count: number }) {
   return (
-    <Link href="/caixa-de-entrada" className="flex items-center gap-3 rounded-2xl border bg-card px-5 py-4 shadow-card hover:border-brand/50">
+    <Link href="/tarefas?aba=entrada" className="flex items-center gap-3 rounded-2xl border bg-card px-5 py-4 shadow-card hover:border-brand/50">
       <InboxIcon className="size-5 text-muted-foreground" />
       <span className="flex-1 text-sm">
         {count ? (
