@@ -20,6 +20,13 @@ describe("agenda: eventos, prazos de tarefas e de conteúdos num lugar só", () 
     expect(agendaEntries(...week, src, "u2").map((e) => e.refId)).toEqual(["call", "t1", "c1"])
   })
 
+  it("vencimento de contrato assinado entra na agenda do time, não na de uma pessoa", () => {
+    const k = (id: string, over: object) => ({ id, title: id, party: "X", kind: "parceiro" as const, files: [], createdById: "u1", createdAt: "x", signedAt: "2026-01-01", endsAt: "2026-11-05", ...over })
+    const src = { events: [], tasks: [], content: [], contracts: [k("vence", {}), k("renova", { autoRenews: true }), k("rascunho", { signedAt: undefined }), k("fechado", { closedAt: "2026-10-01" }), k("fora", { endsAt: "2026-12-01" })] }
+    expect(agendaEntries(...week, src).map((e) => [e.key, e.title])).toEqual([["k:vence", "Vence: vence"], ["k:renova", "Renova: renova"]])
+    expect(agendaEntries(...week, src, "u1")).toEqual([])
+  })
+
   it("ausência de vários dias aparece em cada dia, como dia todo", () => {
     const ferias = ev({ id: "f", kind: "ausencia", ownerId: "u2", start: at("00:00", "2026-11-03").toISOString(), end: at("23:59", "2026-11-05").toISOString() })
     expect(agendaEntries(...week, { events: [ferias], tasks: [], content: [] }).map((e) => [e.day, e.allDay])).toEqual([

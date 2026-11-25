@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale"
 import { CalendarPlusIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { agendaEntries, lanes, type AgendaEntry } from "@/lib/domain/agenda"
 import { EVENT_KINDS, type CalendarEvent } from "@/lib/domain/calendar"
-import { useCalendarEvents, useContentItems } from "@/lib/modules"
+import { useCalendarEvents, useContentItems, useContracts } from "@/lib/modules"
 import { useMinute } from "@/lib/presence"
 import { useStore } from "@/lib/store"
 import { useAreaList } from "@/lib/use-hzk"
@@ -30,6 +30,7 @@ const TONE: Record<string, string> = {
   ausencia: "border-l-muted-foreground bg-muted",
   tarefa: "border-l-foreground/40 bg-background",
   conteudo: "border-l-highlight bg-highlight-soft",
+  contrato: "border-l-danger bg-danger-soft",
 }
 const toneOf = (e: AgendaEntry) => TONE[e.source === "evento" ? e.kind! : e.source]
 
@@ -44,6 +45,7 @@ export function CalendarView() {
   const events = useCalendarEvents((s) => s.items)
   const tasks = useStore((s) => s.tasks)
   const content = useContentItems((s) => s.items)
+  const contracts = useContracts((s) => s.items)
   const [view, setView] = useState<View>("semana")
   const [anchor, setAnchor] = useState(() => new Date())
   const [person, setPerson] = useState<string>("")
@@ -54,7 +56,7 @@ export function CalendarView() {
     if (view === "semana") return [startOfWeek(anchor, { weekStartsOn: 1 }), endOfWeek(anchor, { weekStartsOn: 1 })] as const
     return [startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 }), endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 })] as const
   }, [view, anchor])
-  const entries = useMemo(() => agendaEntries(range[0], range[1], { events, tasks, content }, person || undefined), [range, events, tasks, content, person])
+  const entries = useMemo(() => agendaEntries(range[0], range[1], { events, tasks, content, contracts }, person || undefined), [range, events, tasks, content, contracts, person])
   const days = eachDayOfInterval({ start: range[0], end: range[1] })
 
   const move = (dir: 1 | -1) => setAnchor((a) => (view === "dia" ? addDays(a, dir) : view === "semana" ? addWeeks(a, dir) : addMonths(a, dir)))
@@ -68,6 +70,7 @@ export function CalendarView() {
   function open(e: AgendaEntry) {
     if (e.source === "evento") setEditing({ event: events.find((x) => x.id === e.refId) })
     else if (e.source === "tarefa") useUI.getState().set({ taskDetail: e.refId })
+    else if (e.source === "contrato") router.push(`/contratos?id=${e.refId}`)
     else router.push("/conteudos")
   }
 
@@ -124,7 +127,7 @@ export function CalendarView() {
 }
 
 function Legend() {
-  const items = [...EVENT_KINDS.map((k) => ({ id: k.id, label: k.label })), { id: "tarefa", label: "Prazo de tarefa" }, { id: "conteudo", label: "Prazo de conteúdo" }]
+  const items = [...EVENT_KINDS.map((k) => ({ id: k.id, label: k.label })), { id: "tarefa", label: "Prazo de tarefa" }, { id: "conteudo", label: "Prazo de conteúdo" }, { id: "contrato", label: "Vencimento de contrato" }]
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legenda">
       {items.map((i) => (

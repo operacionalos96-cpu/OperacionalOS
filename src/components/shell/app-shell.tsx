@@ -28,6 +28,8 @@ import { getUser } from "@/config/team"
 import { isOverdue, isTaskFor } from "@/lib/domain/rules"
 import { followupsDue } from "@/lib/domain/funnel"
 import { useFunnel } from "@/lib/funnel-store"
+import { contractsDue } from "@/lib/domain/contracts"
+import { useContracts } from "@/lib/modules"
 import { importLocalData, localSnapshotCounts } from "@/lib/import-local"
 import { useStore } from "@/lib/store"
 import { openCapture, openLeadForm, openTaskForm, openTxForm, useUI } from "@/lib/ui-store"
@@ -158,6 +160,8 @@ function useBadges() {
   const leads = useStore((s) => s.leads)
   const tasks = useStore((s) => s.tasks)
   const meId = useStore((s) => s.meId)
+  // Contratos: os que vencem em breve ou já venceram (o banco só entrega a quem vê a área).
+  const contracts = useContracts((s) => s.items)
   const inbox = useMyInboxCount()
   // Pipeline: só follow-ups do funil vencidos (mesma regra do selo e da aba "Precisa de ação").
   const steps = useFunnel((s) => s.steps)
@@ -167,10 +171,11 @@ function useBadges() {
     const now = new Date()
     return {
       "/pipeline": followupsDue(leads, steps, now, meId).length,
+      "/contratos": contractsDue(contracts, now).length,
       // Tarefas: o que está atrasado + o que espera triagem na aba Entrada.
       "/tarefas": tasks.filter((t) => !t.done && isTaskFor(t, meId) && isOverdue(t.dueDate, now)).length + inbox,
     } as Record<string, number>
-  }, [leads, tasks, meId, steps, inbox])
+  }, [leads, tasks, meId, steps, inbox, contracts])
 }
 
 /** Menu em seções, só com as abas que esta pessoa vê (ADR 0012); seção vazia some. */
