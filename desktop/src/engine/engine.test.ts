@@ -101,3 +101,30 @@ describe("motor", () => {
     expect(e.state).toBe("parado")
   })
 })
+
+describe("historyFrom: a conversa termina na mensagem que disparou a entrega", () => {
+  const BOT = "agt_" + "B".repeat(26)
+  const msg = (id: string, author_type: "human" | "agent", body: string, is_trigger = false) => ({ id, author_type, author_id: author_type === "agent" ? BOT : "u3", kind: "texto", body, is_trigger })
+
+  it("duas mensagens seguidas: a 2ª entrega vê a resposta da 1ª e termina no seu gatilho (antes falhava com 'sem mensagem da pessoa')", async () => {
+    const { historyFrom } = await import("./engine")
+    const d = delivery({ thread: { id: "thr_x", continued_messages: [], messages: [msg("m1", "human", "teste"), msg("m2", "human", "oi", true), msg("m3", "agent", "Olá! Recebi o teste.")] } })
+    expect(historyFrom(d)).toEqual([
+      { role: "user", content: "teste" },
+      { role: "assistant", content: "Olá! Recebi o teste." },
+      { role: "user", content: "oi" },
+    ])
+  })
+
+  it("mensagem da pessoa depois do gatilho fica de fora (tem a entrega dela)", async () => {
+    const { historyFrom } = await import("./engine")
+    const d = delivery({ thread: { id: "thr_x", continued_messages: [], messages: [msg("m1", "human", "primeira", true), msg("m2", "human", "segunda")] } })
+    expect(historyFrom(d)).toEqual([{ role: "user", content: "primeira" }])
+  })
+
+  it("sem gatilho marcado, vale a conversa inteira (como antes)", async () => {
+    const { historyFrom } = await import("./engine")
+    const d = delivery({ thread: { id: "thr_x", continued_messages: [], messages: [msg("m1", "human", "a"), msg("m2", "agent", "b")] } })
+    expect(historyFrom(d).map((m) => m.role)).toEqual(["user", "assistant"])
+  })
+})

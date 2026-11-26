@@ -157,15 +157,26 @@ export function buildSystem(d: Delivery, opts: { level: number; folders: string[
   return lines.join("\n")
 }
 
+/**
+ * Conversa para a IA, terminando na mensagem que DISPAROU esta entrega (is_trigger).
+ * Duas mensagens seguidas viram duas entregas; quando a segunda roda, o bot já pode ter respondido
+ * a primeira, e essa resposta vem DEPOIS do gatilho. Então: o que veio antes do gatilho, as respostas
+ * de bots que chegaram depois dele (são de mensagens anteriores) e, por último, o gatilho.
+ * Mensagens da pessoa depois do gatilho ficam de fora: cada uma tem a sua entrega.
+ * Sem gatilho marcado (entrega antiga), vale a conversa inteira.
+ */
 export function historyFrom(d: Delivery): ChatMessage[] {
+  const all = d.thread?.messages ?? []
+  const t = all.findIndex((m) => m.is_trigger)
+  const ordered = t < 0 ? all : [...all.slice(0, t), ...all.slice(t + 1).filter((m) => m.author_type === "agent"), all[t]]
   const out: ChatMessage[] = []
-  for (const m of d.thread?.messages ?? []) {
+  for (const m of ordered) {
     if (m.kind === "aviso" || m.author_type === "system") continue
     if (m.author_type === "agent" && m.author_id === d.agent.id) out.push({ role: "assistant", content: m.body })
     else if (m.author_type === "agent") out.push({ role: "user", content: untrusted(`outro bot (${m.author_id})`, m.body) })
     else out.push({ role: "user", content: m.body })
   }
-  // a API pede que a conversa termine com a pessoa; se a última for do bot, a entrega não tem o que responder
+  // a API pede que a conversa termine com a pessoa; sem gatilho e com o bot por último, não há o que responder
   return out
 }
 
