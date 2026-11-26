@@ -7,6 +7,7 @@ import { uid } from "@/lib/format"
 import { useMemberRoles, useOrgRoles } from "@/lib/modules"
 import { useStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
@@ -25,7 +26,8 @@ export function InviteMemberDialog({
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [roleLevel, setRoleLevel] = useState<RoleLevel>("operator")
-  const [initialRoleId, setInitialRoleId] = useState<string>("")
+  // Pode ter mais de um cargo (ex.: CEO e CFO); o primeiro marcado é o principal.
+  const [roleIds, setRoleIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,17 +54,17 @@ export function InviteMemberDialog({
       }
       const newTeamId = body.teamId
 
-      // 2. Se um cargo inicial foi selecionado, atribuir
-      if (initialRoleId) {
+      // 2. Atribuir os cargos marcados (o primeiro é o principal)
+      roleIds.forEach((roleId, i) =>
         saveMemberRole({
           id: uid(),
           memberId: newTeamId,
-          roleId: initialRoleId,
-          isPrimary: true,
+          roleId,
+          isPrimary: i === 0,
           assignedAt: new Date().toISOString(),
           assignedBy: meId,
-        })
-      }
+        }),
+      )
 
       await refreshOrgMembers()
       toast.success("Convite enviado", {
@@ -126,19 +128,21 @@ export function InviteMemberDialog({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Cargo Inicial (Opcional)</label>
-              <select
-                value={initialRoleId}
-                onChange={(e) => setInitialRoleId(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Nenhum cargo inicial</option>
+              <label className="text-xs font-medium text-muted-foreground">Cargos (Opcional)</label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
                 {orgRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
+                  <label key={r.id} className="flex items-center gap-2 text-xs text-foreground">
+                    <Checkbox
+                      checked={roleIds.includes(r.id)}
+                      onCheckedChange={(v) => setRoleIds((ids) => (v ? [...ids, r.id] : ids.filter((id) => id !== r.id)))}
+                    />
                     {r.title}
-                  </option>
+                  </label>
                 ))}
-              </select>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                O primeiro marcado é o cargo principal. Quem tem o cargo CEO passa a ser dona das áreas da CEO.
+              </p>
             </div>
           </div>
 
