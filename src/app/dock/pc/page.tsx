@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckIcon, ChevronDownIcon, CircleDotIcon, LockIcon, MonitorIcon, OctagonXIcon, PlayIcon, ShieldCheckIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, CircleDotIcon, CloudIcon, LockIcon, MonitorIcon, OctagonXIcon, PlayIcon, ShieldCheckIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, Hint, Tag } from "@/components/dock/ui"
 import { DockAvatar } from "@/components/dock/dock-avatar"
@@ -68,6 +68,8 @@ export default function DockPcPage() {
         })}
       </Card>
 
+      <CloudEngineCard />
+
       <Card className="lg:col-span-2">
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
@@ -92,6 +94,59 @@ export default function DockPcPage() {
 
       <DesktopFloatCard />
     </div>
+  )
+}
+
+/**
+ * Motor na nuvem (ADR 0026): os bots desta pessoa respondem pelo servidor, sem o app no PC, com o
+ * OpenRouter da empresa. O texto diz o que muda (a conversa passa pelo servidor) e o que falta fazer.
+ */
+function CloudEngineCard() {
+  const d = useDock((s) => s.data)!
+  const run = useDock((s) => s.run)
+  const [busy, setBusy] = useState(false)
+  const hasOR = d.connections.some((c) => c.provider === "openrouter" && c.status !== "desligada")
+  const botsOnOR = d.agents.filter((a) => d.connections.find((c) => c.id === a.connectionId)?.provider === "openrouter").length
+
+  async function toggle() {
+    if (busy) return
+    setBusy(true)
+    await run((api) => api.setCloudEngine(!d.cloud), d.cloud ? "Motor na nuvem desligado." : "Motor na nuvem ligado.")
+    setBusy(false)
+  }
+
+  const next = !d.cloud
+    ? null
+    : !hasOR
+      ? "Falta um passo: em Provedores, conecte o OpenRouter. Depois escolha o OpenRouter como IA de cada bot."
+      : botsOnOR === 0
+        ? "Falta um passo: abra cada bot e escolha o OpenRouter como IA."
+        : `${botsOnOR} ${botsOnOR === 1 ? "bot usa" : "bots usam"} o OpenRouter e já ${botsOnOR === 1 ? "responde" : "respondem"} pela nuvem.`
+
+  return (
+    <Card className={cn("flex items-center gap-4 lg:col-span-2", d.cloud && "shadow-[0_0_0_1.5px_var(--success)]")}>
+      <span className={cn("grid size-11 shrink-0 place-items-center rounded-full", d.cloud ? "bg-success-soft text-success" : "bg-foreground/[0.06] text-muted-foreground")}><CloudIcon className="size-5" /></span>
+      <div className="min-w-0 flex-1">
+        <h3 id="cloud-title" className="t-title">Motor na nuvem</h3>
+        <p id="cloud-text" className="text-sm text-muted-foreground">
+          Seus bots respondem sem nada instalado no seu PC, usando o OpenRouter da empresa. As suas conversas com os bots passam pelo servidor da HZK. Nada de pastas do PC por aqui.
+        </p>
+        {next && <p className="mt-1 text-xs">{next}</p>}
+        {d.cloud && <p className="mt-1 text-xs text-muted-foreground">A resposta pode levar até 1 minuto para começar. A cota do OpenRouter é dividida com o time.</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={d.cloud}
+        aria-labelledby="cloud-title"
+        aria-describedby="cloud-text"
+        disabled={busy}
+        onClick={toggle}
+        className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50", d.cloud ? "bg-success" : "bg-foreground/15")}
+      >
+        <span className={cn("absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left]", d.cloud ? "left-[18px]" : "left-0.5")} />
+      </button>
+    </Card>
   )
 }
 

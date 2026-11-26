@@ -249,6 +249,8 @@ export interface DockData {
   usage: DockUsage[]
   policies: { provider: string; dataClass: "local" | "padrao" | "conferir" | "treina" }[]
   bridge: DockBridge
+  /** Motor na nuvem ligado para os bots desta pessoa (ADR 0026): responde sem o app no PC, só com o OpenRouter. */
+  cloud: boolean
   /** estado de cada bot (office-state/v1), calculado pelo servidor ou pela demonstração */
   states: Record<string, AgentState>
 }

@@ -67,6 +67,8 @@ export interface DockApi {
 
   saveConnection(c: NewConnection): Promise<string>
   setConnectionEnabled(id: string, enabled: boolean): Promise<void>
+  /** Liga ou desliga o motor na nuvem para os bots desta pessoa (ADR 0026). */
+  setCloudEngine(on: boolean): Promise<void>
 
   openThread(kind: "direta" | "canal", agentIds: string[], title?: string, lead?: string | null): Promise<string>
   sendMessage(threadId: string, body: string, mentions: string[], idempotencyKey: string): Promise<void>

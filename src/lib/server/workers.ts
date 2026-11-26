@@ -33,7 +33,8 @@ export interface Worker {
   createdBy: string | null
   /** Dono do trabalhador pessoal (PC liberado, 0026/0028). null = trabalhador da empresa. */
   ownerTeamId: string | null
-  kind: "servico" | "pc"
+  /** nuvem = motor do Dock no servidor (0030): só por dentro do servidor, nunca por token */
+  kind: "servico" | "pc" | "nuvem"
 }
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex")
@@ -84,6 +85,8 @@ export async function authWorker(req: Request): Promise<Worker> {
   if (!data || !data.enabled) throw new WorkerAuthError("token ausente ou inválido", 401)
   // PC liberado só vale aprovado (o banco já impede ligado sem aprovação; aqui é a segunda trava)
   if (data.kind === "pc" && (data.pc_status !== "aprovado" || !data.owner_team_id)) throw new WorkerAuthError("token ausente ou inválido", 401)
+  // motor na nuvem não tem token (0030); se alguém achar um que bata com o hash, aqui ele não entra
+  if (data.kind === "nuvem") throw new WorkerAuthError("token ausente ou inválido", 401)
   if (!(await rateHit(`worker:${data.id}`, 240, 60))) throw new WorkerAuthError("muitas requisições — respeite retry_after_seconds", 429)
   await supabaseAdmin().from("workers").update({ last_seen_at: new Date().toISOString() }).eq("id", data.id)
   return { id: data.id, name: data.name, agent_id: data.agent_id, engine: data.engine, capabilities: data.capabilities ?? [], scopes: (data.scopes ?? []) as Scope[], createdBy: data.created_by ?? null, ownerTeamId: data.owner_team_id ?? null, kind: data.kind === "pc" ? "pc" : "servico" }

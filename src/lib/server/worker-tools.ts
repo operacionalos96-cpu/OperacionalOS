@@ -136,7 +136,7 @@ for (const [name, t] of Object.entries(dockEngineTools(engineRpc))) {
     scope: "office:engine",
     input: t.input,
     run: async (w, a) => {
-      if (w.kind !== "pc" || !w.ownerTeamId) throw new JobError("só o PC liberado usa as ferramentas do Dock", 403)
+      if ((w.kind !== "pc" && w.kind !== "nuvem") || !w.ownerTeamId) throw new JobError("só o PC liberado e o motor na nuvem usam as ferramentas do Dock", 403)
       try {
         return await t.run(w.id, a)
       } catch (e) {
