@@ -16,7 +16,10 @@ $("save").addEventListener("click", async () => {
   if (base && !/^https:\/\/operacional-os\.vercel\.app\/?$|^http:\/\/localhost:3000\/?$/.test(base)) return status("Endereço não permitido.", false)
   await chrome.storage.local.set({ ...(token ? { token } : {}), apiBase: base || "https://operacional-os.vercel.app" })
   $("token").value = ""
+  $("save").disabled = true
+  status("Testando a conexão…", true)
   const r = await chrome.runtime.sendMessage({ type: "api", action: "ping" })
+  $("save").disabled = false
   if (r?.ok) status(`Conectado: ${r.data.nome}. Abra/recarregue o WhatsApp Web.`, true)
   else status(r?.data?.erro || "Não conectou.", false)
 })
