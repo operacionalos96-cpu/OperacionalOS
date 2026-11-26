@@ -38,20 +38,28 @@ async function syncModels(key: string, owners: string[]) {
   }
 }
 
-export async function runDockCloud(opts: { budgetMs: number }): Promise<{ workers: number; skipped?: string } & Partial<CloudRunResult>> {
+/**
+ * Roda o motor na nuvem. Sem `ownerTeamId`: de todo mundo que ligou (agendador, a cada minuto).
+ * Com `ownerTeamId`: só o da pessoa (logo depois que ela manda mensagem, /api/escritorio/nuvem).
+ * Os dois podem rodar juntos sem responder duas vezes: cada entrega tem lease (claim_next_job).
+ */
+export async function runDockCloud(opts: { budgetMs: number; ownerTeamId?: string }): Promise<{ workers: number; skipped?: string } & Partial<CloudRunResult>> {
   const key = process.env.OPENROUTER_API_KEY?.trim() || null
   const db = supabaseAdmin()
-  const { data, error } = await db
+  let q = db
     .from("workers")
     .select("id, name, agent_id, engine, capabilities, scopes, created_by, owner_team_id")
     .eq("kind", "nuvem")
     .eq("enabled", true)
+  if (opts.ownerTeamId) q = q.eq("owner_team_id", opts.ownerTeamId)
+  const { data, error } = await q
   if (error) return { workers: 0, skipped: "fila do Dock indisponível (rodou o SQL 0030?)" }
   const rows = (data ?? []) as { id: string; name: string; agent_id: string | null; engine: string | null; capabilities: string[] | null; scopes: string[] | null; created_by: string | null; owner_team_id: string | null }[]
   if (!rows.length) return { workers: 0 }
   if (!key) return { workers: rows.length, skipped: "falta OPENROUTER_API_KEY na Vercel" }
 
-  await syncModels(key, rows.map((r) => r.owner_team_id).filter((o): o is string => !!o)).catch((e) => console.error("[dock-nuvem] modelos:", (e as Error).message))
+  // a lista de modelos é do agendador; na hora da mensagem, o que importa é responder rápido
+  if (!opts.ownerTeamId) await syncModels(key, rows.map((r) => r.owner_team_id).filter((o): o is string => !!o)).catch((e) => console.error("[dock-nuvem] modelos:", (e as Error).message))
 
   const deadline = Date.now() + Math.max(0, opts.budgetMs)
   const total: CloudRunResult = { replied: 0, notices: 0, failed: 0 }

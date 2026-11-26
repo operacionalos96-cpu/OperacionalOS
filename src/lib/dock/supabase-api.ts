@@ -22,6 +22,14 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
     return data as T
   }
 
+  // Motor na nuvem ligado (lido no load): ao mandar mensagem, acorda a nuvem na hora em vez de esperar
+  // o agendador (ADR 0026). Não espera a resposta: ela chega pelo tempo real. Se falhar, o agendador pega.
+  let cloudOn = false
+  const wakeCloud = () => {
+    if (!cloudOn) return
+    fetch("/api/escritorio/nuvem", { method: "POST", keepalive: true, cache: "no-store" }).catch(() => undefined)
+  }
+
   return {
     mode: "supabase",
 
@@ -95,7 +103,7 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
         usage: usage.map((u) => ({ agentId: u.agent_id, connectionId: u.connection_id, provider: u.provider, model: u.model, free: u.free, costUsd: u.cost_usd === null ? null : Number(u.cost_usd), fallbackFrom: u.fallback_from, createdAt: u.created_at })),
         policies: policies.map((p) => ({ provider: p.provider, dataClass: p.data_class })),
         bridge: { online: !!state?.bridge.online, lastSeenAt: state?.bridge.last_seen_at ?? null, name: null },
-        cloud: !cloud.error && !!(cloud.data as Row[] | null)?.[0]?.enabled,
+        cloud: (cloudOn = !cloud.error && !!(cloud.data as Row[] | null)?.[0]?.enabled),
         states: Object.fromEntries((state?.agents ?? []).map((a) => [a.id, a.state])),
       }
       return data
@@ -137,14 +145,20 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
     saveConnection: (c) => rpc("office_save_connection", { p_id: null, p_kind: c.kind, p_provider: c.provider, p_label: c.label, p_endpoint: c.endpoint ?? null, p_acp_agent: null, p_terms_version: c.termsVersion ?? null }),
     setConnectionEnabled: (id, enabled) => rpc("office_set_connection_enabled", { p_id: id, p_enabled: enabled }),
     setCloudEngine: async (on) => {
-      await rpc("office_set_cloud_engine", { p_on: on })
+      cloudOn = await rpc<boolean>("office_set_cloud_engine", { p_on: on })
+      wakeCloud() // o que já estava na fila sai agora, sem esperar o minuto
     },
     openThread: (kind, ids, title, lead) => rpc("office_open_thread", { p_kind: kind, p_agent_ids: ids, p_title: title ?? "", p_lead: lead ?? null }),
     sendMessage: async (thread, body, mentions, key) => {
       await rpc("office_send_message", { p_thread: thread, p_body: body, p_idempotency_key: key, p_mentions: mentions })
+      wakeCloud()
     },
     setThreadModel: (thread, agent, conn, model) => rpc("office_set_thread_model", { p_thread: thread, p_agent: agent, p_connection: conn, p_model: model ?? null }),
-    continueWith: (thread, agent, key) => rpc("office_continue_with", { p_thread: thread, p_agent: agent, p_idempotency_key: key }),
+    continueWith: async (thread, agent, key) => {
+      const id = await rpc<string>("office_continue_with", { p_thread: thread, p_agent: agent, p_idempotency_key: key })
+      wakeCloud()
+      return id
+    },
     installSkill: (agent, skill, pin) => rpc("office_install_skill", { p_agent: agent, p_skill: skill, p_pin: pin ?? null }),
     uninstallSkill: (agent, skill) => rpc("office_uninstall_skill", { p_agent: agent, p_skill: skill }),
     ackSkillUpdate: (agent, skill, mode) => rpc("office_ack_skill_update", { p_agent: agent, p_skill: skill, p_mode: mode }),
