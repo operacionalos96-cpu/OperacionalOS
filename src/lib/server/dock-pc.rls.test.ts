@@ -132,7 +132,7 @@ describe("entrega: o motor recebe só o que o bot pode usar (office-delivery/v1)
     expect(d.agent).toMatchObject({ id: BOT, name: "Pesquisadora", access_level: 1, instructions: "Seja breve." })
     expect(d.thread.messages.map((m: any) => [m.author_type, m.body, m.is_trigger])).toEqual([["human", "Levante 3 clínicas em Curitiba", true]])
     expect(d.ia.map((x: any) => [x.connection_id, x.why, x.model, x.data_class])).toEqual([
-      [CONN_OR, "bot", "openai/gpt-oss-20b:free", "conferir"],
+      [CONN_OR, "bot", "openai/gpt-oss-20b:free", "padrao"], // classificado na 0030 (motor sempre pede data_collection: deny)
       [CONN_OLLAMA, "reserva 1", "qwen3:4b", "local"],
     ])
     expect(d.skills).toHaveLength(1)

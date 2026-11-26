@@ -48,6 +48,8 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
         rows(db.from("office_usage").select("agent_id, connection_id, provider, model, free, cost_usd, fallback_from, created_at").gte("created_at", new Date(Date.now() - 30 * 86_400_000).toISOString())),
         rows(db.from("dock_provider_policies").select("provider, data_class")),
       ])
+      // motor na nuvem (0030): a RLS de workers mostra só o desta pessoa. Antes da migration, não existe e fica desligado.
+      const cloud = await db.from("workers").select("enabled").eq("kind", "nuvem").limit(1)
       let state: OfficeStateV1 | null = null
       try {
         const r = await fetch("/api/escritorio/estado", { cache: "no-store" })
@@ -93,6 +95,7 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
         usage: usage.map((u) => ({ agentId: u.agent_id, connectionId: u.connection_id, provider: u.provider, model: u.model, free: u.free, costUsd: u.cost_usd === null ? null : Number(u.cost_usd), fallbackFrom: u.fallback_from, createdAt: u.created_at })),
         policies: policies.map((p) => ({ provider: p.provider, dataClass: p.data_class })),
         bridge: { online: !!state?.bridge.online, lastSeenAt: state?.bridge.last_seen_at ?? null, name: null },
+        cloud: !cloud.error && !!(cloud.data as Row[] | null)?.[0]?.enabled,
         states: Object.fromEntries((state?.agents ?? []).map((a) => [a.id, a.state])),
       }
       return data
@@ -133,6 +136,9 @@ export function supabaseDockApi(db: SupabaseClient): DockApi {
     setPaused: (id, paused) => rpc("office_set_agent_paused", { p_agent: id, p_paused: paused }),
     saveConnection: (c) => rpc("office_save_connection", { p_id: null, p_kind: c.kind, p_provider: c.provider, p_label: c.label, p_endpoint: c.endpoint ?? null, p_acp_agent: null, p_terms_version: c.termsVersion ?? null }),
     setConnectionEnabled: (id, enabled) => rpc("office_set_connection_enabled", { p_id: id, p_enabled: enabled }),
+    setCloudEngine: async (on) => {
+      await rpc("office_set_cloud_engine", { p_on: on })
+    },
     openThread: (kind, ids, title, lead) => rpc("office_open_thread", { p_kind: kind, p_agent_ids: ids, p_title: title ?? "", p_lead: lead ?? null }),
     sendMessage: async (thread, body, mentions, key) => {
       await rpc("office_send_message", { p_thread: thread, p_body: body, p_idempotency_key: key, p_mentions: mentions })

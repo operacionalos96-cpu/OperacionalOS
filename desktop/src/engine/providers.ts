@@ -163,6 +163,9 @@ export function openAICompatible(opts: { base: string; key?: string | null; prov
       }
       const body: Record<string, unknown> = { model: req.model, messages, max_tokens: req.maxTokens ?? 2048 }
       if (req.tools?.length) body.tools = req.tools.map((t) => ({ type: "function", function: t }))
+      // OpenRouter: só provedores que não guardam os dados (sem isto, alguns modelos grátis treinam com o conteúdo).
+      // Fonte: https://openrouter.ai/docs/guides/routing/provider-selection (data_collection: "allow" | "deny").
+      if (opts.provider === "openrouter") body.provider = { data_collection: "deny" }
       const res = await post(`${base}/chat/completions`, auth, body, opts.provider, timeout)
       if (!res.ok) throw await failure(res, opts.provider)
       const j = (await res.json()) as {

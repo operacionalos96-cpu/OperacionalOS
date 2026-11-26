@@ -74,7 +74,13 @@ describe("supabase-api.ts × banco", () => {
       if (!have.length) problems.push(`${table}: tabela não existe`)
       for (const c of cols) if (!have.includes(c)) problems.push(`${table}.${c}: coluna não existe`)
       const can = await db.sql<{ ok: boolean }>(`select has_table_privilege('authenticated', $1, 'select') ok`, [`public.${table}`])
-      if (!can[0]?.ok) problems.push(`${table}: a pessoa logada não pode ler`)
+      if (can[0]?.ok) continue
+      // tabela com grant por coluna (ex.: workers, que esconde o hash do token): cada coluna lida precisa do grant
+      if (!cols.length) problems.push(`${table}: a pessoa logada não pode ler`)
+      for (const c of cols) {
+        const col = await db.sql<{ ok: boolean }>(`select has_column_privilege('authenticated', $1, $2, 'select') ok`, [`public.${table}`, c])
+        if (!col[0]?.ok) problems.push(`${table}.${c}: a pessoa logada não pode ler`)
+      }
     }
     expect(problems).toEqual([])
   })

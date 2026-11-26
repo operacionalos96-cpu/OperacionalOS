@@ -108,6 +108,13 @@ export interface EngineDeps {
   skillCache?: Map<string, SkillPackage>
   leaseRenewMs?: number
   now?: () => number
+  /** Nome gravado em start_job (padrão "hzk-pc"; o motor na nuvem usa "hzk-nuvem"). */
+  engineName?: string
+  /**
+   * Nenhuma IA do bot serve a este motor. Devolvendo um texto, o motor grava esse aviso na conversa e
+   * conclui a entrega (a pessoa sabe o que fazer). Sem isto, a entrega falha e volta para a fila.
+   */
+  noIaNotice?: (reason: string, d: Delivery) => string | null
 }
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex")
@@ -380,7 +387,16 @@ export function createEngine(deps: EngineDeps) {
 
     // nenhuma IA disponível: falha com nova tentativa (o servidor decide quando)
     const reason = fallbackReason ?? "nenhuma IA disponível para este bot"
-    await deps.client.call("fail_job", { job_id: job, lease_id: lease, error: `sem IA: ${reason}`.slice(0, 300), retryable: true })
+    const notice = deps.noIaNotice?.(reason, d) ?? null
+    // o banco só aceita mensagem de resposta presa a uma IA do bot (office_post_agent_message): vai a primeira
+    const anchor = d.ia[0]?.connection_id
+    if (notice && anchor) {
+      const posted = await deps.client.call<{ message_id: string }>("office_post_message", { job_id: job, lease_id: lease, seq: seq++, kind: "aviso", body: notice.slice(0, 2000), connection_id: anchor })
+      await deps.client.call("complete_job", { job_id: job, lease_id: lease, result: { message_ids: [posted.message_id], tainted } })
+      log({ event: "sem_ia_avisado", job, agent: d.agent.id, detail: reason })
+      return
+    }
+    await deps.client.call("fail_job",{ job_id: job, lease_id: lease, error: `sem IA: ${reason}`.slice(0, 300), retryable: true })
     log({ event: "sem_ia", job, agent: d.agent.id, detail: reason })
   }
 
@@ -422,7 +438,7 @@ export function createEngine(deps: EngineDeps) {
       deps.client.call("renew_lease", { job_id: jobId, lease_id: leaseId }).catch(() => null)
     }, Math.max(1000, renewEvery))
     try {
-      await deps.client.call("start_job", { job_id: jobId, lease_id: leaseId, engine: "hzk-pc" })
+      await deps.client.call("start_job", { job_id: jobId, lease_id: leaseId, engine: deps.engineName ?? "hzk-pc" })
       const d = await deps.client.call<Delivery>("office_get_delivery", { job_id: jobId, lease_id: leaseId })
       if (d?.schema !== "office-delivery/v1") throw new Error("contexto da entrega em formato desconhecido")
       setState("trabalhando", { job: jobId, agent: d.agent.id })

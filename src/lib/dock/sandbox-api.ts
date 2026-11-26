@@ -164,6 +164,7 @@ function seed(): DockData {
     ),
     policies: [{ provider: "ollama", dataClass: "local" }, { provider: "gemini", dataClass: "treina" }],
     bridge: { online: true, lastSeenAt: iso(0.3), name: "PC do escritório" },
+    cloud: false,
     states: { agt_pesq: "ocioso", agt_dev: "aguardando_aprovacao", agt_coord: "ocioso", agt_ana: "sem_cota", agt_org: "ocioso" },
   }
 }
@@ -320,6 +321,10 @@ export function sandboxDockApi(): DockApi {
     async setConnectionEnabled(cid, enabled) {
       const c = load().connections.find((x) => x.id === cid) ?? fail("office_connection_not_found")
       c.status = enabled ? "conectada" : "desligada"
+      save()
+    },
+    async setCloudEngine(on) {
+      load().cloud = on
       save()
     },
     async openThread(kind, ids, title, lead) {

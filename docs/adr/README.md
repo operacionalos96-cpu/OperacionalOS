@@ -41,3 +41,4 @@ isso sem depender de quem estava na conversa, e evita que uma decisão seja desf
 | [0022](0022-escritorio-pessoal-isolado.md) | Escritório pessoal: privado por dono, sobre a fila que já existe | Proposto |
 | [0024](0024-menu-agrupado-e-sede-na-inicio.md) | Menu agrupado (Entrada em Tarefas, cadastro e cofre em Configurações) e Sede 3D na Início | Proposto |
 | [0025](0025-contratos.md) | Contratos: cadastro, arquivo privado e aviso de vencimento | Proposto |
+| [0026](0026-motor-do-dock-na-nuvem.md) | Motor do Dock na nuvem: OpenRouter com a chave da empresa, ligado por pessoa | Proposto |

@@ -3,12 +3,15 @@ import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/server/supabase-admin"
 import { deliverDue } from "@/lib/server/webhooks"
 import { runSystemJobs } from "@/lib/server/automations"
+import { runDockCloud } from "@/lib/server/dock-cloud"
 
 /**
  * Agendador (pg_cron do Supabase chama a cada minuto, com Authorization: Bearer CRON_SECRET):
- * recolhe leases vencidos e envia webhooks devidos. Sem IA. Idempotente: rodar 2x não duplica.
+ * recolhe leases vencidos, envia webhooks devidos, roda as automações e o motor do Dock na nuvem
+ * (o único passo com IA, só para quem ligou). Idempotente: rodar 2x não duplica (a fila usa lease).
  */
-export const maxDuration = 60
+// 300 s é o teto do plano Hobby da Vercel com Fluid compute (https://vercel.com/docs/limits)
+export const maxDuration = 300
 
 function authorized(req: Request) {
   // Espaços/quebras de linha colados junto com o segredo (na Vercel ou no cofre do Supabase) não contam.
@@ -37,7 +40,10 @@ export async function POST(req: Request) {
   const webhooks = await deliverDue(25).catch((e) => ({ attempted: 0, delivered: 0, erro: e instanceof Error ? e.message.slice(0, 120) : "falha" }))
   // Automações de negócio (ADR 0006): garante que rodam mesmo sem ninguém com o app aberto.
   const automations = await runSystemJobs(undefined, 20).catch((e) => ({ done: 0, failed: 0, erro: e instanceof Error ? e.message.slice(0, 120) : "falha" }))
-  return NextResponse.json({ reaped, webhooks, automations, ms: Date.now() - started })
+  // Motor do Dock na nuvem (ADR 0026): pega entregas novas até ~40 s depois do início (o agendador espera 55 s);
+  // a que já começou termina dentro do maxDuration. Se cair no meio, o lease vence e ela volta para a fila.
+  const dock = await runDockCloud({ budgetMs: 40_000 - (Date.now() - started) }).catch((e) => ({ workers: 0, erro: e instanceof Error ? e.message.slice(0, 120) : "falha" }))
+  return NextResponse.json({ reaped, webhooks, automations, dock, ms: Date.now() - started })
 }
 
 export const GET = POST

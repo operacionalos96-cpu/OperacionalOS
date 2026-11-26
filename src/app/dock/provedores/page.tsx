@@ -116,7 +116,11 @@ export default function DockProvidersPage() {
             </>
           ) : connect ? (
             <>
-              <p className="text-sm text-muted-foreground">{connect.kind === "local" ? `O Dock procura o ${connect.label} neste PC.` : "A chave fica só neste PC."}</p>
+              <p className="text-sm text-muted-foreground">{connect.kind === "local"
+                  ? `O Dock procura o ${connect.label} neste PC.`
+                  : connect.id === "openrouter" && d.cloud
+                    ? "Com o motor na nuvem ligado, o OpenRouter usa a chave da empresa: você não cola nada. Os modelos grátis aparecem no bot em até 1 minuto."
+                    : "A chave fica só neste PC."}</p>
               {connect.terms && <p className="flex gap-2 rounded-[11px] bg-warning-soft p-3 text-sm"><TriangleAlertIcon className="size-4 shrink-0" />{connect.terms}</p>}
               <p className="text-xs text-muted-foreground">{connect.cost} · {connect.source}</p>
             </>

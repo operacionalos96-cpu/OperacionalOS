@@ -114,8 +114,13 @@ export function BotSettings({ d, a }: { d: DockData; a: DockAgent }) {
           </select>
           {conn && conn.models.length > 0 && (
             <select className="h-8 rounded-[5px] border border-input bg-card px-2 text-sm" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })}>
+              {form.model && !conn.models.includes(form.model) && <option>{form.model}</option>}
               {conn.models.map((m) => <option key={m}>{m}</option>)}
             </select>
+          )}
+          {/* sem a lista de modelos (ainda não chegou do PC ou da nuvem): dá para escrever o nome */}
+          {conn && conn.models.length === 0 && (
+            <Input aria-label="Modelo" className="h-8 w-64" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value.trim() })} placeholder={conn.provider === "openrouter" ? "Ex.: meta-llama/llama-3.3-70b-instruct:free" : "Nome do modelo"} />
           )}
         </div>
         <Label>Reservas</Label>
