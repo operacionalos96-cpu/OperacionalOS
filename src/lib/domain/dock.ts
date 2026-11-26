@@ -377,3 +377,22 @@ export function endpointOk(url: string) {
 const AREA_NAMES: Record<string, string> = { producao: "Produção", comercial: "Comercial", design: "Design", operacao: "Operação", marketing: "Marketing", financeiro: "Financeiro" }
 export const areaLabel = (id: string | null, areas: { id: string; name: string }[]) =>
   id ? areas.find((a) => a.id === id)?.name ?? AREA_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1) : "Pessoal"
+
+/* ---------- "digitando…" ---------- */
+/** Depois disto sem resposta, o "digitando…" some: algo travou e o estado do bot (fila, sem cota) explica. */
+export const TYPING_MAX_MS = 5 * 60_000
+/** Estados em que o bot está mesmo a caminho de responder. Os outros têm a própria etiqueta (pausado, sem cota…). */
+const TYPING_STATES: ReadonlySet<AgentState> = new Set(["na_fila", "trabalhando", "conversando", "ocioso"])
+
+/**
+ * O bot está "digitando" nesta conversa? Sim quando a última mensagem é da pessoa (o bot ainda não
+ * respondeu), ela é recente e o bot está em um estado que leva a uma resposta.
+ * "ocioso" entra porque o estado do servidor chega um pouco depois da mensagem.
+ */
+export function isTyping(messages: Pick<DockMessage, "authorType" | "kind" | "createdAt">[], state: AgentState, now = Date.now()): boolean {
+  if (!TYPING_STATES.has(state)) return false
+  const last = [...messages].reverse().find((m) => m.authorType !== "system" && m.kind !== "progresso")
+  if (!last || last.authorType !== "human") return false
+  const age = now - Date.parse(last.createdAt)
+  return age >= 0 && age < TYPING_MAX_MS
+}

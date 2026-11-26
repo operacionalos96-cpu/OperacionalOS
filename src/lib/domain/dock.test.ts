@@ -132,3 +132,34 @@ describe("textos", () => {
     expect(avatarGlyph("Dev", "codigo")).toBe("codigo")
   })
 })
+
+describe("isTyping: o bot aparece digitando até a resposta chegar", () => {
+  const now = Date.parse("2026-11-26T21:00:00Z")
+  const at = (s: number) => new Date(now - s * 1000).toISOString()
+  const human = (s: number) => ({ authorType: "human" as const, kind: "texto" as const, createdAt: at(s) })
+  const bot = (s: number) => ({ authorType: "agent" as const, kind: "texto" as const, createdAt: at(s) })
+
+  it("última mensagem da pessoa, recente e o bot na fila ou trabalhando: digitando", async () => {
+    const { isTyping } = await import("./dock")
+    expect(isTyping([human(5)], "na_fila", now)).toBe(true)
+    expect(isTyping([bot(60), human(3)], "trabalhando", now)).toBe(true)
+    expect(isTyping([human(1)], "ocioso", now)).toBe(true) // o estado do servidor ainda não chegou
+  })
+
+  it("o bot respondeu: para de digitar (o progresso do bot não conta como resposta)", async () => {
+    const { isTyping } = await import("./dock")
+    expect(isTyping([human(10), bot(2)], "trabalhando", now)).toBe(false)
+    expect(isTyping([human(10), { authorType: "agent", kind: "progresso", createdAt: at(2) }], "trabalhando", now)).toBe(true)
+  })
+
+  it("pausado, sem cota ou PC desligado: não finge que está digitando", async () => {
+    const { isTyping } = await import("./dock")
+    for (const s of ["pausado", "sem_cota", "ponte_desligada", "bloqueado", "aguardando_aprovacao"] as const) expect(isTyping([human(5)], s, now)).toBe(false)
+  })
+
+  it("mensagem de mais de 5 minutos sem resposta: para (algo travou; o estado explica)", async () => {
+    const { isTyping } = await import("./dock")
+    expect(isTyping([human(6 * 60)], "na_fila", now)).toBe(false)
+    expect(isTyping([], "na_fila", now)).toBe(false)
+  })
+})

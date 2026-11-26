@@ -5,7 +5,7 @@ import Link from "next/link"
 import { ArrowUpIcon, BotIcon, CheckIcon, ClipboardCheckIcon, CpuIcon, ForwardIcon, HashIcon, PencilIcon, PlusIcon, RepeatIcon, SlidersHorizontalIcon, TriangleAlertIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { approvalPhase, approvalVisible, connectionFor, type DockAgent, type DockApproval, type DockData, type DockMessage, type DockThread } from "@/lib/domain/dock"
+import { approvalPhase, approvalVisible, connectionFor, isTyping, type DockAgent, type DockApproval, type DockData, type DockMessage, type DockThread } from "@/lib/domain/dock"
 import { newKey, useDock } from "@/lib/dock/store"
 import { cn } from "@/lib/utils"
 import { BotApps, BotSettings, BotSkills } from "./bot-panels"
@@ -91,9 +91,16 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
   const lead = agent ?? members[0]
   const cur = thread && lead ? connectionFor(d, thread.id, lead.id) : { connectionId: lead?.connectionId ?? null, model: lead?.model ?? null, override: false }
   const conn = d.connections.find((c) => c.id === cur.connectionId)
+  // relógio de 15 s: o "digitando…" some sozinho se a resposta não vier (TYPING_MAX_MS)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(t)
+  }, [])
+  const typing = !!lead && isTyping(messages, agentState(d, lead), Math.max(now, Date.now()))
   useEffect(() => {
     stream.current?.scrollTo({ top: stream.current.scrollHeight })
-  }, [messages.length, approvals.length])
+  }, [messages.length, approvals.length, typing])
 
   async function send() {
     const body = text.trim()
@@ -133,6 +140,7 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
       <div ref={stream} className="grid min-h-0 flex-1 content-start gap-4 overflow-auto px-4 pb-4 max-lg:max-h-[60dvh]">
         {messages.length === 0 && lead && <div className="grid justify-items-center gap-2 py-16 opacity-80"><BotAvatar d={d} a={lead} size={96} /><b className="text-sm">{lead.name}</b><span className="text-xs text-muted-foreground">{lead.title}</span></div>}
         {messages.map((m) => <Message key={m.id} d={d} m={m} onHandoff={() => setHandoff(m)} />)}
+        {typing && lead && <Typing d={d} a={lead} />}
         {approvals.map((a) => <Approval key={a.id} d={d} a={a} />)}
       </div>
 
@@ -183,6 +191,22 @@ function Chat({ d, thread, agent, onPanel, panel, onOpen }: { d: DockData; threa
         </DialogContent>
       </Dialog>
     </section>
+  )
+}
+
+/** "Fulano está digitando…": a bolha do bot com três pontos, no lugar onde a resposta vai aparecer. */
+function Typing({ d, a }: { d: DockData; a: DockAgent }) {
+  return (
+    <article className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 animate-enter" role="status" aria-live="polite">
+      <BotAvatar d={d} a={{ ...a }} size={38} />
+      <div className="grid justify-items-start gap-1.5">
+        <b className="text-sm">{a.name}</b>
+        <span className="inline-flex items-center gap-1 rounded-[5px_16px_16px_16px] bg-foreground/[0.06] px-3.5 py-3" aria-hidden>
+          {[0, 1, 2].map((i) => <span key={i} className="typing-dot size-1.5 rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 160}ms` }} />)}
+        </span>
+        <span className="sr-only">{a.name} está digitando</span>
+      </div>
+    </article>
   )
 }
 
