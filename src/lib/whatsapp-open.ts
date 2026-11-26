@@ -41,6 +41,11 @@ export function openWhatsapp(contact: string | undefined, text = "", target = ge
   if (target === "app") {
     window.location.href = url // abre o aplicativo (protocolo whatsapp://), sem aba nova
   } else if (target === "web") {
+    // Com a extensão Funil HZK: ela abre a conversa na aba do WhatsApp Web que já está aberta (extensions/whatsapp-funil/bridge.js).
+    if (document.documentElement.dataset.oosFunil === "1") {
+      window.postMessage({ __oosOpenWhatsapp: url }, window.location.origin)
+      return true
+    }
     const w = window.open(url, TAB) // aba nomeada: a mesma é reaproveitada a cada lead
     if (w) w.opener = null
   } else {
