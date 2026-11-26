@@ -132,7 +132,7 @@ function CloudEngineCard() {
           Seus bots respondem sem nada instalado no seu PC, usando o OpenRouter da empresa. As suas conversas com os bots passam pelo servidor da HZK. Nada de pastas do PC por aqui.
         </p>
         {next && <p className="mt-1 text-xs">{next}</p>}
-        {d.cloud && <p className="mt-1 text-xs text-muted-foreground">A resposta pode levar até 1 minuto para começar. A cota do OpenRouter é dividida com o time.</p>}
+        {d.cloud && <p className="mt-1 text-xs text-muted-foreground">A resposta começa logo depois da sua mensagem; se demorar, o servidor tenta de novo a cada minuto. A cota do OpenRouter é dividida com o time.</p>}
       </div>
       <button
         type="button"

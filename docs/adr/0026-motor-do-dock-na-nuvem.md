@@ -49,6 +49,10 @@ Fatos que pesaram:
 6. **Roda no agendador.** `/api/runner/tick` chama o motor na nuvem e pega entregas novas até ~40 s depois
    do início. A entrega que já começou termina dentro dos 300 s. Se a função cair no meio, o lease vence
    e a entrega volta para a fila (`reap_expired_leases`).
+   **Na hora (26/11/2026):** ao mandar mensagem (ou continuar com outro bot, ou ligar a nuvem), a tela
+   chama `POST /api/escritorio/nuvem`, que roda só o trabalhador "nuvem" de quem chamou (sessão dela,
+   até 20 chamadas por minuto). O agendador continua de reserva. Os dois juntos não respondem duas
+   vezes: cada entrega tem lease.
 7. **Aviso quando a pessoa precisa agir.** Bot com uma IA que a nuvem não usa (Ollama, Gemini…), sem
    modelo ou sem cota recebe um aviso na conversa e a entrega conclui, em vez de ficar tentando. Falha
    passageira do provedor volta para a fila.
@@ -78,12 +82,11 @@ Fatos que pesaram:
   antes de ligar.
 - **Riscos aceitos:**
   - a cota grátis é dividida pelo time: 50 pedidos por dia acaba rápido (a tela avisa);
-  - a resposta pode levar até ~1 minuto para começar (o agendador roda a cada minuto);
+  - se a chamada na hora falhar, a resposta espera o agendador (até ~1 minuto);
   - o plano Hobby da Vercel é para uso pessoal ou não comercial ([termos](https://vercel.com/legal/terms)),
     o que já vale para o app inteiro;
   - a classificação `padrao` do OpenRouter foi posta pelo sistema; um founder confirma ou troca.
 - **Testes:** `src/lib/server/dock-cloud.e2e.test.ts` roda a 0030 no Postgres de teste com o motor de
   verdade e um OpenRouter falso: ligar, responder, não pegar a conversa de outro dono, avisar, sem cota e
   desligar.
-- **Depois:** chamar o motor na hora em que a mensagem chega (sem esperar o minuto); chave por pessoa;
-  founder poder desligar a nuvem de alguém.
+- **Depois:** chave por pessoa; founder poder desligar a nuvem de alguém.
